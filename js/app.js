@@ -730,13 +730,14 @@ const App = {
     },
 
     async handleLeaveTable() {
-        if (!confirm('¿Seguro que quieres dejar la mesa?')) return;
+        if (!confirm('¿Seguro que quieres salir?')) return;
         try {
             if (this.state.tableId && this.state.user) {
                 const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${this.state.user.replace(/\./g, '_')}`);
                 await set(participantRef, { ...this.state.tableData.participants[this.state.user.replace(/\./g, '_')], status: 'left' });
             }
             localStorage.removeItem('thermo_tableId');
+            localStorage.removeItem('thermo_partyId');
             location.reload();
         } catch (error) { console.error(error); }
     },
@@ -824,6 +825,7 @@ const App = {
         const data = this.state.partyData;
         const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
         
+        document.getElementById('party-code-badge').textContent = `CÓDIGO: ${this.state.partyId}`;
         document.getElementById('party-balance').textContent = `${balance.toFixed(2)}€`;
         document.getElementById('party-total-collected').textContent = `${(data.totalCollected || 0).toFixed(2)}€`;
         document.getElementById('party-total-spent').textContent = `${(data.totalSpent || 0).toFixed(2)}€`;
