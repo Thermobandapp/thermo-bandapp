@@ -263,8 +263,8 @@ const App = {
             const tableRef = ref(this.db, `tables/${tableId}`);
             const snapshot = await get(tableRef);
             
-            if (snapshot.exists()) {
-                if (!confirm('Esta mesa ya existe. ¿Quieres unirte a ella en lugar de crear una nueva?')) return;
+            if (snapshot.exists() && snapshot.val().status !== 'closed') {
+                if (!confirm('Esta mesa ya existe y está activa. ¿Quieres unirte a ella en lugar de crear una nueva?')) return;
                 const participantRef = ref(this.db, `tables/${tableId}/participants/${userName.replace(/\./g, '_')}`);
                 await set(participantRef, { 
                     name: userName, 
@@ -273,6 +273,8 @@ const App = {
                     joinedAt: Date.now() 
                 });
             } else {
+                // Se crea nueva mesa (si estaba cerrada, se sobreescribe limpiando la cuenta)
+
                 const tableData = {
                     name: `${barName} (Mesa ${tableNum})`,
                     creator: userName,
