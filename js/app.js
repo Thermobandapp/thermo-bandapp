@@ -792,6 +792,26 @@ const App = {
         } catch (error) { console.error(error); }
     },
 
+    async editContribution(id, currentAmount, user) {
+        const newAmount = prompt(`Modificar aportación de ${user}:`, currentAmount);
+        if (newAmount === null) return;
+        const amount = parseFloat(newAmount);
+        if (isNaN(amount) || amount <= 0) {
+            alert('Cantidad inválida.');
+            return;
+        }
+        try {
+            await set(ref(this.db, `tables/${this.state.tableId}/contributions/${id}/amount`), amount);
+        } catch (error) { console.error('Error editando', error); }
+    },
+
+    async deleteContribution(id) {
+        if (!confirm('¿Seguro que quieres borrar este aporte?')) return;
+        try {
+            await set(ref(this.db, `tables/${this.state.tableId}/contributions/${id}`), null);
+        } catch (error) { console.error('Error borrando', error); }
+    },
+
     listenToContributions() {
         const contributionsRef = ref(this.db, `tables/${this.state.tableId}/contributions`);
         onValue(contributionsRef, (snapshot) => {
@@ -810,7 +830,7 @@ const App = {
         // 1. Calcular aportaciones por usuario
         const userContributions = {};
         let totalPot = 0;
-        const contributions = Object.values(this.state.contributions || {});
+        const contributions = Object.entries(this.state.contributions || {}).map(([id, c]) => ({ ...c, id }));
         
         contributions.forEach(c => {
             totalPot += Number(c.amount);
@@ -850,7 +870,14 @@ const App = {
         contributions.sort((a, b) => b.timestamp - a.timestamp).forEach(c => {
             const div = document.createElement('div');
             div.className = 'contribution-item';
-            div.innerHTML = `<span><b>${c.user}</b> puso</span><span>${Number(c.amount).toFixed(2)}€</span>`;
+            div.innerHTML = `
+                <span><b>${c.user}</b> puso</span>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span>${Number(c.amount).toFixed(2)}€</span>
+                    <button class="btn-calc-small" style="font-size: 0.8rem; padding: 0.2rem 0.4rem;" onclick="App.editContribution('${c.id}', ${c.amount}, '${c.user.replace(/'/g, "\\'")}')">✏️</button>
+                    <button class="btn-calc-small" style="font-size: 0.8rem; padding: 0.2rem 0.4rem; color: var(--danger);" onclick="App.deleteContribution('${c.id}')">❌</button>
+                </div>
+            `;
             listContainer.appendChild(div);
         });
 
