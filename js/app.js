@@ -787,6 +787,7 @@ const App = {
             createdBy: userName,
             totalCollected: 0,
             totalSpent: 0,
+            custodian: userName,
             participants: {
                 [userName.replace(/\./g, '_')]: { name: userName, joinedAt: Date.now() }
             },
@@ -863,11 +864,13 @@ const App = {
         }
 
         Object.entries(individualAports).forEach(([name, amount]) => {
+            const isCustodian = data.custodian === name;
             const div = document.createElement('div');
             div.className = 'participant-item glass';
+            div.onclick = () => this.handleTransferCustody(name);
             div.innerHTML = `
                 <div class="p-info">
-                    <span class="p-name">${name}</span>
+                    <span class="p-name">${name} ${isCustodian ? '🚩' : ''}</span>
                 </div>
                 <div class="p-amount">${amount.toFixed(2)}€</div>
             `;
@@ -896,6 +899,25 @@ const App = {
                 historyContainer.appendChild(div);
             });
         }
+    },
+    async handleTransferCustody(name) {
+        if (this.state.partyData.custodian === name) return; // Ya es el custodio
+        
+        if (!confirm(`¿Quieres pasarle la banderola (y el dinero físico) a ${name}?`)) return;
+        
+        try {
+            await set(ref(this.db, `party_pots/${this.state.partyId}/custodian`), name);
+            
+            // Añadir al historial
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'system',
+                amount: 0,
+                description: `🚩 El bote pasa a manos de ${name}`,
+                user: this.state.user,
+                timestamp: Date.now()
+            });
+        } catch (error) { console.error(error); }
     },
 
     async handlePartyAddMoney() {
