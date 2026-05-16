@@ -158,6 +158,7 @@ const App = {
 
         if (savedUser) {
             this.state.user = savedUser;
+            this.updateHeaderUser();
             this.inputs.userName.value = savedUser;
             if (this.inputs.userNameParty) this.inputs.userNameParty.value = savedUser;
             
@@ -195,6 +196,7 @@ const App = {
             if (snapshot.exists() && snapshot.val().code === code) {
                 const officialName = snapshot.val().name; // Usar el nombre con mayúsculas de la BD
                 this.state.user = officialName;
+                this.updateHeaderUser();
                 localStorage.setItem('thermo_user', officialName);
                 localStorage.setItem('thermo_auth', 'true');
                 
@@ -214,6 +216,13 @@ const App = {
                 alert('Usuario o código incorrecto. Acceso denegado.');
             }
         } catch (error) { console.error(error); }
+    },
+
+    updateHeaderUser() {
+        const headerUserName = document.getElementById('header-user-name');
+        if (headerUserName && this.state.user) {
+            headerUserName.textContent = `👤 ${this.state.user}`;
+        }
     },
 
     async addLog(action, details = {}) {
