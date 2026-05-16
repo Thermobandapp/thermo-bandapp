@@ -738,16 +738,13 @@ const App = {
             this.buttons.leaveTable.classList.remove('hidden');
 
             // Mostrar/Ocultar botones según modo
-            const commonButtons = document.querySelectorAll('.nav-item:not(.nav-bar-only):not(.nav-party-only)');
             const barButtons = document.querySelectorAll('.nav-bar-only');
             const partyButtons = document.querySelectorAll('.nav-party-only');
             
             if (viewName === 'party-pot') {
-                commonButtons.forEach(b => b.classList.add('hidden')); // Ocultar Mesa y Fiesta
                 barButtons.forEach(b => b.classList.add('hidden'));
-                partyButtons.forEach(b => b.classList.remove('hidden')); // Solo Irse a casa
+                partyButtons.forEach(b => b.classList.remove('hidden'));
             } else {
-                commonButtons.forEach(b => b.classList.remove('hidden'));
                 barButtons.forEach(b => b.classList.remove('hidden'));
                 partyButtons.forEach(b => b.classList.add('hidden'));
             }
