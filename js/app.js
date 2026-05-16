@@ -51,6 +51,7 @@ const App = {
         };
         this.inputs = {
             userName: document.getElementById('user-name'),
+            userNameParty: document.getElementById('user-name-party'),
             loginUser: document.getElementById('login-user'),
             loginCode: document.getElementById('login-code'),
             barName: document.getElementById('bar-name'),
@@ -150,6 +151,8 @@ const App = {
 
         if (savedUser) {
             this.state.user = savedUser;
+            this.inputs.userName.value = savedUser;
+            if (this.inputs.userNameParty) this.inputs.userNameParty.value = savedUser;
         }
 
         if (savedTableId && savedUser) {
@@ -177,11 +180,16 @@ const App = {
             const snapshot = await get(memberRef);
             
             if (snapshot.exists() && snapshot.val().code === code) {
-                this.state.user = user;
-                localStorage.setItem('thermo_user', user);
+                const officialName = snapshot.val().name; // Usar el nombre con mayúsculas de la BD
+                this.state.user = officialName;
+                localStorage.setItem('thermo_user', officialName);
                 localStorage.setItem('thermo_auth', 'true');
                 
-                await this.addLog('login', { user });
+                // Auto-rellenar en los formularios
+                this.inputs.userName.value = officialName;
+                if (this.inputs.userNameParty) this.inputs.userNameParty.value = officialName;
+                
+                await this.addLog('login', { user: officialName });
                 this.showView('setup');
             } else {
                 alert('Usuario o código incorrecto. Acceso denegado.');
