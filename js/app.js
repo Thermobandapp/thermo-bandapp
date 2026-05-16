@@ -927,6 +927,9 @@ const App = {
     },
 
     updateChangeAssistantUI() {
+        // No mostrar en modo grupo
+        if (this.state.settleMode === 'group') return;
+
         const payer = this.state.tableData?.currentPayer;
         if (!payer) return;
         this.state.currentPayer = payer;
@@ -942,20 +945,21 @@ const App = {
         const totals = this.calculateAllIndividualTotals();
         const settlements = this.state.tableData?.settlements?.[payer] || {};
 
+        // Todos los participantes excepto el pagador
+        const entriesToShow = Object.entries(totals).filter(([friendName]) => friendName !== payer);
+
         const currentPayerInList = this.display.debtsList.dataset.payer;
         
         if (currentPayerInList !== payer) {
             this.display.debtsList.innerHTML = '';
             this.display.debtsList.dataset.payer = payer;
             
-            Object.entries(totals).forEach(([friendName, amount]) => {
-                if (friendName === payer) return;
-                
+            entriesToShow.forEach(([friendName, amount]) => {
                 const div = document.createElement('div');
                 div.className = `payment-row`;
                 div.id = `pay-row-${friendName.replace(/\s/g, '_')}`;
                 div.innerHTML = `
-                    <div class="p-header"><span>${friendName}</span><span class="p-amount">Debe: ${amount.toFixed(2)}€</span></div>
+                    <div class="p-header"><span>${friendName}</span><span class="p-amount">A pagar: ${amount.toFixed(2)}€</span></div>
                     <div class="p-controls">
                         <input type="number" step="0.01" class="input-payment" placeholder="Paga con..." oninput="App.calculateIndividualChange(this, ${amount}); App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', this.value)">
                         <div class="method-options">
@@ -968,8 +972,7 @@ const App = {
             });
         }
         
-        Object.entries(totals).forEach(([friendName, amount]) => {
-            if (friendName === payer) return;
+        entriesToShow.forEach(([friendName, amount]) => {
             const row = document.getElementById(`pay-row-${friendName.replace(/\s/g, '_')}`);
             if (!row) return;
             const input = row.querySelector('.input-payment');
