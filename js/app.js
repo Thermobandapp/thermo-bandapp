@@ -904,7 +904,7 @@ const App = {
                 div.innerHTML = `
                     <div class="p-header"><span>${friendName}</span><span class="p-amount">Debe: ${amount.toFixed(2)}€</span></div>
                     <div class="p-controls">
-                        <input type="number" step="0.01" class="input-payment" placeholder="Paga con..." onchange="App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', this.value)" oninput="App.calculateIndividualChange(this, ${amount})">
+                        <input type="number" step="0.01" class="input-payment" placeholder="Paga con..." oninput="App.calculateIndividualChange(this, ${amount}); App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', this.value)">
                         <div class="method-options">
                              <button class="method-btn" onclick="App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', ${amount})">📲 Bizum</button>
                         </div>
