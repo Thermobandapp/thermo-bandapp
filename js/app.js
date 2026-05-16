@@ -961,12 +961,85 @@ const App = {
     },
 
     async handleAddFriendManual() {
-        const name = prompt('Nombre del amigo:');
-        if (!name) return;
         try {
-            const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${name.replace(/\./g, '_')}`);
-            await set(participantRef, { name, role: 'member', status: 'active', joinedAt: Date.now() });
-        } catch (error) { console.error(error); }
+            const snapshot = await get(ref(this.db, 'members'));
+            const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
+            const currentParticipants = Object.values(this.state.tableData?.participants || {}).map(p => p.name);
+            
+            // Filtramos miembros que ya están en la mesa
+            const availableMembers = members.filter(m => !currentParticipants.includes(m.name));
+
+            this.state.tempSelectionFriends = [];
+            
+            let html = `<h3>Añadir Amigos a la Mesa</h3>`;
+            html += `<p class="subtitle" style="margin-bottom: 1rem;">Selecciona los miembros que quieres añadir:</p>`;
+            html += `<div class="participant-grid" style="max-height: 40vh; overflow-y: auto;">`;
+            
+            availableMembers.forEach(m => {
+                const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                const idName = m.name.replace(/\s/g, '_');
+                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.toggleFriendSelection('${safeName}')">👤 ${m.name}</button>`;
+            });
+            
+            if (availableMembers.length === 0) {
+                html += `<p class="empty-msg" style="grid-column: span 2;">Todos los miembros ya están en la mesa.</p>`;
+            }
+            
+            html += `</div>`;
+            
+            html += `
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
+                    <p class="subtitle" style="margin-bottom: 0.5rem; color: var(--text-main);">¿No es miembro? Añádelo manualmente:</p>
+                    <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 1rem;">
+                </div>
+            `;
+            
+            html += `<button id="btn-confirm-add-friends" class="btn-primary" onclick="App.confirmAddFriends()">Añadir a la mesa (0)</button>`;
+
+            this.openModal(html);
+        } catch (error) {
+            console.error('Error al cargar miembros:', error);
+            alert('Error al conectar con la base de datos.');
+        }
+    },
+
+    toggleFriendSelection(name) {
+        const idx = this.state.tempSelectionFriends.indexOf(name);
+        const btn = document.getElementById(`f-btn-${name.replace(/\s/g, '_')}`);
+        if (idx > -1) {
+            this.state.tempSelectionFriends.splice(idx, 1);
+            btn.classList.remove('selected');
+        } else {
+            this.state.tempSelectionFriends.push(name);
+            btn.classList.add('selected');
+        }
+        
+        const count = this.state.tempSelectionFriends.length;
+        document.getElementById('btn-confirm-add-friends').textContent = `Añadir a la mesa (${count})`;
+    },
+
+    async confirmAddFriends() {
+        const customNameInput = document.getElementById('custom-friend-name').value.trim();
+        const selected = [...(this.state.tempSelectionFriends || [])];
+        
+        if (customNameInput) {
+            selected.push(customNameInput);
+        }
+
+        if (selected.length === 0) {
+            return alert('Selecciona al menos a un miembro o escribe un nombre.');
+        }
+
+        this.closeModal();
+
+        try {
+            for (const name of selected) {
+                const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${name.replace(/\./g, '_')}`);
+                await set(participantRef, { name, role: 'member', status: 'active', joinedAt: Date.now() });
+            }
+        } catch (error) {
+            console.error('Error al añadir amigos:', error);
+        }
     },
 
     async handleCreatePartyFromSetup() {
