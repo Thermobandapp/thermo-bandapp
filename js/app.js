@@ -27,6 +27,26 @@ const App = {
         this.cacheDOM();
         this.bindEvents();
         this.loadLocalSession();
+        this.initDecimalNormalizer();
+    },
+
+    // Convierte comas en puntos en todos los inputs numéricos de la app
+    initDecimalNormalizer() {
+        document.addEventListener('input', (e) => {
+            const el = e.target;
+            if (el.tagName === 'INPUT' && (el.type === 'number' || el.inputMode === 'decimal')) {
+                const val = el.value;
+                if (val.includes(',')) {
+                    el.value = val.replace(',', '.');
+                }
+            }
+        }, true);
+    },
+
+    // Helper: parsea un string numérico aceptando tanto punto como coma decimal
+    parseAmount(value) {
+        if (value === null || value === undefined || value === '') return NaN;
+        return parseFloat(String(value).replace(',', '.'));
     },
 
     initFirebase() {
@@ -784,7 +804,7 @@ const App = {
     },
 
     async addContribution() {
-        const amount = parseFloat(document.getElementById('input-pot-amount').value);
+        const amount = this.parseAmount(document.getElementById('input-pot-amount').value);
         const potContributorEl = document.getElementById('pot-contributor');
         const targetUser = potContributorEl && potContributorEl.value ? potContributorEl.value : this.state.user;
         
@@ -804,7 +824,7 @@ const App = {
     async editContribution(id, currentAmount, user) {
         const newAmount = prompt(`Modificar aportación de ${user}:`, currentAmount);
         if (newAmount === null) return;
-        const amount = parseFloat(newAmount);
+        const amount = this.parseAmount(newAmount);
         if (isNaN(amount) || amount <= 0) {
             alert('Cantidad inválida.');
             return;
@@ -993,7 +1013,7 @@ const App = {
     },
 
     async handleIndividualPaymentChange(payer, friendName, value) {
-        const amount = value === '' || value === null ? null : parseFloat(value);
+        const amount = value === '' || value === null ? null : this.parseAmount(value);
         if (amount !== null && isNaN(amount)) return;
         try {
             await set(ref(this.db, `tables/${this.state.tableId}/settlements/${payer}/${friendName.replace(/\./g, '_')}`), amount);
@@ -1001,7 +1021,7 @@ const App = {
     },
 
     calculateIndividualChange(inputElement, owed) {
-        const paid = parseFloat(inputElement.value);
+        const paid = this.parseAmount(inputElement.value);
         const resultElement = inputElement.closest('.payment-row').querySelector('.change-result-row');
         if (isNaN(paid)) { resultElement.innerHTML = ''; return; }
         const change = Math.round((paid - owed) * 100) / 100;
