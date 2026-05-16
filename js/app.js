@@ -789,8 +789,8 @@ const App = {
         this.state.user = userName;
         localStorage.setItem('thermo_user', userName);
 
-        // Código más sencillo (ej: 6 caracteres)
-        const partyId = Math.random().toString(36).substr(2, 6).toUpperCase();
+        // El código es el propio nombre (en mayúsculas y sin espacios)
+        const partyId = partyName.toUpperCase().replace(/\s+/g, '');
         const partyRef = ref(this.db, `party_pots/${partyId}`);
         
         await set(partyRef, {
