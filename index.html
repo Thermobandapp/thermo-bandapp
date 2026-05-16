@@ -39,29 +39,59 @@
                     <img src="imagenes/LOGO%20Thermo%20Bandapp.png" alt="Thermo Bandapp Logo" class="app-logo-large">
                 </div>
                 <div class="card glass">
-                    <h2>Nueva Quedada</h2>
-                    <p class="subtitle">Configura la mesa para empezar</p>
-                    
-                    <div class="form-group">
-                        <label for="user-name">Tu nombre</label>
-                        <input type="text" id="user-name" placeholder="Ej: Fernando" autocomplete="name">
+                    <div class="setup-mode-selector">
+                        <button class="mode-tab active" data-setup-mode="bar">🍻 Bar</button>
+                        <button class="mode-tab" data-setup-mode="party">🍹 Fiesta</button>
                     </div>
 
-                    <div class="form-row">
+                    <!-- Formulario BAR -->
+                    <div id="setup-form-bar" class="setup-form">
+                        <h2>Nueva Mesa</h2>
+                        <p class="subtitle">Configura la mesa para empezar</p>
+                        
                         <div class="form-group">
-                            <label for="bar-name">Nombre del Bar</label>
-                            <input type="text" id="bar-name" placeholder="Ej: Glofi">
+                            <label for="user-name">Tu nombre</label>
+                            <input type="text" id="user-name" placeholder="Ej: Fernando" autocomplete="name">
                         </div>
-                        <div class="form-group" style="width: 100px;">
-                            <label for="table-num">Nº Mesa</label>
-                            <input type="number" id="table-num" placeholder="01">
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="bar-name">Nombre del Bar</label>
+                                <input type="text" id="bar-name" placeholder="Ej: Glofi">
+                            </div>
+                            <div class="form-group" style="width: 100px;">
+                                <label for="table-num">Nº Mesa</label>
+                                <input type="number" id="table-num" placeholder="01">
+                            </div>
+                        </div>
+
+                        <div class="actions">
+                            <button id="btn-create-table" class="btn-primary">Crear Mesa</button>
+                            <div class="divider"><span>o</span></div>
+                            <button id="btn-join-table" class="btn-secondary">Unirse con Código</button>
                         </div>
                     </div>
 
-                    <div class="actions">
-                        <button id="btn-create-table" class="btn-primary">Crear Mesa</button>
-                        <div class="divider"><span>o</span></div>
-                        <button id="btn-join-table" class="btn-secondary">Unirse con Código</button>
+                    <!-- Formulario FIESTA -->
+                    <div id="setup-form-party" class="setup-form hidden">
+                        <h2>Bote de Fiesta</h2>
+                        <p class="subtitle">Recauda dinero y gestiona los gastos</p>
+                        
+                        <div class="form-group">
+                            <label for="user-name-party">Tu nombre</label>
+                            <input type="text" id="user-name-party" placeholder="Ej: Fernando">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="party-name-input">Nombre del Bote</label>
+                            <input type="text" id="party-name-input" placeholder="Ej: Cumpleaños Juan">
+                        </div>
+
+                        <div class="actions">
+                            <button id="btn-create-party-main" class="btn-primary">Crear Bote</button>
+                            <div class="divider"><span>o</span></div>
+                            <button id="btn-join-party-main" class="btn-secondary">Unirse al Bote</button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -191,17 +221,12 @@
             <!-- VISTA: Bote de Fiesta -->
             <section id="party-pot-view" class="view">
                 <div class="card glass">
-                    <h2>Bote de Fiesta 🥳</h2>
-                    <div id="party-pot-setup" class="party-setup">
-                        <p class="subtitle">Configura el fondo común para la noche</p>
-                        <div class="form-group">
-                            <label>Nombre del Bote (ej: Despedida Juan)</label>
-                            <input type="text" id="party-pot-name" placeholder="La Noche de los Muertos">
-                        </div>
-                        <button id="btn-create-party" class="btn-primary">Crear Bote</button>
+                    <div class="summary-header">
+                        <h2>Bote de Fiesta 🥳</h2>
+                        <div id="party-code-badge" class="code-badge">CÓDIGO: ---</div>
                     </div>
 
-                    <div id="party-pot-active" class="hidden">
+                    <div id="party-pot-active">
                         <div class="pot-display-large">
                             <span class="label">Dinero Disponible</span>
                             <span id="party-balance" class="value">0.00€</span>

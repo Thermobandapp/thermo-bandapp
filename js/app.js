@@ -101,6 +101,21 @@ const App = {
                 this.showView(view);
             });
         });
+
+        // Tabs de Setup
+        document.querySelectorAll('.mode-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const mode = e.currentTarget.dataset.setupMode;
+                document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                
+                document.querySelectorAll('.setup-form').forEach(f => f.classList.add('hidden'));
+                document.getElementById(`setup-form-${mode}`).classList.remove('hidden');
+            });
+        });
+
+        document.getElementById('btn-create-party-main').addEventListener('click', () => this.handleCreatePartyFromSetup());
+        document.getElementById('btn-join-party-main').addEventListener('click', () => this.handleJoinPartyFromSetup());
     },
 
     loadLocalSession() {
@@ -743,17 +758,21 @@ const App = {
         } catch (error) { console.error(error); }
     },
 
-    async handleCreateParty() {
-        const name = document.getElementById('party-pot-name').value.trim();
-        if (!name) return alert('Ponle un nombre al bote');
-        
+    async handleCreatePartyFromSetup() {
+        const userName = document.getElementById('user-name-party').value.trim();
+        const partyName = document.getElementById('party-name-input').value.trim();
+        if (!userName || !partyName) return alert('Rellena todos los campos');
+
+        this.state.user = userName;
+        localStorage.setItem('thermo_user', userName);
+
         const partyId = 'PARTY_' + Math.random().toString(36).substr(2, 6).toUpperCase();
         const partyRef = ref(this.db, `party_pots/${partyId}`);
         
         await set(partyRef, {
-            name: name,
+            name: partyName,
             createdAt: Date.now(),
-            createdBy: this.state.user,
+            createdBy: userName,
             totalCollected: 0,
             totalSpent: 0,
             history: {}
@@ -762,6 +781,30 @@ const App = {
         this.state.partyId = partyId;
         localStorage.setItem('thermo_partyId', partyId);
         this.listenToParty(partyId);
+        this.showView('party-pot');
+    },
+
+    async handleJoinPartyFromSetup() {
+        const userName = document.getElementById('user-name-party').value.trim();
+        if (!userName) return alert('Dinos tu nombre primero');
+        
+        const code = prompt('Introduce el código del Bote (ej: PARTY_XXXXXX):');
+        if (!code) return;
+
+        this.state.user = userName;
+        localStorage.setItem('thermo_user', userName);
+
+        const partyRef = ref(this.db, `party_pots/${code}`);
+        const snapshot = await get(partyRef);
+        
+        if (snapshot.exists()) {
+            this.state.partyId = code;
+            localStorage.setItem('thermo_partyId', code);
+            this.listenToParty(code);
+            this.showView('party-pot');
+        } else {
+            alert('Ese código de Bote no existe.');
+        }
     },
 
     listenToParty(partyId) {
