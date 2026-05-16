@@ -938,7 +938,7 @@ const App = {
                     ¡Buena noche, amigos! 👋
                 </p>
                 <div class="actions" style="display: flex; gap: 1rem;">
-                    <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver</button>
+                    <button onclick="App.showView('party-pot'); App.closeModal();" class="btn-secondary" style="flex: 1;">Volver</button>
                     <button onclick="App.handleFinalCloseParty()" class="btn-primary" style="flex: 1;">Cerrar y Salir</button>
                 </div>
             </div>
