@@ -817,7 +817,7 @@ const App = {
             div.innerHTML = `
                 <span class="name">${name}</span>
                 <div class="details">
-                    <span>Debe: ${owed.toFixed(2)}€</span>
+                    <span>A pagar: ${owed.toFixed(2)}€</span>
                     <span class="balance" style="color: ${balance > 0.01 ? '#3b82f6' : (isSettled ? '#22c55e' : '#f59e0b')}">
                         ${balance > 0.01 ? `Te sobran ${balance.toFixed(2)}€` : (isSettled ? '✓ Pagado' : `Faltan ${(Math.abs(balance)).toFixed(2)}€`)}
                     </span>
