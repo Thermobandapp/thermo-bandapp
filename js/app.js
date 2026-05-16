@@ -47,7 +47,7 @@ const App = {
             order: document.getElementById('order-view'),
             settle: document.getElementById('settle-view'),
             'party-pot': document.getElementById('party-pot-view'),
-            login: document.getElementById('login-view')
+            'login-view': document.getElementById('login-view')
         };
         this.inputs = {
             userName: document.getElementById('user-name'),
