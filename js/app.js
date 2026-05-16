@@ -738,13 +738,16 @@ const App = {
             this.buttons.leaveTable.classList.remove('hidden');
 
             // Mostrar/Ocultar botones según modo
+            const commonButtons = document.querySelectorAll('.nav-item:not(.nav-bar-only):not(.nav-party-only)');
             const barButtons = document.querySelectorAll('.nav-bar-only');
             const partyButtons = document.querySelectorAll('.nav-party-only');
             
             if (viewName === 'party-pot') {
+                commonButtons.forEach(b => b.classList.add('hidden')); // Ocultar Mesa y Fiesta
                 barButtons.forEach(b => b.classList.add('hidden'));
-                partyButtons.forEach(b => b.classList.remove('hidden'));
+                partyButtons.forEach(b => b.classList.remove('hidden')); // Solo Irse a casa
             } else {
+                commonButtons.forEach(b => b.classList.remove('hidden'));
                 barButtons.forEach(b => b.classList.remove('hidden'));
                 partyButtons.forEach(b => b.classList.add('hidden'));
             }
@@ -937,7 +940,10 @@ const App = {
                 <p style="text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
                     ¡Buena noche, amigos! 👋
                 </p>
-                <button onclick="location.reload()" class="btn-primary" style="width: 100%;">Cerrar y Salir</button>
+                <div class="actions" style="display: flex; gap: 1rem;">
+                    <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver</button>
+                    <button onclick="location.reload()" class="btn-primary" style="flex: 1;">Cerrar y Salir</button>
+                </div>
             </div>
         `;
         
