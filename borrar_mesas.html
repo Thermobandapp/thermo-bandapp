@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limpiador de Base de Datos - Thermo Bandapp</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #0f172a; color: white; }
+        .btn { background: #ef4444; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 1.2rem; cursor: pointer; }
+        .status { margin-top: 20px; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <h1>Limpieza de Mesas</h1>
+    <p>Este proceso borrará todas las mesas activas pero <b>mantendrá los menús de los bares</b>.</p>
+    <button id="btn-clear" class="btn">BORRAR TODAS LAS MESAS</button>
+    <div id="status" class="status">Esperando...</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAz8FohIM_HlmFo7h_uv1r0rBygpVKcNQw",
+            authDomain: "thermo-bandapp.firebaseapp.com",
+            databaseURL: "https://thermo-bandapp-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "thermo-bandapp",
+            storageBucket: "thermo-bandapp.firebasestorage.app",
+            messagingSenderId: "1066995195154",
+            appId: "1:1066995195154:web:45adce88df461d308ca7cb",
+            measurementId: "G-GX2KZZ446Q"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        document.getElementById('btn-clear').addEventListener('click', async () => {
+            if (!confirm('¿Seguro que quieres borrar todas las mesas? Esta acción no se puede deshacer.')) return;
+            
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = 'Borrando...';
+            
+            try {
+                await remove(ref(db, 'tables'));
+                statusDiv.innerHTML = '<b style="color: #22c55e">✅ ¡ÉXITO! Las mesas han sido borradas.</b><br>Ya puedes cerrar esta ventana y volver a usar la app.';
+                document.getElementById('btn-clear').disabled = true;
+                document.getElementById('btn-clear').style.opacity = '0.5';
+            } catch (error) {
+                statusDiv.innerHTML = '<b style="color: #ef4444">❌ ERROR:</b> ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>

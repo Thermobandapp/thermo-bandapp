@@ -16,7 +16,9 @@ const App = {
         currentPayer: null,
         allTotals: {},
         settleMode: 'single',
-        contributions: {}
+        contributions: {},
+        partyId: null,
+        partyData: null
     },
 
     init() {
@@ -44,6 +46,7 @@ const App = {
             summary: document.getElementById('summary-view'),
             order: document.getElementById('order-view'),
             settle: document.getElementById('settle-view'),
+            'party-pot': document.getElementById('party-pot-view')
         };
         this.inputs = {
             userName: document.getElementById('user-name'),
@@ -54,7 +57,10 @@ const App = {
             createTable: document.getElementById('btn-create-table'),
             joinTable: document.getElementById('btn-join-table'),
             addProduct: document.getElementById('btn-add-product-menu'),
-            leaveTable: document.getElementById('btn-leave-table')
+            leaveTable: document.getElementById('btn-leave-table'),
+            createParty: document.getElementById('btn-create-party'),
+            addPartyMoney: document.getElementById('btn-party-add-money'),
+            addPartyExpense: document.getElementById('btn-party-add-expense')
         };
         this.display = {
             tableName: document.getElementById('display-table-name'),
@@ -83,6 +89,10 @@ const App = {
         this.display.finishTable.addEventListener('click', () => this.handleFinishTable());
         this.display.addFriendManual.addEventListener('click', () => this.handleAddFriendManual());
         
+        this.buttons.createParty.addEventListener('click', () => this.handleCreateParty());
+        this.buttons.addPartyMoney.addEventListener('click', () => this.handlePartyAddMoney());
+        this.buttons.addPartyExpense.addEventListener('click', () => this.handlePartyAddExpense());
+        
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const view = e.currentTarget.dataset.view;
@@ -96,6 +106,7 @@ const App = {
     loadLocalSession() {
         const savedUser = localStorage.getItem('thermo_user');
         const savedTableId = localStorage.getItem('thermo_tableId');
+        const savedPartyId = localStorage.getItem('thermo_partyId');
 
         if (savedUser) {
             this.inputs.userName.value = savedUser;
@@ -106,6 +117,10 @@ const App = {
             this.state.tableId = savedTableId;
             this.showView('summary');
             this.listenToTable(savedTableId);
+        } else if (savedPartyId && savedUser) {
+            this.state.partyId = savedPartyId;
+            this.showView('party-pot');
+            this.listenToParty(savedPartyId);
         }
     },
 
@@ -726,6 +741,103 @@ const App = {
             const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${name.replace(/\./g, '_')}`);
             await set(participantRef, { name, role: 'member', status: 'active', joinedAt: Date.now() });
         } catch (error) { console.error(error); }
+    },
+
+    async handleCreateParty() {
+        const name = document.getElementById('party-pot-name').value.trim();
+        if (!name) return alert('Ponle un nombre al bote');
+        
+        const partyId = 'PARTY_' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        const partyRef = ref(this.db, `party_pots/${partyId}`);
+        
+        await set(partyRef, {
+            name: name,
+            createdAt: Date.now(),
+            createdBy: this.state.user,
+            totalCollected: 0,
+            totalSpent: 0,
+            history: {}
+        });
+
+        this.state.partyId = partyId;
+        localStorage.setItem('thermo_partyId', partyId);
+        this.listenToParty(partyId);
+    },
+
+    listenToParty(partyId) {
+        const partyRef = ref(this.db, `party_pots/${partyId}`);
+        onValue(partyRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                this.state.partyData = data;
+                this.updatePartyUI();
+                document.getElementById('party-pot-setup').classList.add('hidden');
+                document.getElementById('party-pot-active').classList.remove('hidden');
+            }
+        });
+    },
+
+    updatePartyUI() {
+        const data = this.state.partyData;
+        const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
+        
+        document.getElementById('party-balance').textContent = `${balance.toFixed(2)}€`;
+        document.getElementById('party-total-collected').textContent = `${(data.totalCollected || 0).toFixed(2)}€`;
+        document.getElementById('party-total-spent').textContent = `${(data.totalSpent || 0).toFixed(2)}€`;
+
+        const historyContainer = document.getElementById('party-history');
+        historyContainer.innerHTML = '';
+        
+        if (data.history) {
+            Object.values(data.history).sort((a,b) => b.timestamp - a.timestamp).forEach(item => {
+                const div = document.createElement('div');
+                div.className = `history-item ${item.type}`;
+                div.innerHTML = `
+                    <div class="info">
+                        <b>${item.description}</b><br>
+                        <small>${new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} por ${item.user}</small>
+                    </div>
+                    <span class="amount">${item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                `;
+                historyContainer.appendChild(div);
+            });
+        }
+    },
+
+    async handlePartyAddMoney() {
+        const amount = parseFloat(prompt('¿Cuánto dinero se añade al bote?', '20'));
+        if (isNaN(amount)) return;
+        const friend = prompt('¿Quién pone el dinero?', this.state.user);
+        
+        const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+        await set(historyRef, {
+            type: 'income',
+            amount: amount,
+            description: `Aporte de ${friend}`,
+            user: this.state.user,
+            timestamp: Date.now()
+        });
+
+        const newTotal = (this.state.partyData.totalCollected || 0) + amount;
+        await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
+    },
+
+    async handlePartyAddExpense() {
+        const amount = parseFloat(prompt('¿Cuánto ha costado la ronda/gasto?', '15'));
+        if (isNaN(amount)) return;
+        const desc = prompt('¿En qué se ha gastado? (ej: 4 cervezas)', 'Ronda');
+        
+        const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+        await set(historyRef, {
+            type: 'expense',
+            amount: amount,
+            description: desc,
+            user: this.state.user,
+            timestamp: Date.now()
+        });
+
+        const newTotal = (this.state.partyData.totalSpent || 0) + amount;
+        await set(ref(this.db, `party_pots/${this.state.partyId}/totalSpent`), newTotal);
     },
 
     openModal(html) {

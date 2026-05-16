@@ -188,20 +188,64 @@
                     <p class="subtitle" style="text-align: center; margin-top: 0.5rem;">Esto expulsará a todos y archivará la cuenta.</p>
                 </div>
             </section>
+            <!-- VISTA: Bote de Fiesta -->
+            <section id="party-pot-view" class="view">
+                <div class="card glass">
+                    <h2>Bote de Fiesta 🥳</h2>
+                    <div id="party-pot-setup" class="party-setup">
+                        <p class="subtitle">Configura el fondo común para la noche</p>
+                        <div class="form-group">
+                            <label>Nombre del Bote (ej: Despedida Juan)</label>
+                            <input type="text" id="party-pot-name" placeholder="La Noche de los Muertos">
+                        </div>
+                        <button id="btn-create-party" class="btn-primary">Crear Bote</button>
+                    </div>
+
+                    <div id="party-pot-active" class="hidden">
+                        <div class="pot-display-large">
+                            <span class="label">Dinero Disponible</span>
+                            <span id="party-balance" class="value">0.00€</span>
+                        </div>
+
+                        <div class="grid-stats">
+                            <div class="stat-card glass">
+                                <span id="party-total-collected" class="stat-value">0.00€</span>
+                                <span class="stat-label">Recaudado</span>
+                            </div>
+                            <div class="stat-card glass">
+                                <span id="party-total-spent" class="stat-value">0.00€</span>
+                                <span class="stat-label">Gastado</span>
+                            </div>
+                        </div>
+
+                        <div class="party-actions">
+                            <button id="btn-party-add-money" class="btn-secondary">➕ Añadir Fondos</button>
+                            <button id="btn-party-add-expense" class="btn-primary">💸 Anotar Gasto</button>
+                        </div>
+
+                        <div class="history-section" style="margin-top: 2rem;">
+                            <h3>Historial de la Noche</h3>
+                            <div id="party-history" class="list-container" style="margin-top: 1rem;">
+                                <!-- Gastos y aportes -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
 
         <nav class="main-nav hidden">
             <button class="nav-item active" data-view="summary">
                 <span class="nav-icon">📊</span>
-                <span class="nav-label">Resumen</span>
+                <span class="nav-label">Mesa</span>
+            </button>
+            <button class="nav-item" data-view="party-pot">
+                <span class="nav-icon">🍹</span>
+                <span class="nav-label">Fiesta</span>
             </button>
             <button class="nav-item" data-view="order">
                 <span class="nav-icon">➕</span>
                 <span class="nav-label">Pedir</span>
-            </button>
-            <button class="nav-item" data-view="friends">
-                <span class="nav-icon">👥</span>
-                <span class="nav-label">Amigos</span>
             </button>
             <button class="nav-item" data-view="settle">
                 <span class="nav-icon">💸</span>
