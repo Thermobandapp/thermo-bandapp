@@ -139,13 +139,16 @@ const App = {
         const savedPartyId = localStorage.getItem('thermo_partyId');
         const isAuth = localStorage.getItem('thermo_auth');
 
+        // Si no hay login, forzamos login y NO seguimos
         if (!isAuth) {
+            console.log('No hay sesión de miembro. Bloqueando en login-view.');
             this.showView('login-view');
             return;
         }
 
+        console.log('Sesión de miembro detectada:', savedUser);
+
         if (savedUser) {
-            this.inputs.userName.value = savedUser;
             this.state.user = savedUser;
         }
 
@@ -157,6 +160,9 @@ const App = {
             this.state.partyId = savedPartyId;
             this.showView('party-pot');
             this.listenToParty(savedPartyId);
+        } else {
+            // Si está logueado pero no hay mesa/fiesta, va al setup
+            this.showView('setup');
         }
     },
 
