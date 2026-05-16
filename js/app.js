@@ -777,7 +777,8 @@ const App = {
         this.state.user = userName;
         localStorage.setItem('thermo_user', userName);
 
-        const partyId = 'PARTY_' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        // Código más sencillo (ej: 6 caracteres)
+        const partyId = Math.random().toString(36).substr(2, 6).toUpperCase();
         const partyRef = ref(this.db, `party_pots/${partyId}`);
         
         await set(partyRef, {
@@ -786,6 +787,9 @@ const App = {
             createdBy: userName,
             totalCollected: 0,
             totalSpent: 0,
+            participants: {
+                [userName.replace(/\./g, '_')]: { name: userName, joinedAt: Date.now() }
+            },
             history: {}
         });
 
