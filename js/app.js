@@ -777,7 +777,8 @@ const App = {
     showView(viewName) {
         if (viewName === 'settle') this.initSettleView();
         Object.values(this.views).forEach(v => v?.classList.remove('active'));
-        const targetView = document.getElementById(`${viewName}-view`);
+        
+        const targetView = this.views[viewName];
         if (targetView) targetView.classList.add('active');
         this.state.currentView = viewName;
 
