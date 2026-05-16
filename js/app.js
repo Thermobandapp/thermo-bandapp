@@ -46,10 +46,13 @@ const App = {
             summary: document.getElementById('summary-view'),
             order: document.getElementById('order-view'),
             settle: document.getElementById('settle-view'),
-            'party-pot': document.getElementById('party-pot-view')
+            'party-pot': document.getElementById('party-pot-view'),
+            login: document.getElementById('login-view')
         };
         this.inputs = {
             userName: document.getElementById('user-name'),
+            loginUser: document.getElementById('login-user'),
+            loginCode: document.getElementById('login-code'),
             barName: document.getElementById('bar-name'),
             tableNum: document.getElementById('table-num')
         };
@@ -62,7 +65,8 @@ const App = {
             addPartyMoney: document.getElementById('btn-party-add-money'),
             addPartyExpense: document.getElementById('btn-party-add-expense'),
             addPartyFriend: document.getElementById('btn-party-add-friend'),
-            partyGoHome: document.getElementById('btn-party-go-home')
+            partyGoHome: document.getElementById('btn-party-go-home'),
+            loginSubmit: document.getElementById('btn-login-submit')
         };
         this.display = {
             tableName: document.getElementById('display-table-name'),
@@ -97,6 +101,7 @@ const App = {
         this.buttons.addPartyExpense.addEventListener('click', () => this.handlePartyAddExpense());
         this.buttons.addPartyFriend.addEventListener('click', () => this.handlePartyAddFriend());
         this.buttons.partyGoHome.addEventListener('click', () => this.handlePartyGoHome());
+        this.buttons.loginSubmit.addEventListener('click', () => this.handleLogin());
 
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -132,6 +137,12 @@ const App = {
         const savedUser = localStorage.getItem('thermo_user');
         const savedTableId = localStorage.getItem('thermo_tableId');
         const savedPartyId = localStorage.getItem('thermo_partyId');
+        const isAuth = localStorage.getItem('thermo_auth');
+
+        if (!isAuth) {
+            this.showView('login-view');
+            return;
+        }
 
         if (savedUser) {
             this.inputs.userName.value = savedUser;
@@ -147,6 +158,40 @@ const App = {
             this.showView('party-pot');
             this.listenToParty(savedPartyId);
         }
+    },
+
+    async handleLogin() {
+        const user = this.inputs.loginUser.value.trim();
+        const code = this.inputs.loginCode.value.trim();
+
+        if (!user || !code) return alert('Rellena tus datos de miembro');
+
+        try {
+            const memberRef = ref(this.db, `members/${user.toLowerCase()}`);
+            const snapshot = await get(memberRef);
+            
+            if (snapshot.exists() && snapshot.val().code === code) {
+                this.state.user = user;
+                localStorage.setItem('thermo_user', user);
+                localStorage.setItem('thermo_auth', 'true');
+                
+                await this.addLog('login', { user });
+                this.showView('setup');
+            } else {
+                alert('Usuario o código incorrecto. Acceso denegado.');
+            }
+        } catch (error) { console.error(error); }
+    },
+
+    async addLog(action, details = {}) {
+        const date = new Date().toISOString().split('T')[0];
+        const logRef = push(ref(this.db, `logs/${date}`));
+        await set(logRef, {
+            timestamp: Date.now(),
+            user: this.state.user || 'anonymous',
+            action,
+            ...details
+        });
     },
 
     async handleJoinTable() {
@@ -245,6 +290,7 @@ const App = {
 
             this.showView('summary');
             this.listenToTable(tableId);
+            await this.addLog('create_table', { tableId, barName, tableNum });
         } catch (error) {
             console.error('Error al crear la mesa:', error);
             alert('Error al conectar con la base de datos.');
@@ -769,6 +815,7 @@ const App = {
         try {
             await set(ref(this.db, `tables/${this.state.tableId}/status`), 'closed');
             await set(ref(this.db, `tables/${this.state.tableId}/finishedAt`), Date.now());
+            await this.addLog('finish_table', { tableId: this.state.tableId });
         } catch (error) { console.error(error); }
     },
 
@@ -810,6 +857,7 @@ const App = {
         localStorage.setItem('thermo_partyId', partyId);
         this.listenToParty(partyId);
         this.showView('party-pot');
+        await this.addLog('create_party', { partyId, partyName });
     },
 
     async handleJoinPartyFromSetup() {
@@ -958,6 +1006,7 @@ const App = {
             localStorage.removeItem('thermo_partyId');
             this.state.partyId = null;
             
+            await this.addLog('close_party', { partyId: currentId });
             location.reload();
         } catch (error) { console.error(error); }
     },

@@ -30,11 +30,39 @@
                 <span>Dejar la mesa</span>
                 <span class="icon">🚪</span>
             </button>
+            <button id="btn-logout" class="btn-logout" onclick="localStorage.clear(); location.reload();" title="Cerrar Sesión de Miembro">
+                <span class="icon">👤❌</span>
+            </button>
         </header>
 
         <main id="main-content">
             <!-- Las vistas se cargarán aquí dinámicamente -->
-            <section id="setup-view" class="view active">
+            <!-- VISTA: Acceso Miembros -->
+            <section id="login-view" class="view active">
+                <div class="setup-header">
+                    <img src="imagenes/LOGO%20Thermo%20Bandapp.png" alt="Thermo Bandapp Logo" class="app-logo-large">
+                </div>
+                <div class="card glass">
+                    <h2>Acceso Miembros</h2>
+                    <p class="subtitle">Identifícate para entrar en la banda</p>
+                    
+                    <div class="form-group">
+                        <label for="login-user">Nombre de Miembro</label>
+                        <input type="text" id="login-user" placeholder="Tu nombre oficial">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-code">Código Secreto</label>
+                        <input type="password" id="login-code" placeholder="****">
+                    </div>
+                    
+                    <div class="actions">
+                        <button id="btn-login-submit" class="btn-primary">Entrar</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA: Configuración (Setup) -->
+            <section id="setup-view" class="view">
                 <div class="setup-header">
                     <img src="imagenes/LOGO%20Thermo%20Bandapp.png" alt="Thermo Bandapp Logo" class="app-logo-large">
                 </div>
