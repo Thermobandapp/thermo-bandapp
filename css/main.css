@@ -49,6 +49,12 @@ body {
     position: relative;
 }
 
+#main-content {
+    flex: 1;
+    padding-bottom: 120px; /* Asegura espacio para la barra de navegación en todas las pantallas */
+    width: 100%;
+}
+
 /* Header */
 .main-header {
     padding: 1.5rem;
@@ -137,7 +143,7 @@ body {
 /* Cards & Layout */
 .view {
     display: none;
-    padding: 1rem 1rem 6rem 1rem;
+    padding: 1rem;
     animation: fadeIn 0.3s ease;
 }
 
