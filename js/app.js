@@ -103,15 +103,19 @@ const App = {
         });
 
         // Tabs de Setup
-        document.querySelectorAll('.mode-tab').forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                const mode = e.currentTarget.dataset.setupMode;
-                document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
-                e.currentTarget.classList.add('active');
+        document.body.addEventListener('click', (e) => {
+            if (e.target.classList.contains('mode-tab')) {
+                const mode = e.target.dataset.setupMode;
                 
+                // Actualizar botones
+                document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Actualizar formularios
                 document.querySelectorAll('.setup-form').forEach(f => f.classList.add('hidden'));
-                document.getElementById(`setup-form-${mode}`).classList.remove('hidden');
-            });
+                const targetForm = document.getElementById(`setup-form-${mode}`);
+                if (targetForm) targetForm.classList.remove('hidden');
+            }
         });
 
         document.getElementById('btn-create-party-main').addEventListener('click', () => this.handleCreatePartyFromSetup());
