@@ -54,7 +54,7 @@ const App = {
             createTable: document.getElementById('btn-create-table'),
             joinTable: document.getElementById('btn-join-table'),
             addProduct: document.getElementById('btn-add-product-menu'),
-            settings: document.getElementById('btn-settings')
+            leaveTable: document.getElementById('btn-leave-table')
         };
         this.display = {
             tableName: document.getElementById('display-table-name'),
@@ -78,7 +78,7 @@ const App = {
         this.buttons.createTable.addEventListener('click', () => this.handleCreateTable());
         this.buttons.joinTable.addEventListener('click', () => this.handleJoinTable());
         this.buttons.addProduct.addEventListener('click', () => this.handleAddProductMenu());
-        this.buttons.settings.addEventListener('click', () => this.handleSettings());
+        this.buttons.leaveTable.addEventListener('click', () => this.handleLeaveTable());
         document.getElementById('btn-close-modal').addEventListener('click', () => this.closeModal());
         this.display.finishTable.addEventListener('click', () => this.handleFinishTable());
         this.display.addFriendManual.addEventListener('click', () => this.handleAddFriendManual());
@@ -688,18 +688,19 @@ const App = {
         const targetView = document.getElementById(`${viewName}-view`);
         if (targetView) targetView.classList.add('active');
         this.state.currentView = viewName;
-        if (viewName !== 'setup') this.nav.classList.remove('hidden');
-    },
 
-    handleSettings() {
-        let html = `<h3>Configuración</h3><div class="list-container" style="margin: 1.5rem 0;">`;
-        html += `<p class="subtitle">Usuario: <b>${this.state.user}</b></p><p class="subtitle">Mesa: <b>${this.state.tableId || 'Ninguna'}</b></p>`;
-        html += `<button class="btn-secondary" style="color: var(--danger); border-color: var(--danger); margin-top: 1rem;" onclick="App.handleLeaveTable()">🚪 Salir de la Mesa</button></div>`;
-        this.openModal(html);
+        // Gestión de visibilidad de navegación y botón de salida
+        if (viewName === 'setup') {
+            this.nav.classList.add('hidden');
+            this.buttons.leaveTable.classList.add('hidden');
+        } else {
+            this.nav.classList.remove('hidden');
+            this.buttons.leaveTable.classList.remove('hidden');
+        }
     },
 
     async handleLeaveTable() {
-        if (!confirm('¿Has pagado tu parte y quieres salir de la mesa?')) return;
+        if (!confirm('¿Seguro que quieres dejar la mesa?')) return;
         try {
             if (this.state.tableId && this.state.user) {
                 const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${this.state.user.replace(/\./g, '_')}`);
