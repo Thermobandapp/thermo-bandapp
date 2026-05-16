@@ -776,7 +776,7 @@ const App = {
         this.state.currentView = viewName;
 
         // Gestión de visibilidad de navegación y botones contextuales
-        if (viewName === 'setup') {
+        if (viewName === 'setup' || viewName === 'login-view') {
             this.nav.classList.add('hidden');
             this.buttons.leaveTable.classList.add('hidden');
         } else {
