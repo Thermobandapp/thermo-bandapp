@@ -221,7 +221,7 @@ const App = {
     updateHeaderUser() {
         const headerUserName = document.getElementById('header-user-name');
         if (headerUserName && this.state.user) {
-            headerUserName.textContent = `👤 ${this.state.user}`;
+            headerUserName.textContent = this.state.user;
         }
     },
 
@@ -714,7 +714,7 @@ const App = {
         html += `<button class="participant-btn btn-shared" style="grid-column: span 2;" onclick="App.handleSharedOrder(${JSON.stringify(product).replace(/"/g, '&quot;')})">💎 A Escote (Todos)</button>`;
         participants.forEach(p => {
             const isMe = p.name === this.state.user;
-            html += `<button id="p-btn-${p.name.replace(/\s/g, '_')}" class="participant-btn ${isMe ? 'is-me' : ''}" onclick="App.toggleParticipantSelection('${p.name.replace(/'/g, "\\'")}')">${isMe ? '🏠' : '👤'} ${p.name}</button>`;
+            html += `<button id="p-btn-${p.name.replace(/\s/g, '_')}" class="participant-btn ${isMe ? 'is-me' : ''}" onclick="App.toggleParticipantSelection('${p.name.replace(/'/g, "\\'")}')">${p.name}</button>`;
         });
         html += `</div><button id="btn-confirm-order" class="btn-primary" onclick="App.confirmMultiOrder(${JSON.stringify(product).replace(/"/g, '&quot;')})">Confirmar Pedido (0)</button>`;
         this.openModal(html);
@@ -1081,7 +1081,7 @@ const App = {
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = m.name.replace(/\s/g, '_');
-                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.toggleFriendSelection('${safeName}')">👤 ${m.name}</button>`;
+                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.toggleFriendSelection('${safeName}')">${m.name}</button>`;
             });
             
             if (availableMembers.length === 0) {
@@ -1427,7 +1427,7 @@ const App = {
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = m.name.replace(/\s/g, '_');
-                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.toggleFriendSelection('${safeName}')">👤 ${m.name}</button>`;
+                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.toggleFriendSelection('${safeName}')">${m.name}</button>`;
             });
             
             if (availableMembers.length === 0) {
