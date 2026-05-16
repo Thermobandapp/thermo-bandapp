@@ -102,21 +102,29 @@ const App = {
             });
         });
 
-        // Tabs de Setup
-        document.body.addEventListener('click', (e) => {
-            const tab = e.target.closest('.mode-tab');
-            if (tab) {
-                const mode = tab.dataset.setupMode;
+        // Tabs de Setup (Enlace Directo)
+        const tabs = document.querySelectorAll('.mode-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const mode = e.currentTarget.dataset.setupMode;
+                console.log('Cambiando a modo:', mode);
+
+                // 1. Limpiar botones
+                tabs.forEach(t => t.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+
+                // 2. Mostrar/Ocultar formularios
+                const barForm = document.getElementById('setup-form-bar');
+                const partyForm = document.getElementById('setup-form-party');
                 
-                // Actualizar botones
-                document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Actualizar formularios
-                document.querySelectorAll('.setup-form').forEach(f => f.classList.add('hidden'));
-                const targetForm = document.getElementById(`setup-form-${mode}`);
-                if (targetForm) targetForm.classList.remove('hidden');
-            }
+                if (mode === 'bar') {
+                    barForm.classList.remove('hidden');
+                    partyForm.classList.add('hidden');
+                } else {
+                    barForm.classList.add('hidden');
+                    partyForm.classList.remove('hidden');
+                }
+            });
         });
 
         document.getElementById('btn-create-party-main').addEventListener('click', () => this.handleCreatePartyFromSetup());
