@@ -102,33 +102,28 @@ const App = {
             });
         });
 
-        // Tabs de Setup (Enlace Directo)
-        const tabs = document.querySelectorAll('.mode-tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                const mode = e.currentTarget.dataset.setupMode;
-                console.log('Cambiando a modo:', mode);
-
-                // 1. Limpiar botones
-                tabs.forEach(t => t.classList.remove('active'));
-                e.currentTarget.classList.add('active');
-
-                // 2. Mostrar/Ocultar formularios
-                const barForm = document.getElementById('setup-form-bar');
-                const partyForm = document.getElementById('setup-form-party');
-                
-                if (mode === 'bar') {
-                    barForm.classList.remove('hidden');
-                    partyForm.classList.add('hidden');
-                } else {
-                    barForm.classList.add('hidden');
-                    partyForm.classList.remove('hidden');
-                }
-            });
-        });
-
         document.getElementById('btn-create-party-main').addEventListener('click', () => this.handleCreatePartyFromSetup());
         document.getElementById('btn-join-party-main').addEventListener('click', () => this.handleJoinPartyFromSetup());
+    },
+
+    switchSetupMode(mode, element) {
+        console.log('Cambiando a modo nuclear:', mode);
+        
+        // 1. Botones
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        element.classList.add('active');
+
+        // 2. Formularios
+        const barForm = document.getElementById('setup-form-bar');
+        const partyForm = document.getElementById('setup-form-party');
+        
+        if (mode === 'bar') {
+            barForm.classList.remove('hidden');
+            partyForm.classList.add('hidden');
+        } else {
+            barForm.classList.add('hidden');
+            partyForm.classList.remove('hidden');
+        }
     },
 
     loadLocalSession() {
