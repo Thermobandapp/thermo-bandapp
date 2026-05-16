@@ -104,12 +104,13 @@ const App = {
 
         // Tabs de Setup
         document.body.addEventListener('click', (e) => {
-            if (e.target.classList.contains('mode-tab')) {
-                const mode = e.target.dataset.setupMode;
+            const tab = e.target.closest('.mode-tab');
+            if (tab) {
+                const mode = tab.dataset.setupMode;
                 
                 // Actualizar botones
                 document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
-                e.target.classList.add('active');
+                tab.classList.add('active');
                 
                 // Actualizar formularios
                 document.querySelectorAll('.setup-form').forEach(f => f.classList.add('hidden'));
