@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Thermo Bandapp | Gestión de Cañas</title>
+    <meta name="description" content="La app definitiva para dividir la cuenta de forma justa y rápida.">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+    <!-- Fuentes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body class="dark-theme">
+    <div id="app">
+        <header class="main-header">
+            <div class="logo">
+                <span class="icon">🍻</span>
+                <h1>Thermo Bandapp</h1>
+            </div>
+            <button id="btn-settings" class="btn-icon">⚙️</button>
+        </header>
+
+        <main id="main-content">
+            <!-- Las vistas se cargarán aquí dinámicamente -->
+            <section id="setup-view" class="view active">
+                <div class="card glass">
+                    <h2>Nueva Quedada</h2>
+                    <p class="subtitle">Configura la mesa para empezar</p>
+                    
+                    <div class="form-group">
+                        <label for="user-name">Tu nombre</label>
+                        <input type="text" id="user-name" placeholder="Ej: Fernando" autocomplete="name">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="bar-name">Nombre del Bar</label>
+                            <input type="text" id="bar-name" placeholder="Ej: Glofi">
+                        </div>
+                        <div class="form-group" style="width: 100px;">
+                            <label for="table-num">Nº Mesa</label>
+                            <input type="number" id="table-num" placeholder="01">
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button id="btn-create-table" class="btn-primary">Crear Mesa</button>
+                        <div class="divider"><span>o</span></div>
+                        <button id="btn-join-table" class="btn-secondary">Unirse con Código</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="summary-view" class="view">
+                <div class="summary-header">
+                    <h2 id="display-table-name">Cargando...</h2>
+                    <p id="display-table-code" class="code-badge">Código: ----</p>
+                </div>
+
+                <div class="grid-stats">
+                    <div class="stat-card glass">
+                        <span class="stat-value" id="total-bill">0.00€</span>
+                        <span class="stat-label">Total Ticket</span>
+                    </div>
+                    <div class="stat-card glass">
+                        <span class="stat-value" id="my-share">0.00€</span>
+                        <span class="stat-label">Tu parte</span>
+                    </div>
+                </div>
+
+                <div class="card glass friends-list">
+                    <div class="menu-controls">
+                        <h3>Amigos en la mesa</h3>
+                        <button id="btn-add-friend-manual" class="btn-icon-small">➕ Añadir Amigo</button>
+                    </div>
+                    <div id="participants-container" class="list-container">
+                        <!-- Se llena dinámicamente -->
+                        <p class="empty-msg">Esperando a que se unan...</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="order-view" class="view">
+                <div class="summary-header">
+                    <h2>¿Qué vamos a tomar?</h2>
+                    <p class="subtitle">Pulsa para añadir a tu cuenta</p>
+                </div>
+
+                <div class="card glass">
+                    <div class="menu-controls">
+                        <h3>Menú de la mesa</h3>
+                        <button id="btn-add-product-menu" class="btn-icon-small">➕ Nuevo</button>
+                    </div>
+                    <div id="menu-container" class="grid-menu">
+                        <!-- Productos favoritos aquí -->
+                        <p class="empty-msg">No hay productos en el menú aún.</p>
+                    </div>
+                </div>
+
+                <div class="card glass last-orders">
+                    <h3>Últimos pedidos</h3>
+                    <div id="recent-orders-container" class="list-container">
+                        <!-- Listado de lo último pedido -->
+                    </div>
+                </div>
+            </section>
+
+            <section id="settle-view" class="view">
+                <div class="summary-header">
+                    <h2>Cerrar Cuenta</h2>
+                    <p class="subtitle">Calculando el reparto final</p>
+                </div>
+
+                <div class="settle-modes">
+                    <button class="mode-btn active" id="mode-single-payer" onclick="App.setSettleMode('single')">👤 Pagador Único</button>
+                    <button class="mode-btn" id="mode-group-pay" onclick="App.setSettleMode('group')">👥 Pago en Grupo</button>
+                </div>
+
+                <div id="single-payer-section" class="card glass">
+                    <h3>1. ¿Quién paga el total de la cuenta?</h3>
+                    <div id="payer-selector-container" class="payer-grid">
+                        <!-- Botones de amigos -->
+                    </div>
+                </div>
+
+                <div id="group-pay-section" class="card glass hidden">
+                    <h3>Fondo Común (El Bote)</h3>
+                    <div class="pot-status">
+                        <div class="pot-item">
+                            <span class="label">Total Ticket</span>
+                            <span id="group-total-bill" class="value">0.00€</span>
+                        </div>
+                        <div class="pot-item highlight">
+                            <span class="label">Hay en la mesa</span>
+                            <span id="pot-amount" class="value">0.00€</span>
+                        </div>
+                        <div id="pot-difference-container" class="pot-item">
+                            <span id="pot-diff-label" class="label">Faltan</span>
+                            <span id="pot-diff-value" class="value">0.00€</span>
+                        </div>
+                    </div>
+                    
+                    <div class="contribution-form">
+                        <h4>Añadir mi aporte</h4>
+                        <div class="form-row">
+                            <input type="number" id="input-pot-amount" placeholder="¿Cuánto pones? (€)" step="0.01">
+                            <button class="btn-primary" onclick="App.addContribution()">Añadir</button>
+                        </div>
+                    </div>
+
+                    <div id="group-individual-status" class="individual-status-list">
+                        <!-- Desglose de cuánto debe y ha puesto cada uno -->
+                    </div>
+
+                    <div id="contributions-list" class="contribution-list">
+                        <!-- Lista de quién ha puesto qué -->
+                    </div>
+                </div>
+
+                <div id="settlement-results" class="hidden">
+                    <div class="card glass">
+                        <h3>2. Calculadora de Cambio (<span id="selected-payer-name">...</span>)</h3>
+                        <p class="subtitle">Introduce cuánto te da cada uno para calcular el cambio</p>
+                        
+                        <div id="change-assistant-list" class="payment-list">
+                            <!-- Lista dinámica de amigos para cambio -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions" style="margin-top: 2rem;">
+                    <button id="btn-finish-table" class="btn-primary" style="background: var(--danger);">Finalizar y Cerrar Mesa</button>
+                    <p class="subtitle" style="text-align: center; margin-top: 0.5rem;">Esto expulsará a todos y archivará la cuenta.</p>
+                </div>
+            </section>
+        </main>
+
+        <nav class="main-nav hidden">
+            <button class="nav-item active" data-view="summary">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Resumen</span>
+            </button>
+            <button class="nav-item" data-view="order">
+                <span class="nav-icon">➕</span>
+                <span class="nav-label">Pedir</span>
+            </button>
+            <button class="nav-item" data-view="friends">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Amigos</span>
+            </button>
+            <button class="nav-item" data-view="settle">
+                <span class="nav-icon">💸</span>
+                <span class="nav-label">Pagar</span>
+            </button>
+        </nav>
+
+        <!-- Modales Dinámicos -->
+        <div id="modal-overlay" class="modal-overlay hidden">
+            <div class="modal-card glass">
+                <div id="modal-content"></div>
+                <button id="btn-close-modal" class="btn-secondary">Volver</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
