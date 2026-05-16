@@ -58,7 +58,7 @@ const App = {
             joinTable: document.getElementById('btn-join-table'),
             addProduct: document.getElementById('btn-add-product-menu'),
             leaveTable: document.getElementById('btn-leave-table'),
-            createParty: document.getElementById('btn-create-party'),
+            createParty: document.getElementById('btn-create-party-main'),
             addPartyMoney: document.getElementById('btn-party-add-money'),
             addPartyExpense: document.getElementById('btn-party-add-expense')
         };
@@ -102,7 +102,7 @@ const App = {
             });
         });
 
-        document.getElementById('btn-create-party-main').addEventListener('click', () => this.handleCreatePartyFromSetup());
+        this.buttons.createParty.addEventListener('click', () => this.handleCreatePartyFromSetup());
         document.getElementById('btn-join-party-main').addEventListener('click', () => this.handleJoinPartyFromSetup());
     },
 
