@@ -1404,18 +1404,50 @@ const App = {
     },
 
     async handlePartyAddMoney() {
-        // Obtener lista de amigos actuales para sugerir
-        const friends = this.state.partyData.participants ? Object.values(this.state.partyData.participants).map(p => p.name) : [];
-        let promptMsg = '¿Quién pone el dinero?\n';
-        if (friends.length > 0) promptMsg += `Sugerencias: ${friends.join(', ')}`;
-        
-        const friend = prompt(promptMsg, this.state.user);
-        if (!friend) return;
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
 
-        const amount = parseFloat(prompt(`¿Cuánto dinero añade ${friend}?`, '20'));
-        if (isNaN(amount)) return;
-        
-        // Si el amigo no existe en la lista, lo añadimos automáticamente
+        let optionsHtml = '';
+        participants.forEach(name => {
+            const selected = name === this.state.user ? 'selected' : '';
+            optionsHtml += `<option value="${name}" ${selected}>${name}</option>`;
+        });
+
+        const html = `
+            <h3>Añadir Fondos al Bote</h3>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; display:block;">¿Quién pone el dinero?</label>
+                    <select id="party-money-contributor" style="width: 100%; padding: 0.9rem 1rem; font-size: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(0,0,0,0.3); color: white; -webkit-appearance: none; appearance: none;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; display:block;">¿Cuánto dinero añade?</label>
+                    <input type="number" id="party-money-amount" placeholder="Cantidad (€)" step="0.01" style="width: 100%; padding: 0.9rem 1rem; font-size: 1.1rem;">
+                </div>
+                <button class="btn-primary" onclick="App.confirmPartyAddMoney()" style="width: 100%; padding: 0.9rem; font-size: 1rem;">Añadir al bote</button>
+            </div>
+        `;
+        this.openModal(html);
+    },
+
+    async confirmPartyAddMoney() {
+        const friendEl = document.getElementById('party-money-contributor');
+        const amountEl = document.getElementById('party-money-amount');
+        const friend = friendEl?.value?.trim();
+        const amount = this.parseAmount(amountEl?.value);
+
+        if (!friend) return alert('Selecciona quién pone el dinero.');
+        if (isNaN(amount) || amount <= 0) return alert('Introduce una cantidad válida.');
+
+        this.closeModal();
+
+        const friends = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
+
         if (!friends.includes(friend)) {
             await this.addPartyFriendSilent(friend);
         }
@@ -1425,7 +1457,7 @@ const App = {
             type: 'income',
             amount: amount,
             description: `Aporte de ${friend}`,
-            user: this.state.user, // Quien registra el aporte
+            user: this.state.user,
             timestamp: Date.now()
         });
 
