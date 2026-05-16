@@ -30,11 +30,6 @@
                 <span>Dejar la mesa</span>
                 <span class="icon">🚪</span>
             </button>
-            <!-- Botón de logout oculto temporalmente
-            <button id="btn-logout" class="btn-logout" onclick="localStorage.clear(); location.reload();" title="Cerrar Sesión de Miembro">
-                <span class="icon">👤❌</span>
-            </button>
-            -->
         </header>
 
         <main id="main-content">
@@ -74,9 +69,12 @@
                         <button class="mode-tab" onclick="App.switchSetupMode('party', this)">🍹 Fiesta</button>
                     </div>
 
-                    <!-- Botón Admin Oculto por Defecto -->
-                    <div id="admin-panel-btn" class="hidden" style="text-align: center; margin-bottom: 1rem;">
-                        <button class="btn-secondary" onclick="App.showAdminView()" style="background: rgba(129, 140, 248, 0.2); border-color: var(--primary);">⚙️ Gestión de Miembros (Admin)</button>
+                    <!-- Botón Admin y Logout Exclusivos para Fernando -->
+                    <div id="admin-panel-btn" class="hidden" style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1rem;">
+                        <button class="btn-secondary" onclick="App.showAdminView()" style="background: rgba(129, 140, 248, 0.2); border-color: var(--primary);">⚙️ Gestión de Miembros</button>
+                        <button class="btn-logout" onclick="localStorage.clear(); location.reload();" title="Cerrar Sesión de Miembro" style="background: rgba(239, 68, 68, 0.1); border-color: var(--danger); display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="icon">👤❌</span> Salir
+                        </button>
                     </div>
 
                     <!-- Formulario BAR -->
