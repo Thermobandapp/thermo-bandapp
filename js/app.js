@@ -531,6 +531,9 @@ const App = {
                 this.updateSummaryUI();
                 this.updateMenuUI();
                 this.updateOrdersUI();
+                if (this.state.currentView === 'settle') {
+                    this.updateChangeAssistantUI();
+                }
             }
         });
     },
@@ -733,20 +736,19 @@ const App = {
             const btn = document.createElement('div');
             btn.className = 'payer-btn';
             btn.innerHTML = `<span>${p.name}</span> <span>💰</span>`;
-            btn.onclick = () => this.selectPayer(p.name, btn);
+            btn.onclick = () => this.selectPayer(p.name);
             this.display.payerSelector.appendChild(btn);
         });
 
         this.listenToContributions();
+        this.updateChangeAssistantUI();
     },
 
-    selectPayer(name, element) {
-        document.querySelectorAll('.payer-btn').forEach(b => b.classList.remove('selected'));
-        element.classList.add('selected');
-        document.getElementById('settlement-results').classList.remove('hidden');
-        document.getElementById('selected-payer-name').textContent = name;
-        this.state.currentPayer = name;
-        this.updateChangeAssistantUI();
+    async selectPayer(name) {
+        if (!name) return;
+        try {
+            await set(ref(this.db, `tables/${this.state.tableId}/currentPayer`), name);
+        } catch (e) { console.error(e); }
     },
 
     setSettleMode(mode) {
@@ -872,26 +874,74 @@ const App = {
     },
 
     updateChangeAssistantUI() {
-        const payer = this.state.currentPayer;
+        const payer = this.state.tableData?.currentPayer;
         if (!payer) return;
+        this.state.currentPayer = payer;
+        
+        document.querySelectorAll('.payer-btn').forEach(b => {
+            const spanName = b.querySelector('span').textContent;
+            if (spanName === payer) b.classList.add('selected');
+            else b.classList.remove('selected');
+        });
+        document.getElementById('settlement-results').classList.remove('hidden');
+        document.getElementById('selected-payer-name').textContent = payer;
+
         const totals = this.calculateAllIndividualTotals();
-        this.display.debtsList.innerHTML = '';
+        const settlements = this.state.tableData?.settlements?.[payer] || {};
+
+        const currentPayerInList = this.display.debtsList.dataset.payer;
+        
+        if (currentPayerInList !== payer) {
+            this.display.debtsList.innerHTML = '';
+            this.display.debtsList.dataset.payer = payer;
+            
+            Object.entries(totals).forEach(([friendName, amount]) => {
+                if (friendName === payer) return;
+                
+                const div = document.createElement('div');
+                div.className = `payment-row`;
+                div.id = `pay-row-${friendName.replace(/\s/g, '_')}`;
+                div.innerHTML = `
+                    <div class="p-header"><span>${friendName}</span><span class="p-amount">Debe: ${amount.toFixed(2)}€</span></div>
+                    <div class="p-controls">
+                        <input type="number" step="0.01" class="input-payment" placeholder="Paga con..." onchange="App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', this.value)" oninput="App.calculateIndividualChange(this, ${amount})">
+                        <div class="method-options">
+                             <button class="method-btn" onclick="App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', ${amount})">📲 Bizum</button>
+                        </div>
+                    </div>
+                    <div class="change-result-row" style="margin-top: 0.5rem; min-height: 1.2rem; font-size: 0.9rem; color: var(--primary);"></div>
+                `;
+                this.display.debtsList.appendChild(div);
+            });
+        }
+        
         Object.entries(totals).forEach(([friendName, amount]) => {
             if (friendName === payer) return;
-            const div = document.createElement('div');
-            div.className = `payment-row`;
-            div.innerHTML = `
-                <div class="p-header"><span>${friendName}</span><span class="p-amount">Debe: ${amount.toFixed(2)}€</span></div>
-                <div class="p-controls">
-                    <input type="number" step="0.01" class="input-payment" placeholder="Paga con..." oninput="App.calculateIndividualChange(this, ${amount})">
-                    <div class="method-options">
-                         <button class="method-btn" onclick="const inp=this.closest('.p-controls').querySelector('input'); inp.value=${amount.toFixed(2)}; App.calculateIndividualChange(inp, ${amount})">📲 Bizum</button>
-                    </div>
-                </div>
-                <div class="change-result-row" style="margin-top: 0.5rem; min-height: 1.2rem; font-size: 0.9rem; color: var(--primary);"></div>
-            `;
-            this.display.debtsList.appendChild(div);
+            const row = document.getElementById(`pay-row-${friendName.replace(/\s/g, '_')}`);
+            if (!row) return;
+            const input = row.querySelector('.input-payment');
+            
+            const safeName = friendName.replace(/\./g, '_');
+            const paid = settlements[safeName];
+            
+            if (document.activeElement !== input) {
+                if (paid !== undefined && paid !== null && paid !== '') {
+                    input.value = paid;
+                    this.calculateIndividualChange(input, amount);
+                } else {
+                    input.value = '';
+                    row.querySelector('.change-result-row').innerHTML = '';
+                }
+            }
         });
+    },
+
+    async handleIndividualPaymentChange(payer, friendName, value) {
+        const amount = value === '' || value === null ? null : parseFloat(value);
+        if (amount !== null && isNaN(amount)) return;
+        try {
+            await set(ref(this.db, `tables/${this.state.tableId}/settlements/${payer}/${friendName.replace(/\./g, '_')}`), amount);
+        } catch (error) { console.error(error); }
     },
 
     calculateIndividualChange(inputElement, owed) {
