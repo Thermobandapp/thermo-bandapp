@@ -74,6 +74,11 @@
                         <button class="mode-tab" onclick="App.switchSetupMode('party', this)">🍹 Fiesta</button>
                     </div>
 
+                    <!-- Botón Admin Oculto por Defecto -->
+                    <div id="admin-panel-btn" class="hidden" style="text-align: center; margin-bottom: 1rem;">
+                        <button class="btn-secondary" onclick="App.showAdminView()" style="background: rgba(129, 140, 248, 0.2); border-color: var(--primary);">⚙️ Gestión de Miembros (Admin)</button>
+                    </div>
+
                     <!-- Formulario BAR -->
                     <div id="setup-form-bar" class="setup-form">
                         <h2>Nueva Mesa</h2>
@@ -118,14 +123,48 @@
                         </div>
 
                         <div class="actions">
-                            <button id="btn-create-party-main" class="btn-primary">Crear Bote</button>
+                            <button id="btn-create-party-main" class="btn-primary">Crear Nuevo Bote</button>
                             <div class="divider"><span>o</span></div>
-                            <button id="btn-join-party-main" class="btn-secondary">Unirse al Bote</button>
+                            <button id="btn-join-party-main" class="btn-secondary">Unirse a un Bote</button>
                         </div>
                     </div>
                 </div>
             </section>
 
+            <!-- VISTA: Gestión de Miembros (ADMIN) -->
+            <section id="admin-view" class="view">
+                <div class="setup-header">
+                    <h2>Gestión de Miembros</h2>
+                    <p class="subtitle">Altas, bajas y modificación de claves</p>
+                </div>
+                <div class="card glass">
+                    <h3>Nuevo / Modificar Miembro</h3>
+                    <div class="form-group">
+                        <label>Nombre</label>
+                        <input type="text" id="admin-member-name" placeholder="Ej: Fulanito">
+                    </div>
+                    <div class="form-group">
+                        <label>Código Secreto</label>
+                        <input type="text" id="admin-member-code" placeholder="Ej: 5678">
+                    </div>
+                    <div class="actions">
+                        <button id="btn-admin-save-member" class="btn-primary">Guardar Miembro</button>
+                    </div>
+                    
+                    <hr class="divider">
+                    
+                    <h3>Miembros Actuales</h3>
+                    <div id="admin-members-list" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Lista generada por JS -->
+                    </div>
+
+                    <div class="actions" style="margin-top: 2rem;">
+                        <button class="btn-secondary" onclick="App.showView('setup')">Volver</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA: Resumen Mesa -->
             <section id="summary-view" class="view">
                 <div class="summary-header">
                     <h2 id="display-table-name">Cargando...</h2>

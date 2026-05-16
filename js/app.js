@@ -47,6 +47,7 @@ const App = {
             order: document.getElementById('order-view'),
             settle: document.getElementById('settle-view'),
             'party-pot': document.getElementById('party-pot-view'),
+            'admin-view': document.getElementById('admin-view'),
             'login-view': document.getElementById('login-view')
         };
         this.inputs = {
@@ -67,9 +68,12 @@ const App = {
             addPartyExpense: document.getElementById('btn-party-add-expense'),
             addPartyFriend: document.getElementById('btn-party-add-friend'),
             partyGoHome: document.getElementById('btn-party-go-home'),
-            loginSubmit: document.getElementById('btn-login-submit')
+            loginSubmit: document.getElementById('btn-login-submit'),
+            adminSaveMember: document.getElementById('btn-admin-save-member')
         };
         this.display = {
+            adminPanelBtn: document.getElementById('admin-panel-btn'),
+            adminMembersList: document.getElementById('admin-members-list'),
             tableName: document.getElementById('display-table-name'),
             tableCode: document.getElementById('display-table-code'),
             participants: document.getElementById('participants-container'),
@@ -103,6 +107,9 @@ const App = {
         this.buttons.addPartyFriend.addEventListener('click', () => this.handlePartyAddFriend());
         this.buttons.partyGoHome.addEventListener('click', () => this.handlePartyGoHome());
         this.buttons.loginSubmit.addEventListener('click', () => this.handleLogin());
+        if (this.buttons.adminSaveMember) {
+            this.buttons.adminSaveMember.addEventListener('click', () => this.handleSaveMember());
+        }
 
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -153,6 +160,12 @@ const App = {
             this.state.user = savedUser;
             this.inputs.userName.value = savedUser;
             if (this.inputs.userNameParty) this.inputs.userNameParty.value = savedUser;
+            
+            if (savedUser.toLowerCase() === 'fernando') {
+                this.display.adminPanelBtn.classList.remove('hidden');
+            } else {
+                this.display.adminPanelBtn.classList.add('hidden');
+            }
         }
 
         if (savedTableId && savedUser) {
@@ -189,6 +202,12 @@ const App = {
                 this.inputs.userName.value = officialName;
                 if (this.inputs.userNameParty) this.inputs.userNameParty.value = officialName;
                 
+                if (officialName.toLowerCase() === 'fernando') {
+                    this.display.adminPanelBtn.classList.remove('hidden');
+                } else {
+                    this.display.adminPanelBtn.classList.add('hidden');
+                }
+                
                 await this.addLog('login', { user: officialName });
                 this.showView('setup');
             } else {
@@ -207,6 +226,70 @@ const App = {
             ...details
         });
     },
+
+    // --- FUNCIONES DE ADMINISTRACIÓN ---
+    async showAdminView() {
+        if (this.state.user !== 'Fernando') return; // Seguridad extra
+        this.showView('admin-view');
+        this.loadAdminMembers();
+    },
+
+    async loadAdminMembers() {
+        try {
+            const snapshot = await get(ref(this.db, 'members'));
+            if (!snapshot.exists()) {
+                this.display.adminMembersList.innerHTML = '<p>No hay miembros registrados.</p>';
+                return;
+            }
+            
+            const members = snapshot.val();
+            let html = '';
+            for (const [key, data] of Object.entries(members)) {
+                html += `
+                    <div class="participant-item" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <b>${data.name}</b> (Código: ${data.code})
+                        </div>
+                        <button class="btn-leave" onclick="App.handleDeleteMember('${key}')" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Eliminar 🗑️</button>
+                    </div>
+                `;
+            }
+            this.display.adminMembersList.innerHTML = html;
+        } catch (error) { console.error(error); }
+    },
+
+    async handleSaveMember() {
+        const nameInput = document.getElementById('admin-member-name').value.trim();
+        const codeInput = document.getElementById('admin-member-code').value.trim();
+        
+        if (!nameInput || !codeInput) return alert('Rellena nombre y código');
+        
+        try {
+            const key = nameInput.toLowerCase();
+            await set(ref(this.db, `members/${key}`), {
+                name: nameInput,
+                code: codeInput
+            });
+            alert(`Miembro ${nameInput} guardado correctamente.`);
+            document.getElementById('admin-member-name').value = '';
+            document.getElementById('admin-member-code').value = '';
+            this.loadAdminMembers();
+            await this.addLog('admin_save_member', { targetUser: nameInput });
+        } catch (error) { console.error(error); }
+    },
+
+    async handleDeleteMember(key) {
+        if (key === 'fernando') return alert('No puedes eliminar al administrador principal.');
+        if (!confirm(`¿Seguro que quieres eliminar al miembro ${key}?`)) return;
+        
+        try {
+            await set(ref(this.db, `members/${key}`), null);
+            this.loadAdminMembers();
+            await this.addLog('admin_delete_member', { targetUser: key });
+        } catch (error) { console.error(error); }
+    },
+
+    // --- FIN ADMINISTRACIÓN ---
 
     async handleJoinTable() {
         const code = prompt('Introduce el código de la mesa:');
@@ -793,7 +876,7 @@ const App = {
         this.state.currentView = viewName;
 
         // Gestión de visibilidad de navegación y botones contextuales
-        if (viewName === 'setup' || viewName === 'login-view') {
+        if (viewName === 'setup' || viewName === 'login-view' || viewName === 'admin-view') {
             this.nav.classList.add('hidden');
             this.buttons.leaveTable.classList.add('hidden');
         } else {
