@@ -1358,7 +1358,7 @@ const App = {
                     ¡Buena noche, amigos! 👋
                 </p>
                 <div class="actions" style="display: flex; gap: 1rem;">
-                    <button onclick="App.showView('party-pot'); App.closeModal();" class="btn-secondary" style="flex: 1;">Volver</button>
+                    <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver</button>
                     <button onclick="App.handleFinalCloseParty()" class="btn-primary" style="flex: 1;">Cerrar y Salir</button>
                 </div>
             </div>
@@ -1371,16 +1371,15 @@ const App = {
         if (!confirm('¿Cerrar la fiesta definitivamente? El código dejará de funcionar.')) return;
         
         try {
-            // Marcamos como terminada en DB (opcional, pero limpio)
-            await set(ref(this.db, `party_pots/${this.state.partyId}/status`), 'finished');
+            const currentId = this.state.partyId;
+            await set(ref(this.db, `party_pots/${currentId}/status`), 'finished');
             
-            // Limpiamos local
             localStorage.removeItem('thermo_partyId');
             this.state.partyId = null;
             
             await this.addLog('close_party', { partyId: currentId });
             location.reload();
-        } catch (error) { console.error(error); }
+        } catch (error) { console.error('Error cerrando fiesta:', error); }
     },
 
     async handleTransferCustody(name) {
