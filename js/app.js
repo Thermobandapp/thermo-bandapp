@@ -942,12 +942,27 @@ const App = {
                 </p>
                 <div class="actions" style="display: flex; gap: 1rem;">
                     <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver</button>
-                    <button onclick="location.reload()" class="btn-primary" style="flex: 1;">Cerrar y Salir</button>
+                    <button onclick="App.handleFinalCloseParty()" class="btn-primary" style="flex: 1;">Cerrar y Salir</button>
                 </div>
             </div>
         `;
         
         this.openModal(summaryHtml);
+    },
+
+    async handleFinalCloseParty() {
+        if (!confirm('¿Cerrar la fiesta definitivamente? El código dejará de funcionar.')) return;
+        
+        try {
+            // Marcamos como terminada en DB (opcional, pero limpio)
+            await set(ref(this.db, `party_pots/${this.state.partyId}/status`), 'finished');
+            
+            // Limpiamos local
+            localStorage.removeItem('thermo_partyId');
+            this.state.partyId = null;
+            
+            location.reload();
+        } catch (error) { console.error(error); }
     },
 
     async handleTransferCustody(name) {
