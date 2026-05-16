@@ -246,11 +246,14 @@ const App = {
             let html = '';
             for (const [key, data] of Object.entries(members)) {
                 html += `
-                    <div class="participant-item" style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <b>${data.name}</b> (Código: ${data.code})
+                    <div class="participant-item" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 150px;">
+                            <b>${data.name}</b> <span style="color: var(--text-muted); font-size: 0.9rem;">(Cód: ${data.code})</span>
                         </div>
-                        <button class="btn-leave" onclick="App.handleDeleteMember('${key}')" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Eliminar 🗑️</button>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn-secondary" onclick="App.handleEditMember('${data.name}', '${data.code}')" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">Editar ✏️</button>
+                            <button class="btn-leave" onclick="App.handleDeleteMember('${key}')" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; margin: 0;">Eliminar 🗑️</button>
+                        </div>
                     </div>
                 `;
             }
@@ -276,6 +279,12 @@ const App = {
             this.loadAdminMembers();
             await this.addLog('admin_save_member', { targetUser: nameInput });
         } catch (error) { console.error(error); }
+    },
+
+    handleEditMember(name, code) {
+        document.getElementById('admin-member-name').value = name;
+        document.getElementById('admin-member-code').value = code;
+        document.getElementById('admin-member-name').focus();
     },
 
     async handleDeleteMember(key) {
