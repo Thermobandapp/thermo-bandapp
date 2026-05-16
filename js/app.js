@@ -301,21 +301,55 @@ const App = {
     // --- FIN ADMINISTRACIÓN ---
 
     async handleJoinTable() {
-        const code = prompt('Introduce el código de la mesa:');
-        if (!code) return;
-
         const userName = this.inputs.userName.value.trim();
         if (!userName) {
             alert('Por favor, dinos tu nombre primero.');
             return;
         }
 
-        const tableRef = ref(this.db, `tables/${code}`);
+        try {
+            const tablesRef = ref(this.db, 'tables');
+            const snapshot = await get(tablesRef);
+            let activeTables = [];
+            
+            if (snapshot.exists()) {
+                const allTables = snapshot.val();
+                for (const [code, data] of Object.entries(allTables)) {
+                    if (data.status === 'active') {
+                        activeTables.push({ code, name: data.name, createdAt: data.createdAt });
+                    }
+                }
+            }
+
+            if (activeTables.length === 0) {
+                alert('No hay mesas abiertas en este momento.');
+                return;
+            }
+
+            activeTables.sort((a, b) => b.createdAt - a.createdAt);
+
+            let html = `<h3>Mesas Abiertas</h3><div class="list-container" style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">`;
+            activeTables.forEach(t => {
+                html += `<button class="btn-secondary" onclick="App.joinSpecificTable('${t.code}')">${t.name}</button>`;
+            });
+            html += `</div>`;
+            this.openModal(html);
+
+        } catch (error) {
+            console.error('Error al obtener mesas:', error);
+            alert('Error al conectar con la base de datos.');
+        }
+    },
+
+    async joinSpecificTable(code) {
+        this.closeModal();
+        const userName = this.inputs.userName.value.trim();
+        const tableRef = ref(this.db, \`tables/\${code}\`);
 
         try {
             const snapshot = await get(tableRef);
             if (snapshot.exists()) {
-                const participantRef = ref(this.db, `tables/${code}/participants/${userName.replace(/\./g, '_')}`);
+                const participantRef = ref(this.db, \`tables/\${code}/participants/\${userName.replace(/\\./g, '_')}\`);
                 await set(participantRef, { 
                     name: userName, 
                     role: 'member', 
@@ -330,8 +364,6 @@ const App = {
                 
                 this.showView('summary');
                 this.listenToTable(code);
-            } else {
-                alert('Ese código de mesa no existe.');
             }
         } catch (error) {
             console.error('Error al unirse:', error);
@@ -973,13 +1005,47 @@ const App = {
         const userName = document.getElementById('user-name-party').value.trim();
         if (!userName) return alert('Dinos tu nombre primero');
         
-        const code = prompt('Introduce el código del Bote (ej: PARTY_XXXXXX):');
-        if (!code) return;
+        try {
+            const partiesRef = ref(this.db, 'party_pots');
+            const snapshot = await get(partiesRef);
+            let activeParties = [];
+            
+            if (snapshot.exists()) {
+                const allParties = snapshot.val();
+                for (const [code, data] of Object.entries(allParties)) {
+                    if (data.status !== 'finished') {
+                        activeParties.push({ code, name: data.name, createdAt: data.createdAt });
+                    }
+                }
+            }
 
+            if (activeParties.length === 0) {
+                alert('No hay botes de fiesta abiertos en este momento.');
+                return;
+            }
+
+            activeParties.sort((a, b) => b.createdAt - a.createdAt);
+
+            let html = `<h3>Botes Abiertos</h3><div class="list-container" style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">`;
+            activeParties.forEach(p => {
+                html += `<button class="btn-secondary" onclick="App.joinSpecificParty('${p.code}')">${p.name}</button>`;
+            });
+            html += `</div>`;
+            this.openModal(html);
+
+        } catch (error) {
+            console.error('Error al obtener fiestas:', error);
+        }
+    },
+
+    async joinSpecificParty(code) {
+        this.closeModal();
+        const userName = document.getElementById('user-name-party').value.trim();
+        
         this.state.user = userName;
         localStorage.setItem('thermo_user', userName);
 
-        const partyRef = ref(this.db, `party_pots/${code}`);
+        const partyRef = ref(this.db, \`party_pots/\${code}\`);
         const snapshot = await get(partyRef);
         
         if (snapshot.exists()) {
@@ -987,8 +1053,6 @@ const App = {
             localStorage.setItem('thermo_partyId', code);
             this.listenToParty(code);
             this.showView('party-pot');
-        } else {
-            alert('Ese código de Bote no existe.');
         }
     },
 
