@@ -344,12 +344,12 @@ const App = {
     async joinSpecificTable(code) {
         this.closeModal();
         const userName = this.inputs.userName.value.trim();
-        const tableRef = ref(this.db, \`tables/\${code}\`);
+        const tableRef = ref(this.db, `tables/${code}`);
 
         try {
             const snapshot = await get(tableRef);
             if (snapshot.exists()) {
-                const participantRef = ref(this.db, \`tables/\${code}/participants/\${userName.replace(/\\./g, '_')}\`);
+                const participantRef = ref(this.db, `tables/${code}/participants/${userName.replace(/\./g, '_')}`);
                 await set(participantRef, { 
                     name: userName, 
                     role: 'member', 
@@ -1045,7 +1045,7 @@ const App = {
         this.state.user = userName;
         localStorage.setItem('thermo_user', userName);
 
-        const partyRef = ref(this.db, \`party_pots/\${code}\`);
+        const partyRef = ref(this.db, `party_pots/${code}`);
         const snapshot = await get(partyRef);
         
         if (snapshot.exists()) {
