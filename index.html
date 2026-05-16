@@ -253,9 +253,10 @@
                     </div>
                     
                     <div class="contribution-form">
-                        <h4>Añadir mi aporte</h4>
+                        <h4>Añadir dinero al bote</h4>
                         <div class="form-row">
-                            <input type="number" id="input-pot-amount" placeholder="¿Cuánto pones? (€)" step="0.01">
+                            <select id="pot-contributor" style="padding: 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: white;"></select>
+                            <input type="number" id="input-pot-amount" placeholder="Cantidad (€)" step="0.01">
                             <button class="btn-primary" onclick="App.addContribution()">Añadir</button>
                         </div>
                     </div>

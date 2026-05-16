@@ -732,6 +732,19 @@ const App = {
     initSettleView() {
         const participants = Object.values(this.state.tableData.participants);
         this.display.payerSelector.innerHTML = '';
+        
+        const potContributorSelect = document.getElementById('pot-contributor');
+        if (potContributorSelect) {
+            potContributorSelect.innerHTML = '';
+            participants.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.name;
+                opt.textContent = p.name;
+                if (p.name === this.state.user) opt.selected = true;
+                potContributorSelect.appendChild(opt);
+            });
+        }
+
         participants.forEach(p => {
             const btn = document.createElement('div');
             btn.className = 'payer-btn';
@@ -763,12 +776,16 @@ const App = {
 
     async addContribution() {
         const amount = parseFloat(document.getElementById('input-pot-amount').value);
+        const potContributorEl = document.getElementById('pot-contributor');
+        const targetUser = potContributorEl && potContributorEl.value ? potContributorEl.value : this.state.user;
+        
         if (isNaN(amount) || amount <= 0) return;
         try {
             const contributionsRef = ref(this.db, `tables/${this.state.tableId}/contributions`);
             await push(contributionsRef, {
-                user: this.state.user,
+                user: targetUser,
                 amount: amount,
+                registeredBy: this.state.user,
                 timestamp: Date.now()
             });
             document.getElementById('input-pot-amount').value = '';
