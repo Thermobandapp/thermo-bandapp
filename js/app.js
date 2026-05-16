@@ -60,7 +60,8 @@ const App = {
             leaveTable: document.getElementById('btn-leave-table'),
             createParty: document.getElementById('btn-create-party-main'),
             addPartyMoney: document.getElementById('btn-party-add-money'),
-            addPartyExpense: document.getElementById('btn-party-add-expense')
+            addPartyExpense: document.getElementById('btn-party-add-expense'),
+            addPartyFriend: document.getElementById('btn-party-add-friend')
         };
         this.display = {
             tableName: document.getElementById('display-table-name'),
@@ -92,6 +93,7 @@ const App = {
         this.buttons.createParty.addEventListener('click', () => this.handleCreateParty());
         this.buttons.addPartyMoney.addEventListener('click', () => this.handlePartyAddMoney());
         this.buttons.addPartyExpense.addEventListener('click', () => this.handlePartyAddExpense());
+        this.buttons.addPartyFriend.addEventListener('click', () => this.handlePartyAddFriend());
         
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -838,6 +840,41 @@ const App = {
         document.getElementById('party-total-collected').textContent = `${(data.totalCollected || 0).toFixed(2)}€`;
         document.getElementById('party-total-spent').textContent = `${(data.totalSpent || 0).toFixed(2)}€`;
 
+        // 1. Lista de Participantes
+        const friendsContainer = document.getElementById('party-participants-list');
+        friendsContainer.innerHTML = '';
+        
+        // Calcular aportes por persona
+        const individualAports = {};
+        if (data.participants) {
+            Object.values(data.participants).forEach(p => individualAports[p.name] = 0);
+        }
+        if (data.history) {
+            Object.values(data.history).forEach(item => {
+                if (item.type === 'income') {
+                    const name = item.description.replace('Aporte de ', '');
+                    individualAports[name] = (individualAports[name] || 0) + item.amount;
+                }
+            });
+        }
+
+        Object.entries(individualAports).forEach(([name, amount]) => {
+            const div = document.createElement('div');
+            div.className = 'participant-item glass';
+            div.innerHTML = `
+                <div class="p-info">
+                    <span class="p-name">${name}</span>
+                </div>
+                <div class="p-amount">${amount.toFixed(2)}€</div>
+            `;
+            friendsContainer.appendChild(div);
+        });
+
+        if (Object.keys(individualAports).length === 0) {
+            friendsContainer.innerHTML = '<div class="empty-msg">Pulsa en "Añadir Amigo" para empezar la lista</div>';
+        }
+
+        // 2. Historial
         const historyContainer = document.getElementById('party-history');
         historyContainer.innerHTML = '';
         
@@ -858,21 +895,44 @@ const App = {
     },
 
     async handlePartyAddMoney() {
-        const amount = parseFloat(prompt('¿Cuánto dinero se añade al bote?', '20'));
-        if (isNaN(amount)) return;
-        const friend = prompt('¿Quién pone el dinero?', this.state.user);
+        // Obtener lista de amigos actuales para sugerir
+        const friends = this.state.partyData.participants ? Object.values(this.state.partyData.participants).map(p => p.name) : [];
+        let promptMsg = '¿Quién pone el dinero?\n';
+        if (friends.length > 0) promptMsg += `Sugerencias: ${friends.join(', ')}`;
         
+        const friend = prompt(promptMsg, this.state.user);
+        if (!friend) return;
+
+        const amount = parseFloat(prompt(`¿Cuánto dinero añade ${friend}?`, '20'));
+        if (isNaN(amount)) return;
+        
+        // Si el amigo no existe en la lista, lo añadimos automáticamente
+        if (!friends.includes(friend)) {
+            await this.addPartyFriendSilent(friend);
+        }
+
         const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
         await set(historyRef, {
             type: 'income',
             amount: amount,
             description: `Aporte de ${friend}`,
-            user: this.state.user,
+            user: this.state.user, // Quien registra el aporte
             timestamp: Date.now()
         });
 
         const newTotal = (this.state.partyData.totalCollected || 0) + amount;
         await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
+    },
+
+    async handlePartyAddFriend() {
+        const name = prompt('Nombre del nuevo amigo:');
+        if (!name) return;
+        await this.addPartyFriendSilent(name);
+    },
+
+    async addPartyFriendSilent(name) {
+        const friendRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\./g, '_')}`);
+        await set(friendRef, { name: name, joinedAt: Date.now() });
     },
 
     async handlePartyAddExpense() {
