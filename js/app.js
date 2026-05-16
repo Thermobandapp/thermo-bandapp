@@ -61,7 +61,8 @@ const App = {
             createParty: document.getElementById('btn-create-party-main'),
             addPartyMoney: document.getElementById('btn-party-add-money'),
             addPartyExpense: document.getElementById('btn-party-add-expense'),
-            addPartyFriend: document.getElementById('btn-party-add-friend')
+            addPartyFriend: document.getElementById('btn-party-add-friend'),
+            partyGoHome: document.getElementById('btn-party-go-home')
         };
         this.display = {
             tableName: document.getElementById('display-table-name'),
@@ -90,11 +91,13 @@ const App = {
         this.display.finishTable.addEventListener('click', () => this.handleFinishTable());
         this.display.addFriendManual.addEventListener('click', () => this.handleAddFriendManual());
         
-        this.buttons.createParty.addEventListener('click', () => this.handleCreateParty());
+        this.buttons.createParty.addEventListener('click', () => this.handleCreatePartyFromSetup());
+        document.getElementById('btn-join-party-main').addEventListener('click', () => this.handleJoinPartyFromSetup());
         this.buttons.addPartyMoney.addEventListener('click', () => this.handlePartyAddMoney());
         this.buttons.addPartyExpense.addEventListener('click', () => this.handlePartyAddExpense());
         this.buttons.addPartyFriend.addEventListener('click', () => this.handlePartyAddFriend());
-        
+        this.buttons.partyGoHome.addEventListener('click', () => this.handlePartyGoHome());
+
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const view = e.currentTarget.dataset.view;
@@ -103,9 +106,6 @@ const App = {
                 this.showView(view);
             });
         });
-
-        this.buttons.createParty.addEventListener('click', () => this.handleCreatePartyFromSetup());
-        document.getElementById('btn-join-party-main').addEventListener('click', () => this.handleJoinPartyFromSetup());
     },
 
     switchSetupMode(mode, element) {
@@ -729,13 +729,25 @@ const App = {
         if (targetView) targetView.classList.add('active');
         this.state.currentView = viewName;
 
-        // Gestión de visibilidad de navegación y botón de salida
+        // Gestión de visibilidad de navegación y botones contextuales
         if (viewName === 'setup') {
             this.nav.classList.add('hidden');
             this.buttons.leaveTable.classList.add('hidden');
         } else {
             this.nav.classList.remove('hidden');
             this.buttons.leaveTable.classList.remove('hidden');
+
+            // Mostrar/Ocultar botones según modo
+            const barButtons = document.querySelectorAll('.nav-bar-only');
+            const partyButtons = document.querySelectorAll('.nav-party-only');
+            
+            if (viewName === 'party-pot') {
+                barButtons.forEach(b => b.classList.add('hidden'));
+                partyButtons.forEach(b => b.classList.remove('hidden'));
+            } else {
+                barButtons.forEach(b => b.classList.remove('hidden'));
+                partyButtons.forEach(b => b.classList.add('hidden'));
+            }
         }
     },
 
@@ -900,6 +912,38 @@ const App = {
             });
         }
     },
+    async handlePartyGoHome() {
+        const data = this.state.partyData;
+        const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
+        
+        let summaryHtml = `
+            <div class="final-summary">
+                <h2 style="text-align: center; margin-bottom: 1.5rem;">🎊 Resumen Final 🎊</h2>
+                <div class="summary-card glass" style="padding: 1.5rem; border-radius: 15px; margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Total Recaudado:</span>
+                        <b style="color: var(--success);">${(data.totalCollected || 0).toFixed(2)}€</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Total Gastado:</span>
+                        <b style="color: var(--danger);">${(data.totalSpent || 0).toFixed(2)}€</b>
+                    </div>
+                    <hr style="border: none; border-top: 1px dashed var(--glass-border); margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; font-size: 1.2rem;">
+                        <span>Sobran en el bote:</span>
+                        <b style="color: var(--primary);">${balance.toFixed(2)}€</b>
+                    </div>
+                </div>
+                <p style="text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+                    ¡Buena noche, amigos! 👋
+                </p>
+                <button onclick="location.reload()" class="btn-primary" style="width: 100%;">Cerrar y Salir</button>
+            </div>
+        `;
+        
+        this.openModal(summaryHtml);
+    },
+
     async handleTransferCustody(name) {
         if (this.state.partyData.custodian === name) return; // Ya es el custodio
         
