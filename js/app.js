@@ -1364,7 +1364,7 @@ const App = {
             </div>
         `;
         
-        this.openModal(summaryHtml);
+        this.openModal(summaryHtml, true);
     },
 
     async handleFinalCloseParty() {
@@ -1552,9 +1552,11 @@ const App = {
         await set(ref(this.db, `party_pots/${this.state.partyId}/totalSpent`), newTotal);
     },
 
-    openModal(html) {
+    openModal(html, hideCloseBtn = false) {
         this.display.modalContent.innerHTML = html;
         this.display.modalOverlay.classList.remove('hidden');
+        const closeBtn = document.getElementById('btn-close-modal');
+        if (closeBtn) closeBtn.style.display = hideCloseBtn ? 'none' : '';
     },
 
     closeModal() {
