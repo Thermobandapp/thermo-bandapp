@@ -1337,6 +1337,7 @@ const App = {
         const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
         
         let summaryHtml = `
+            <style>#btn-close-modal { display: none !important; }</style>
             <div class="final-summary">
                 <h2 style="text-align: center; margin-bottom: 1.5rem;">🎊 Resumen Final 🎊</h2>
                 <div class="summary-card glass" style="padding: 1.5rem; border-radius: 15px; margin-bottom: 1.5rem;">
