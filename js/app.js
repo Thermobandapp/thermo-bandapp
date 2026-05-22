@@ -1327,10 +1327,15 @@ const App = {
             
             const div = document.createElement('div');
             div.className = `participant-item glass ${hasLeft ? 'is-left' : ''}`;
-            div.onclick = () => !hasLeft && this.handleTransferCustody(name);
+            div.style.cursor = 'pointer';
+            if (hasLeft) {
+                div.onclick = () => this.showPartyRefundModal(name);
+            } else {
+                div.onclick = () => this.handleTransferCustody(name);
+            }
             div.innerHTML = `
                 <div class="p-info">
-                    <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera)</small>' : ''}</span>
+                    <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera) 💸</small>' : ''}</span>
                 </div>
                 <div class="p-amount">${amount.toFixed(2)}€</div>
             `;
@@ -1360,6 +1365,52 @@ const App = {
             });
         }
     },
+    showPartyRefundModal(name) {
+        const data = this.state.partyData;
+        if (!data) return;
+        const totalCollected = data.totalCollected || 0;
+        const balance = totalCollected - (data.totalSpent || 0);
+        const pData = data.participants?.[name.replace(/\./g, '_')];
+        const alreadyRefunded = pData?.refunded;
+
+        // Calcular aportes individuales
+        const individualAports = {};
+        if (data.history) {
+            Object.values(data.history).forEach(item => {
+                if (item.type === 'income') {
+                    const n = item.description.replace('Aporte de ', '');
+                    individualAports[n] = (individualAports[n] || 0) + item.amount;
+                }
+            });
+        }
+        const aport = individualAports[name] || 0;
+        const refundable = (balance > 0 && totalCollected > 0)
+            ? (balance * aport) / totalCollected
+            : 0;
+
+        let html = `<h3>💸 ${name} se fue antes</h3>`;
+        html += `<p style="color: var(--text-muted); margin-bottom: 1rem;">Aportó al bote: <b>${aport.toFixed(2)}€</b></p>`;
+
+        if (alreadyRefunded) {
+            html += `<p style="color: var(--success);">✅ Ya reclamó su sobrante.</p>`;
+        } else if (refundable > 0.01) {
+            html += `
+                <div style="background: rgba(99,102,241,0.15); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Le corresponde del sobrante:</p>
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #818cf8;">${refundable.toFixed(2)}€</span>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Calculado proporcionalmente según su aporte (${aport.toFixed(2)}€ de ${totalCollected.toFixed(2)}€ totales recaudados).
+                </p>
+                <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${refundable.toFixed(2)}€</button>
+            `;
+        } else {
+            html += `<p style="color: var(--text-muted);">No hay sobrante para repartir ahora mismo.</p>`;
+        }
+
+        this.openModal(html);
+    },
+
     async handlePartyGoHome() {
         const data = this.state.partyData;
         const totalCollected = data.totalCollected || 0;
