@@ -1336,6 +1336,40 @@ const App = {
         const data = this.state.partyData;
         const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
         
+        // Calcular reparto equitativo si sobra dinero
+        const participants = data.participants ? Object.values(data.participants) : [];
+        const numParticipants = participants.length;
+        const refundPerPerson = numParticipants > 0 ? (balance / numParticipants) : 0;
+        
+        let refundHtml = '';
+        if (balance > 0.01 && numParticipants > 0) {
+            refundHtml = `
+                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border-color: rgba(99, 102, 241, 0.4);">
+                    <h3 style="text-align: center; margin-bottom: 0.75rem; color: #818cf8; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>💸 Reparto Equitativo</span>
+                    </h3>
+                    <div style="display: flex; justify-content: space-between; font-size: 1.1rem; margin-bottom: 0.75rem; background: rgba(99, 102, 241, 0.15); padding: 0.6rem 0.8rem; border-radius: 10px;">
+                        <span>Cada amigo recibe:</span>
+                        <b style="color: #60a5fa;">${refundPerPerson.toFixed(2)}€</b>
+                    </div>
+                    <div style="max-height: 150px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;">
+            `;
+            
+            participants.forEach(p => {
+                refundHtml += `
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; padding: 0.3rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.02);">
+                        <span style="color: var(--text-main); font-weight: 500;">${p.name}</span>
+                        <span style="color: var(--success); font-weight: 600;">+${refundPerPerson.toFixed(2)}€</span>
+                    </div>
+                `;
+            });
+            
+            refundHtml += `
+                    </div>
+                </div>
+            `;
+        }
+        
         let summaryHtml = `
             <style>#btn-close-modal { display: none !important; }</style>
             <div class="final-summary">
@@ -1355,6 +1389,7 @@ const App = {
                         <b style="color: var(--primary);">${balance.toFixed(2)}€</b>
                     </div>
                 </div>
+                ${refundHtml}
                 <p style="text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
                     ¡Buena noche, amigos! 👋
                 </p>
