@@ -724,6 +724,31 @@ const App = {
         if (!hasOrders) html += `<p class="empty-msg">Aún no ha pedido nada.</p>`;
         else html += `<div class="order-row total-row"><span><b>TOTAL</b></span><span><b>${total.toFixed(2)}€</b></span></div>`;
         html += `</div>`;
+        // Si el participante se ha ido y no ha reclamado, ofrecer botón de reclamo y mostrar monto disponible
+        if (pInfo?.status === 'left' && !pInfo?.refunded) {
+            // Calcular monto reembolsable
+            const partyData = this.state.partyData;
+            const totalCollected = partyData.totalCollected || 0;
+            const balance = totalCollected - (partyData.totalSpent || 0);
+            let refundable = 0;
+            if (balance > 0) {
+                const individualAports = {};
+                if (partyData.history) {
+                    Object.values(partyData.history).forEach(item => {
+                        if (item.type === 'income') {
+                            const contribName = item.description.replace('Aporte de ', '');
+                            individualAports[contribName] = (individualAports[contribName] || 0) + item.amount;
+                        }
+                    });
+                }
+                const aport = individualAports[name] || 0;
+                refundable = (balance * aport) / totalCollected;
+            }
+            if (refundable > 0) {
+                html += `<p class="refund-amount">Puedes reclamar ${refundable.toFixed(2)}€ del bote.</p>`;
+            }
+            html += `<button class="btn-primary" onclick="App.claimRefund('${name}')">Reclamar sobrante</button>`;
+        }
         this.openModal(html);
     },
 
@@ -1297,12 +1322,15 @@ const App = {
 
         Object.entries(individualAports).forEach(([name, amount]) => {
             const isCustodian = data.custodian === name;
+            const pData = data.participants[name.replace(/\./g, '_')];
+            const hasLeft = pData?.status === 'left';
+            
             const div = document.createElement('div');
-            div.className = 'participant-item glass';
-            div.onclick = () => this.handleTransferCustody(name);
+            div.className = `participant-item glass ${hasLeft ? 'is-left' : ''}`;
+            div.onclick = () => !hasLeft && this.handleTransferCustody(name);
             div.innerHTML = `
                 <div class="p-info">
-                    <span class="p-name">${name} ${isCustodian ? '🚩' : ''}</span>
+                    <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera)</small>' : ''}</span>
                 </div>
                 <div class="p-amount">${amount.toFixed(2)}€</div>
             `;
@@ -1459,6 +1487,54 @@ const App = {
                 timestamp: Date.now()
             });
         } catch (error) { console.error(error); }
+    },
+
+    // Claim refund for a participant who left early
+    async claimRefund(name) {
+        const data = this.state.partyData;
+        const totalCollected = data.totalCollected || 0;
+        const balance = totalCollected - (data.totalSpent || 0);
+        if (balance <= 0) {
+            alert('No hay dinero sobrante para reclamar.');
+            return;
+        }
+        // Calcular aportes individuales
+        const individualAports = {};
+        if (data.history) {
+            Object.values(data.history).forEach(item => {
+                if (item.type === 'income') {
+                    const contribName = item.description.replace('Aporte de ', '');
+                    individualAports[contribName] = (individualAports[contribName] || 0) + item.amount;
+                }
+            });
+        }
+        const aport = individualAports[name] || 0;
+        const refund = (balance * aport) / totalCollected;
+        if (refund <= 0) {
+            alert('No hay nada que reclamar para ' + name);
+            return;
+        }
+        // Actualizar total del bote
+        const newTotal = totalCollected - refund;
+        await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
+        // Marcar como reembolsado
+        await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\\./g, '_')}/refunded`), true);
+        // Añadir entrada al historial
+        const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+        await set(historyRef, {
+            type: 'refund',
+            amount: -refund,
+            description: `Reclamo de ${name}`,
+            user: this.state.user,
+            timestamp: Date.now()
+        });
+        alert(`${name} ha reclamado ${refund.toFixed(2)}€ del bote.`);
+        // Recargar UI
+        if (this.listenToParty) {
+            this.listenToParty(this.state.partyId);
+        } else {
+            location.reload();
+        }
     },
 
     async handlePartyAddMoney() {
