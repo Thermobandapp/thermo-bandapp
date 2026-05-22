@@ -1082,9 +1082,15 @@ const App = {
             if (viewName === 'party-pot') {
                 barButtons.forEach(b => b.classList.add('hidden'));
                 partyButtons.forEach(b => b.classList.remove('hidden'));
+                // Cambiar texto del botón a "Dejar la fiesta"
+                const leaveSpan = this.buttons.leaveTable.querySelector('span:first-child');
+                if (leaveSpan) leaveSpan.textContent = 'Dejar la fiesta';
             } else {
                 barButtons.forEach(b => b.classList.remove('hidden'));
                 partyButtons.forEach(b => b.classList.add('hidden'));
+                // Restaurar texto a "Dejar la mesa"
+                const leaveSpan = this.buttons.leaveTable.querySelector('span:first-child');
+                if (leaveSpan) leaveSpan.textContent = 'Dejar la mesa';
             }
         }
     },
@@ -1331,7 +1337,7 @@ const App = {
             if (hasLeft) {
                 div.onclick = () => this.showPartyRefundModal(name);
             } else {
-                div.onclick = () => this.handleTransferCustody(name);
+                div.onclick = () => this.showPartyParticipantOptions(name);
             }
             div.innerHTML = `
                 <div class="p-info">
@@ -1365,6 +1371,43 @@ const App = {
             });
         }
     },
+    showPartyParticipantOptions(name) {
+        const isCustodian = this.state.partyData?.custodian === name;
+        const isMe = name === this.state.user;
+        let html = `<h3>👤 ${name}</h3>`;
+        html += `<div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">`;
+
+        if (!isCustodian) {
+            html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${name}')">🚩 Pasarle la banderola (y el dinero)</button>`;
+        }
+
+        if (!isMe) {
+            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name}')">&#128682; Marcar que se ha ido a casa</button>`;
+        }
+
+        html += `</div>`;
+        this.openModal(html);
+    },
+
+    async markParticipantAsLeft(name) {
+        if (!confirm(`¿Seguro que quieres marcar a ${name} como que se ha ido?`)) return;
+        try {
+            const key = name.replace(/\./g, '_');
+            const participantRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${key}`);
+            const currentData = this.state.partyData?.participants?.[key] || {};
+            await set(participantRef, { ...currentData, name, status: 'left', leftAt: Date.now() });
+            // Registrar en historial
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'system',
+                amount: 0,
+                description: `🚶 ${name} se fue a casa`,
+                user: this.state.user,
+                timestamp: Date.now()
+            });
+        } catch (error) { console.error('Error marcando como ido:', error); }
+    },
+
     showPartyRefundModal(name) {
         const data = this.state.partyData;
         if (!data) return;
