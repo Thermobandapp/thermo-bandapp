@@ -1334,32 +1334,55 @@ const App = {
     },
     async handlePartyGoHome() {
         const data = this.state.partyData;
-        const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
+        const totalCollected = data.totalCollected || 0;
+        const balance = totalCollected - (data.totalSpent || 0);
         
-        // Calcular reparto equitativo si sobra dinero
+        // Calcular aportes individuales
+        const individualAports = {};
+        if (data.participants) {
+            Object.values(data.participants).forEach(p => individualAports[p.name] = 0);
+        }
+        if (data.history) {
+            Object.values(data.history).forEach(item => {
+                if (item.type === 'income') {
+                    const name = item.description.replace('Aporte de ', '');
+                    individualAports[name] = (individualAports[name] || 0) + item.amount;
+                }
+            });
+        }
+        
         const participants = data.participants ? Object.values(data.participants) : [];
-        const numParticipants = participants.length;
-        const refundPerPerson = numParticipants > 0 ? (balance / numParticipants) : 0;
         
         let refundHtml = '';
-        if (balance > 0.01 && numParticipants > 0) {
+        if (balance > 0.01 && totalCollected > 0 && participants.length > 0) {
             refundHtml = `
                 <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border-color: rgba(99, 102, 241, 0.4);">
                     <h3 style="text-align: center; margin-bottom: 0.75rem; color: #818cf8; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>💸 Reparto Equitativo</span>
+                        <span>💸 Reparto Proporcional</span>
                     </h3>
-                    <div style="display: flex; justify-content: space-between; font-size: 1.1rem; margin-bottom: 0.75rem; background: rgba(99, 102, 241, 0.15); padding: 0.6rem 0.8rem; border-radius: 10px;">
-                        <span>Cada amigo recibe:</span>
-                        <b style="color: #60a5fa;">${refundPerPerson.toFixed(2)}€</b>
-                    </div>
-                    <div style="max-height: 150px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                    <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
+                        Devolución calculada según el aporte de cada amigo al bote.
+                    </p>
+                    <div style="max-height: 180px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;">
             `;
             
-            participants.forEach(p => {
+            // Ordenar por devolución de mayor a menor
+            const sortedParticipants = participants.map(p => {
+                const aport = individualAports[p.name] || 0;
+                const refund = (balance * aport) / totalCollected;
+                return { name: p.name, aport, refund };
+            }).sort((a, b) => b.refund - a.refund);
+            
+            sortedParticipants.forEach(p => {
                 refundHtml += `
-                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; padding: 0.3rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.02);">
-                        <span style="color: var(--text-main); font-weight: 500;">${p.name}</span>
-                        <span style="color: var(--success); font-weight: 600;">+${refundPerPerson.toFixed(2)}€</span>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; padding: 0.35rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.02); align-items: center;">
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="color: var(--text-main); font-weight: 500;">${p.name}</span>
+                            <span style="font-size: 0.7rem; color: var(--text-muted);">Aportó: ${p.aport.toFixed(2)}€</span>
+                        </div>
+                        <span style="color: ${p.refund > 0.01 ? 'var(--success)' : 'var(--text-muted)'}; font-weight: 600;">
+                            ${p.refund > 0.01 ? `+${p.refund.toFixed(2)}€` : '0.00€'}
+                        </span>
                     </div>
                 `;
             });
