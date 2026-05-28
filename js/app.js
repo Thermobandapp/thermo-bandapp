@@ -762,7 +762,23 @@ const App = {
             if (price > 0) {
                 hasOrders = true;
                 total += price;
-                html += `<div class="order-row"><span>${label}</span><div class="order-actions"><span>${price.toFixed(2)}€</span><button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button></div></div>`;
+                const orderHour = o.timestamp ? new Date(o.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+                const orderedByStr = o.orderedBy ? `por ${o.orderedBy}` : '';
+                const timeStr = orderHour ? ` a las ${orderHour}` : '';
+                const metaInfo = (orderedByStr || timeStr) ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; width: 100%; text-align: left;">Pedida ${orderedByStr}${timeStr}</div>` : '';
+                
+                html += `
+                    <div class="order-row" style="flex-direction: column; align-items: flex-start; padding: 0.6rem 0;">
+                        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                            <span>${label}</span>
+                            <div class="order-actions">
+                                <span>${price.toFixed(2)}€</span>
+                                <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button>
+                            </div>
+                        </div>
+                        ${metaInfo}
+                    </div>
+                `;
             }
         });
 
