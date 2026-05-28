@@ -54,6 +54,7 @@ const App = {
             this.app = initializeApp(firebaseConfig);
             this.db = getDatabase(this.app);
             console.log('Firebase conectado correctamente ✅');
+            this.listenToBars();
         } catch (error) {
             console.error('Error al conectar con Firebase:', error);
             alert('Error de conexión con la base de datos.');
@@ -76,7 +77,9 @@ const App = {
             loginUser: document.getElementById('login-user'),
             loginCode: document.getElementById('login-code'),
             barName: document.getElementById('bar-name'),
-            tableNum: document.getElementById('table-num')
+            tableNum: document.getElementById('table-num'),
+            btnToggleBarDropdown: document.getElementById('btn-toggle-bar-dropdown'),
+            barDropdownList: document.getElementById('bar-dropdown-list')
         };
         this.buttons = {
             createTable: document.getElementById('btn-create-table'),
@@ -138,6 +141,32 @@ const App = {
                 e.currentTarget.classList.add('active');
                 this.showView(view);
             });
+        });
+
+        // Combobox de Selección de Bar
+        if (this.inputs.btnToggleBarDropdown) {
+            this.inputs.btnToggleBarDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleBarDropdown();
+            });
+        }
+
+        if (this.inputs.barName) {
+            this.inputs.barName.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openBarDropdown();
+            });
+            this.inputs.barName.addEventListener('input', (e) => {
+                this.openBarDropdown();
+                this.updateBarsDropdownUI(e.target.value);
+            });
+        }
+
+        // Cerrar dropdown al hacer clic fuera
+        document.addEventListener('click', (e) => {
+            if (this.inputs.barDropdownList && !e.target.closest('.bar-combobox')) {
+                this.closeBarDropdown();
+            }
         });
     },
 
@@ -449,6 +478,15 @@ const App = {
             this.state.tableId = tableId;
             localStorage.setItem('thermo_user', userName);
             localStorage.setItem('thermo_tableId', tableId);
+
+            // Guardar automáticamente en el listado de bares si no existe
+            const barExists = Object.values(this.state.bars || {}).some(
+                b => b.name.toLowerCase().trim() === barName.toLowerCase().trim()
+            );
+            if (!barExists) {
+                const newBarRef = push(ref(this.db, 'bars'));
+                await set(newBarRef, { name: barName });
+            }
 
             // PERSISTENCIA: Cargar menú previo del bar si existe
             const barMenuRef = ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}`);
@@ -1790,6 +1828,150 @@ const App = {
 
     closeModal() {
         this.display.modalOverlay.classList.add('hidden');
+    },
+
+    // --- MÉTODOS DEL COMBOBOX DE BARES ---
+    listenToBars() {
+        const barsRef = ref(this.db, 'bars');
+        onValue(barsRef, (snapshot) => {
+            this.state.bars = snapshot.val() || {};
+            this.updateBarsDropdownUI(this.inputs.barName ? this.inputs.barName.value : '');
+        });
+    },
+
+    updateBarsDropdownUI(filterText = '') {
+        const listEl = this.inputs.barDropdownList;
+        if (!listEl) return;
+        listEl.innerHTML = '';
+
+        const filter = filterText.toLowerCase().trim();
+        const bars = Object.entries(this.state.bars || {});
+
+        const filteredBars = bars.filter(([id, b]) => {
+            return b.name.toLowerCase().includes(filter);
+        });
+
+        if (filteredBars.length === 0) {
+            listEl.innerHTML = '<div class="dropdown-item empty-msg" style="padding: 0.75rem 1rem;">No hay bares que coincidan</div>';
+            return;
+        }
+
+        filteredBars.forEach(([id, b]) => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            
+            const textSpan = document.createElement('span');
+            textSpan.className = 'dropdown-item-text';
+            textSpan.textContent = b.name;
+            textSpan.onclick = (e) => {
+                e.stopPropagation();
+                this.inputs.barName.value = b.name;
+                this.closeBarDropdown();
+            };
+
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'dropdown-item-actions';
+
+            const btnEdit = document.createElement('button');
+            btnEdit.type = 'button';
+            btnEdit.className = 'btn-action-small';
+            btnEdit.innerHTML = '✏️';
+            btnEdit.onclick = (e) => {
+                e.stopPropagation();
+                this.handleEditBar(id, b.name);
+            };
+
+            const btnDelete = document.createElement('button');
+            btnDelete.type = 'button';
+            btnDelete.className = 'btn-action-small delete';
+            btnDelete.innerHTML = '🗑️';
+            btnDelete.onclick = (e) => {
+                e.stopPropagation();
+                this.handleDeleteBar(id, b.name);
+            };
+
+            actionsDiv.appendChild(btnEdit);
+            actionsDiv.appendChild(btnDelete);
+
+            item.appendChild(textSpan);
+            item.appendChild(actionsDiv);
+
+            listEl.appendChild(item);
+        });
+    },
+
+    async handleEditBar(id, oldName) {
+        const newName = prompt(`Modificar nombre del bar "${oldName}":`, oldName);
+        if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+
+        const trimmedNewName = newName.trim();
+        const oldKey = oldName.replace(/\s/g, '_');
+        const newKey = trimmedNewName.replace(/\s/g, '_');
+
+        try {
+            // 1. Actualizar el nombre en la lista de bares
+            await set(ref(this.db, `bars/${id}`), { name: trimmedNewName });
+            
+            // 2. Si hay menú guardado en el antiguo key, migrarlo al nuevo key
+            if (oldKey !== newKey) {
+                const oldMenuRef = ref(this.db, `bar_menus/${oldKey}`);
+                const snapshot = await get(oldMenuRef);
+                if (snapshot.exists()) {
+                    await set(ref(this.db, `bar_menus/${newKey}`), snapshot.val());
+                    await set(oldMenuRef, null);
+                }
+            }
+            alert(`El bar se ha actualizado a "${trimmedNewName}" correctamente.`);
+        } catch (error) {
+            console.error('Error al editar bar:', error);
+            alert('Error al actualizar el bar en la base de datos.');
+        }
+    },
+
+    async handleDeleteBar(id, barName) {
+        if (!confirm(`¿Seguro que quieres borrar el bar "${barName}"? Esto eliminará también su menú predeterminado guardado.`)) return;
+
+        try {
+            await set(ref(this.db, `bars/${id}`), null);
+            const menuKey = barName.replace(/\s/g, '_');
+            await set(ref(this.db, `bar_menus/${menuKey}`), null);
+            alert(`El bar "${barName}" ha sido eliminado.`);
+        } catch (error) {
+            console.error('Error al eliminar bar:', error);
+            alert('Error al eliminar el bar de la base de datos.');
+        }
+    },
+
+    toggleBarDropdown() {
+        const dropdown = this.inputs.barDropdownList;
+        const toggleBtn = this.inputs.btnToggleBarDropdown;
+        if (!dropdown) return;
+        
+        const isOpen = dropdown.classList.contains('open');
+        if (isOpen) {
+            this.closeBarDropdown();
+        } else {
+            this.openBarDropdown();
+        }
+    },
+
+    openBarDropdown() {
+        const dropdown = this.inputs.barDropdownList;
+        const toggleBtn = this.inputs.btnToggleBarDropdown;
+        if (!dropdown) return;
+
+        dropdown.classList.add('open');
+        if (toggleBtn) toggleBtn.classList.add('open');
+        this.updateBarsDropdownUI(this.inputs.barName ? this.inputs.barName.value : '');
+    },
+
+    closeBarDropdown() {
+        const dropdown = this.inputs.barDropdownList;
+        const toggleBtn = this.inputs.btnToggleBarDropdown;
+        if (!dropdown) return;
+
+        dropdown.classList.remove('open');
+        if (toggleBtn) toggleBtn.classList.remove('open');
     }
 };
 
