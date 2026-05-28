@@ -168,6 +168,12 @@ const App = {
                 this.closeBarDropdown();
             }
         });
+
+        // Edición de nombre de mesa
+        const editTableBtn = document.getElementById('btn-edit-table-name');
+        if (editTableBtn) {
+            editTableBtn.addEventListener('click', () => this.handleRenameTable());
+        }
     },
 
     switchSetupMode(mode, element) {
@@ -457,8 +463,9 @@ const App = {
             } else {
                 // Se crea nueva mesa (si estaba cerrada, se sobreescribe limpiando la cuenta)
 
+                const dateFormatted = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 const tableData = {
-                    name: `${barName} (Mesa ${tableNum})`,
+                    name: `${barName} (${dateFormatted})`,
                     creator: userName,
                     createdAt: Date.now(),
                     status: 'active',
@@ -1972,6 +1979,23 @@ const App = {
 
         dropdown.classList.remove('open');
         if (toggleBtn) toggleBtn.classList.remove('open');
+    },
+
+    async handleRenameTable() {
+        if (!this.state.tableId || !this.state.tableData) return;
+        
+        const currentName = this.state.tableData.name || '';
+        const newName = prompt("Cambiar el nombre de la mesa:", currentName);
+        if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+
+        const trimmedNewName = newName.trim();
+        try {
+            await set(ref(this.db, `tables/${this.state.tableId}/name`), trimmedNewName);
+            await this.addLog('rename_table', { tableId: this.state.tableId, oldName: currentName, newName: trimmedNewName });
+        } catch (error) {
+            console.error('Error al cambiar el nombre de la mesa:', error);
+            alert('Error al actualizar el nombre de la mesa en la base de datos.');
+        }
     }
 };
 
