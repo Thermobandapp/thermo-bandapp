@@ -44,19 +44,20 @@
                 </div>
                 <div class="card glass">
                     <h2>Acceso Miembros</h2>
-                    <p class="subtitle">Identifícate para entrar en la banda</p>
+                    <p class="subtitle" id="login-subtitle">Selecciona tu miembro de la banda para entrar</p>
                     
-                    <div class="form-group">
-                        <label for="login-user">Nombre de Miembro</label>
-                        <input type="text" id="login-user" placeholder="Tu nombre">
+                    <div id="login-members-grid" class="participant-grid" style="margin-top: 1rem;">
+                        <!-- Botones de miembros cargados de Firebase -->
+                        <p class="empty-msg">Cargando miembros...</p>
                     </div>
-                    <div class="form-group">
-                        <label for="login-code">Código Secreto</label>
+
+                    <!-- Código de administrador visible solo para Fernando -->
+                    <div id="login-admin-code-group" class="form-group hidden" style="margin-top: 1.5rem; animation: fadeIn 0.3s ease;">
+                        <label for="login-code">Código Secreto de Fernando</label>
                         <input type="password" id="login-code" placeholder="****">
-                    </div>
-                    
-                    <div class="actions">
-                        <button id="btn-login-submit" class="btn-primary">Entrar</button>
+                        <div class="actions" style="margin-top: 1rem;">
+                            <button id="btn-login-submit" class="btn-primary">Entrar como Admin</button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -72,12 +73,16 @@
                         <button class="mode-tab" onclick="App.switchSetupMode('party', this)">🍹 Fiesta</button>
                     </div>
 
-                    <!-- Botón Admin y Logout Exclusivos para Fernando -->
+                    <!-- Botón de cambio de miembro (visible para todos) -->
+                    <div id="switch-member-btn" style="display: flex; justify-content: flex-end; margin-bottom: 0.75rem;">
+                        <button class="btn-logout" onclick="localStorage.clear(); location.reload();" title="Cambiar de miembro" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.85rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                            <span>👤</span> <span id="switch-member-name"></span> <span style="color: var(--text-muted); font-size: 0.75rem;">· Cambiar</span>
+                        </button>
+                    </div>
+
+                    <!-- Botón Admin Exclusivo para Fernando -->
                     <div id="admin-panel-btn" class="hidden" style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1rem;">
                         <button class="btn-secondary" onclick="App.showAdminView()" style="background: rgba(129, 140, 248, 0.2); border-color: var(--primary);">⚙️ Gestión de Miembros</button>
-                        <button class="btn-logout" onclick="localStorage.clear(); location.reload();" title="Cerrar Sesión de Miembro" style="background: rgba(239, 68, 68, 0.1); border-color: var(--danger); display: flex; align-items: center; gap: 0.5rem;">
-                            <span class="icon">👤❌</span> Salir
-                        </button>
                     </div>
 
                     <!-- Formulario BAR -->
@@ -85,9 +90,9 @@
                         <h2>Nueva Mesa</h2>
                         <p class="subtitle">Configura la mesa para empezar</p>
                         
-                        <div class="form-group">
+                        <div class="form-group hidden" id="form-group-user-name">
                             <label for="user-name">Tu nombre</label>
-                            <input type="text" id="user-name" placeholder="Ej: Fernando" autocomplete="name">
+                            <input type="text" id="user-name" placeholder="Ej: Fernando" autocomplete="name" readonly style="opacity: 0.7; cursor: default;">
                         </div>
 
                         <div class="form-row">
@@ -119,9 +124,9 @@
                         <h2>Bote de Fiesta</h2>
                         <p class="subtitle">Recauda dinero y gestiona los gastos</p>
                         
-                        <div class="form-group">
+                        <div class="form-group hidden" id="form-group-user-name-party">
                             <label for="user-name-party">Tu nombre</label>
-                            <input type="text" id="user-name-party" placeholder="Ej: Fernando">
+                            <input type="text" id="user-name-party" placeholder="Ej: Fernando" readonly style="opacity: 0.7; cursor: default;">
                         </div>
 
                         <div class="form-group">
@@ -142,7 +147,7 @@
             <section id="admin-view" class="view">
                 <div class="setup-header">
                     <h2>Gestión de Miembros</h2>
-                    <p class="subtitle">Altas, bajas y modificación de claves</p>
+                    <p class="subtitle">Altas, bajas y gestión de la banda</p>
                 </div>
                 <div class="card glass">
                     <h3>Nuevo / Modificar Miembro</h3>

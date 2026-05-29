@@ -18,7 +18,9 @@ const App = {
         settleMode: 'single',
         contributions: {},
         partyId: null,
-        partyData: null
+        partyData: null,
+        tempLoginName: null,
+        tempLoginCode: null
     },
 
     init() {
@@ -239,36 +241,34 @@ const App = {
     },
 
     async handleLogin() {
-        const user = this.inputs.loginUser.value.trim();
+        const user = this.state.tempLoginName || '';
         const code = this.inputs.loginCode.value.trim();
-
-        if (!user || !code) return alert('Rellena tus datos de miembro');
-
+ 
+        if (!user) return alert('Por favor, selecciona primero un miembro.');
+        if (!code) return alert('Rellena el código de administrador.');
+ 
+        if (user.toLowerCase() !== 'fernando') {
+            await this.executeDirectLogin(user);
+            return;
+        }
+ 
         try {
-            const memberRef = ref(this.db, `members/${user.toLowerCase()}`);
-            const snapshot = await get(memberRef);
-            
-            if (snapshot.exists() && snapshot.val().code === code) {
-                const officialName = snapshot.val().name; // Usar el nombre con mayúsculas de la BD
-                this.state.user = officialName;
+            if (code === this.state.tempLoginCode) {
+                this.state.user = user;
                 this.updateHeaderUser();
-                localStorage.setItem('thermo_user', officialName);
+                localStorage.setItem('thermo_user', user);
                 localStorage.setItem('thermo_auth', 'true');
                 
                 // Auto-rellenar en los formularios
-                this.inputs.userName.value = officialName;
-                if (this.inputs.userNameParty) this.inputs.userNameParty.value = officialName;
+                this.inputs.userName.value = user;
+                if (this.inputs.userNameParty) this.inputs.userNameParty.value = user;
                 
-                if (officialName.toLowerCase() === 'fernando') {
-                    this.display.adminPanelBtn.classList.remove('hidden');
-                } else {
-                    this.display.adminPanelBtn.classList.add('hidden');
-                }
+                this.display.adminPanelBtn.classList.remove('hidden');
                 
-                await this.addLog('login', { user: officialName });
+                await this.addLog('login', { user: user, type: 'admin' });
                 this.showView('setup');
             } else {
-                alert('Usuario o código incorrecto. Acceso denegado.');
+                alert('Código secreto incorrecto. Acceso denegado.');
             }
         } catch (error) { console.error(error); }
     },
@@ -277,6 +277,11 @@ const App = {
         const headerUserName = document.getElementById('header-user-name');
         if (headerUserName && this.state.user) {
             headerUserName.textContent = this.state.user;
+        }
+        // Actualizar el nombre en el botón "Cambiar de miembro"
+        const switchName = document.getElementById('switch-member-name');
+        if (switchName && this.state.user) {
+            switchName.textContent = this.state.user;
         }
     },
 
@@ -1122,6 +1127,19 @@ const App = {
 
     showView(viewName) {
         if (viewName === 'settle') this.initSettleView();
+        if (viewName === 'login-view') {
+            this.loadLoginMembers();
+            const codeGroup = document.getElementById('login-admin-code-group');
+            if (codeGroup) codeGroup.classList.add('hidden');
+            const loginSubtitle = document.getElementById('login-subtitle');
+            if (loginSubtitle) loginSubtitle.textContent = `Selecciona tu miembro de la banda para entrar`;
+            // Limpiar selección previa
+            document.querySelectorAll('#login-members-grid .participant-btn').forEach(btn => btn.classList.remove('selected'));
+        }
+        if (viewName === 'setup') {
+            // Actualizar el nombre del usuario en el botón de cambio de miembro
+            this.updateHeaderUser();
+        }
         Object.values(this.views).forEach(v => v?.classList.remove('active'));
         
         const targetView = this.views[viewName];
@@ -2011,6 +2029,91 @@ const App = {
         } catch (error) {
             console.error('Error al cambiar el nombre de la mesa:', error);
             alert('Error al actualizar el nombre de la mesa en la base de datos.');
+        }
+    },
+
+    // --- MÉTODOS DE ACCESO SIMPLIFICADO ---
+    async loadLoginMembers() {
+        const gridEl = document.getElementById('login-members-grid');
+        if (!gridEl) return;
+        
+        try {
+            const snapshot = await get(ref(this.db, 'members'));
+            if (!snapshot.exists()) {
+                gridEl.innerHTML = '<p class="empty-msg">No hay miembros registrados.</p>';
+                return;
+            }
+            
+            const members = snapshot.val();
+            gridEl.innerHTML = '';
+            
+            // Ordenar alfabéticamente para que se vea premium
+            const sortedMembers = Object.entries(members).sort((a, b) => a[1].name.localeCompare(b[1].name));
+            
+            sortedMembers.forEach(([key, data]) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'participant-btn';
+                if (data.name.toLowerCase() === 'fernando') {
+                    btn.classList.add('is-me'); // estilo destacado
+                }
+                btn.textContent = data.name;
+                btn.onclick = () => this.handleLoginMemberClick(data.name, data.code);
+                gridEl.appendChild(btn);
+            });
+        } catch (error) {
+            console.error('Error al cargar miembros para login:', error);
+            gridEl.innerHTML = '<p class="empty-msg">Error al conectar con la base de datos.</p>';
+        }
+    },
+
+    async handleLoginMemberClick(name, officialCode) {
+        this.state.tempLoginName = name;
+        this.state.tempLoginCode = officialCode;
+        
+        const codeGroup = document.getElementById('login-admin-code-group');
+        const loginSubtitle = document.getElementById('login-subtitle');
+
+        document.querySelectorAll('#login-members-grid .participant-btn').forEach(btn => {
+            if (btn.textContent === name) {
+                btn.classList.add('selected');
+            } else {
+                btn.classList.remove('selected');
+            }
+        });
+
+        if (name.toLowerCase() === 'fernando') {
+            if (codeGroup) codeGroup.classList.remove('hidden');
+            if (loginSubtitle) loginSubtitle.textContent = `Introduce el código para verificar que eres Fernando:`;
+            const codeInput = document.getElementById('login-code');
+            if (codeInput) {
+                codeInput.value = '';
+                codeInput.focus();
+            }
+        } else {
+            if (codeGroup) codeGroup.classList.add('hidden');
+            if (loginSubtitle) loginSubtitle.textContent = `Selecciona tu miembro de la banda para entrar`;
+            
+            await this.executeDirectLogin(name);
+        }
+    },
+
+    async executeDirectLogin(name) {
+        try {
+            this.state.user = name;
+            this.updateHeaderUser();
+            localStorage.setItem('thermo_user', name);
+            localStorage.setItem('thermo_auth', 'true');
+            
+            this.inputs.userName.value = name;
+            if (this.inputs.userNameParty) this.inputs.userNameParty.value = name;
+            
+            this.display.adminPanelBtn.classList.add('hidden');
+            
+            await this.addLog('login', { user: name, type: 'direct' });
+            this.showView('setup');
+        } catch (e) {
+            console.error(e);
         }
     }
 };
