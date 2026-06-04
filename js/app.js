@@ -1331,10 +1331,12 @@ const App = {
         try {
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
-            const currentParticipants = Object.values(this.state.tableData?.participants || {}).map(p => p.name);
+            const activeParticipants = Object.values(this.state.tableData?.participants || {})
+                .filter(p => p.status === 'active')
+                .map(p => p.name);
             
-            // Filtramos miembros que ya están en la mesa
-            const availableMembers = members.filter(m => !currentParticipants.includes(m.name));
+            // Filtramos miembros que ya están activos en la mesa
+            const availableMembers = members.filter(m => !activeParticipants.includes(m.name));
 
             this.state.tempSelectionFriends = [];
             
