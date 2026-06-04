@@ -811,6 +811,11 @@ const App = {
         if (!hasOrders) html += `<p class="empty-msg">Aún no ha pedido nada.</p>`;
         else html += `<div class="order-row total-row"><span><b>TOTAL</b></span><span><b>${total.toFixed(2)}€</b></span></div>`;
         html += `</div>`;
+
+        if (pInfo?.status === 'active') {
+            html += `<button class="btn-primary" style="background: var(--danger); margin-top: 1rem; width: 100%;" onclick="App.kickParticipant('${name.replace(/'/g, "\\'")}')">Sacar de la mesa 🚪</button>`;
+        }
+
         // Si el participante se ha ido y no ha reclamado, ofrecer botón de reclamo y mostrar monto disponible
         if (pInfo?.status === 'left' && !pInfo?.refunded) {
             // Calcular monto reembolsable
@@ -1288,6 +1293,29 @@ const App = {
             localStorage.removeItem('thermo_partyId');
             location.reload();
         } catch (error) { console.error(error); }
+    },
+
+    async kickParticipant(name) {
+        if (!confirm(`¿Seguro que quieres sacar a "${name}" de la mesa?`)) return;
+        try {
+            const key = name.replace(/\./g, '_');
+            const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${key}`);
+            const currentParticipant = this.state.tableData.participants[key];
+            await set(participantRef, { ...currentParticipant, status: 'left' });
+            
+            this.closeModal();
+            
+            if (name === this.state.user) {
+                localStorage.removeItem('thermo_tableId');
+                localStorage.removeItem('thermo_partyId');
+                location.reload();
+            } else {
+                alert(`"${name}" ha sido sacado de la mesa.`);
+            }
+        } catch (error) {
+            console.error('Error al sacar de la mesa:', error);
+            alert('Error al sacar de la mesa.');
+        }
     },
 
     async handleFinishTable() {
