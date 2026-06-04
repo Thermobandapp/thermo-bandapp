@@ -87,6 +87,7 @@ const App = {
             createTable: document.getElementById('btn-create-table'),
             joinTable: document.getElementById('btn-join-table'),
             addProduct: document.getElementById('btn-add-product-menu'),
+            repeatRound: document.getElementById('btn-repeat-round'),
             leaveTable: document.getElementById('btn-leave-table'),
             createParty: document.getElementById('btn-create-party-main'),
             addPartyMoney: document.getElementById('btn-party-add-money'),
@@ -120,6 +121,9 @@ const App = {
         this.buttons.createTable.addEventListener('click', () => this.handleCreateTable());
         this.buttons.joinTable.addEventListener('click', () => this.handleJoinTable());
         this.buttons.addProduct.addEventListener('click', () => this.handleAddProductMenu());
+        if (this.buttons.repeatRound) {
+            this.buttons.repeatRound.addEventListener('click', () => this.handleRepeatRoundSelector());
+        }
         this.buttons.leaveTable.addEventListener('click', () => this.handleLeaveTable());
         document.getElementById('btn-close-modal').addEventListener('click', () => this.closeModal());
         this.display.finishTable.addEventListener('click', () => this.handleFinishTable());
@@ -864,6 +868,88 @@ const App = {
     confirmMultiOrder(product) {
         if (this.state.tempSelection.length === 0) return alert('Selecciona al menos a una persona.');
         this.addOrder(product, this.state.tempSelection);
+    },
+
+    handleRepeatRoundSelector() {
+        const participants = Object.values(this.state.tableData.participants || {});
+        if (participants.length === 0) return alert('No hay participantes en la mesa.');
+
+        const orders = Object.values(this.state.tableData.orders || {});
+        const participantLastOrders = {};
+        participants.forEach(p => {
+            const userOrders = orders.filter(o => o.user === p.name);
+            if (userOrders.length > 0) {
+                userOrders.sort((a, b) => b.timestamp - a.timestamp);
+                participantLastOrders[p.name] = userOrders[0];
+            } else {
+                participantLastOrders[p.name] = null;
+            }
+        });
+
+        this.state.tempRepeatSelection = [];
+        
+        let html = `<h3>Otra ronda de lo mismo 🔁</h3>`;
+        html += `<p class="subtitle" style="margin-bottom: 1rem; text-align: center;">¿Quiénes quieren repetir su último pedido?</p>`;
+        html += `<div class="participant-grid">`;
+        
+        participants.forEach(p => {
+            const lastOrder = participantLastOrders[p.name];
+            const isMe = p.name === this.state.user;
+            const disabled = !lastOrder;
+            const detailText = lastOrder ? lastOrder.productName : 'Sin pedidos';
+            
+            html += `
+                <button id="rep-btn-${p.name.replace(/\s/g, '_')}" 
+                        class="participant-btn ${isMe && lastOrder ? 'is-me' : ''} ${disabled ? 'disabled' : ''}" 
+                        ${disabled ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''} 
+                        onclick="App.toggleRepeatSelection('${p.name.replace(/'/g, "\\'")}')">
+                    <div style="font-weight: bold;">${p.name}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">${detailText}</div>
+                </button>
+            `;
+        });
+        
+        html += `</div>`;
+        html += `<button id="btn-confirm-repeat" class="btn-primary" onclick="App.confirmRepeatRound(${JSON.stringify(participantLastOrders).replace(/"/g, '&quot;')})">Repetir pedidos (0)</button>`;
+        
+        this.openModal(html);
+    },
+
+    toggleRepeatSelection(name) {
+        if (!this.state.tempRepeatSelection) this.state.tempRepeatSelection = [];
+        const idx = this.state.tempRepeatSelection.indexOf(name);
+        const btn = document.getElementById(`rep-btn-${name.replace(/\s/g, '_')}`);
+        if (idx > -1) {
+            this.state.tempRepeatSelection.splice(idx, 1);
+            btn.classList.remove('selected');
+        } else {
+            this.state.tempRepeatSelection.push(name);
+            btn.classList.add('selected');
+        }
+        document.getElementById('btn-confirm-repeat').textContent = `Repetir pedidos (${this.state.tempRepeatSelection.length})`;
+    },
+
+    async confirmRepeatRound(participantLastOrders) {
+        if (!this.state.tempRepeatSelection || this.state.tempRepeatSelection.length === 0) {
+            return alert('Selecciona al menos a una persona.');
+        }
+
+        try {
+            for (const name of this.state.tempRepeatSelection) {
+                const lastOrder = participantLastOrders[name];
+                if (lastOrder) {
+                    const productMock = {
+                        name: lastOrder.productName,
+                        price: lastOrder.price
+                    };
+                    await this.addOrder(productMock, name);
+                }
+            }
+            this.closeModal();
+        } catch (error) {
+            console.error('Error al repetir la ronda:', error);
+            alert('Error al repetir la ronda.');
+        }
     },
 
     initSettleView() {
