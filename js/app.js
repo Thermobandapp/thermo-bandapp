@@ -548,6 +548,18 @@ const App = {
         await set(ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${id}`), productData);
     },
 
+    async handleDeleteProduct(id, item) {
+        if (!confirm(`¿Seguro que quieres borrar el producto "${item.name}" del menú?`)) return;
+        try {
+            await set(ref(this.db, `tables/${this.state.tableId}/menu/${id}`), null);
+            const barName = this.state.tableData.name.split(' (Mesa')[0].trim();
+            await set(ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${id}`), null);
+        } catch (error) {
+            console.error('Error al borrar el producto:', error);
+            alert('Error al borrar el producto.');
+        }
+    },
+
     async addOrder(product, targetUsers) {
         const users = Array.isArray(targetUsers) ? targetUsers : [targetUsers];
         for (const targetUser of users) {
@@ -658,17 +670,22 @@ const App = {
             div.className = 'menu-item glass';
             div.innerHTML = `
                 <button class="btn-edit-small" data-id="${id}">✏️</button>
+                <button class="btn-delete-menu-small" data-id="${id}">🗑️</button>
                 <span class="item-icon">${item.icon || '🍴'}</span>
                 <span class="item-name">${item.name}</span>
                 <span class="item-price">${item.price.toFixed(2)}€</span>
             `;
             div.onclick = (e) => {
-                if (e.target.classList.contains('btn-edit-small')) return;
+                if (e.target.classList.contains('btn-edit-small') || e.target.classList.contains('btn-delete-menu-small')) return;
                 this.showParticipantSelector(item);
             };
             div.querySelector('.btn-edit-small').onclick = (e) => {
                 e.stopPropagation();
                 this.handleEditProduct(id, item);
+            };
+            div.querySelector('.btn-delete-menu-small').onclick = (e) => {
+                e.stopPropagation();
+                this.handleDeleteProduct(id, item);
             };
             this.display.menu.appendChild(div);
         });

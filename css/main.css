@@ -473,6 +473,7 @@ input:focus {
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
+    position: relative;
 }
 
 .menu-item:active {
@@ -577,6 +578,28 @@ input:focus {
     justify-content: center;
     border: none;
     cursor: pointer;
+}
+
+.btn-delete-menu-small {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    font-size: 0.8rem;
+    padding: 0.2rem;
+    background: rgba(0,0,0,0.3);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-delete-menu-small:hover {
+    background: rgba(239, 68, 68, 0.6);
 }
 
 .participant-btn.selected {
