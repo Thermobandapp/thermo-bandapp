@@ -1351,7 +1351,7 @@ const App = {
             itemsHtml += `
                 <div class="ticket-row">
                     <span class="t-qty">${itemData.qty}x</span>
-                    <span class="t-name">${name}</span>
+                    <span class="t-name">${name} <span style="color: #555; font-size: 0.8em; margin-left: 0.2rem;">(${itemData.price.toFixed(2)}€)</span></span>
                     <span class="t-price">${sum.toFixed(2)}€</span>
                 </div>
             `;
