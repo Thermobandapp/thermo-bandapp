@@ -1120,3 +1120,73 @@ input:focus {
     background: var(--danger);
 }
 
+/* Ticket Receipt Modal Styles */
+.ticket-receipt {
+    background: #fff;
+    color: #000;
+    font-family: 'Courier New', Courier, monospace;
+    padding: 1.5rem;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    margin: 1rem 0;
+}
+
+.ticket-header {
+    text-align: center;
+    border-bottom: 1px dashed #000;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.ticket-header h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+}
+
+.ticket-header p {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.ticket-body {
+    margin-bottom: 1rem;
+}
+
+.ticket-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.ticket-row .t-qty {
+    width: 30px;
+    text-align: left;
+}
+
+.ticket-row .t-name {
+    flex: 1;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 10px;
+}
+
+.ticket-row .t-price {
+    text-align: right;
+}
+
+.ticket-footer {
+    border-top: 1px dashed #000;
+    padding-top: 0.5rem;
+}
+
+.ticket-total {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-top: 0.5rem;
+}

@@ -95,7 +95,8 @@ const App = {
             addPartyFriend: document.getElementById('btn-party-add-friend'),
             partyGoHome: document.getElementById('btn-party-go-home'),
             loginSubmit: document.getElementById('btn-login-submit'),
-            adminSaveMember: document.getElementById('btn-admin-save-member')
+            adminSaveMember: document.getElementById('btn-admin-save-member'),
+            showTicket: document.getElementById('btn-show-ticket')
         };
         this.display = {
             adminPanelBtn: document.getElementById('admin-panel-btn'),
@@ -128,6 +129,9 @@ const App = {
         document.getElementById('btn-close-modal').addEventListener('click', () => this.closeModal());
         this.display.finishTable.addEventListener('click', () => this.handleFinishTable());
         this.display.addFriendManual.addEventListener('click', () => this.handleAddFriendManual());
+        if (this.buttons.showTicket) {
+            this.buttons.showTicket.addEventListener('click', () => this.handleShowTicket());
+        }
         
         this.buttons.createParty.addEventListener('click', () => this.handleCreatePartyFromSetup());
         document.getElementById('btn-join-party-main').addEventListener('click', () => this.handleJoinPartyFromSetup());
@@ -1316,6 +1320,67 @@ const App = {
             console.error('Error al sacar de la mesa:', error);
             alert('Error al sacar de la mesa.');
         }
+    },
+
+    async handleShowTicket() {
+        const data = this.state.tableData;
+        if (!data || !data.orders) {
+            alert('No hay pedidos en la mesa para generar un ticket.');
+            return;
+        }
+
+        const barName = data.name ? data.name.split(' (Mesa')[0].trim() : 'Mesa';
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        const orders = Object.values(data.orders);
+        const items = {};
+        let total = 0;
+
+        orders.forEach(o => {
+            if (!items[o.productName]) {
+                items[o.productName] = { qty: 0, price: Number(o.price) };
+            }
+            items[o.productName].qty++;
+            total += Number(o.price);
+        });
+
+        let itemsHtml = '';
+        Object.entries(items).forEach(([name, itemData]) => {
+            const sum = itemData.qty * itemData.price;
+            itemsHtml += `
+                <div class="ticket-row">
+                    <span class="t-qty">${itemData.qty}x</span>
+                    <span class="t-name">${name}</span>
+                    <span class="t-price">${sum.toFixed(2)}€</span>
+                </div>
+            `;
+        });
+
+        const html = `
+            <div class="ticket-receipt">
+                <div class="ticket-header">
+                    <h3>${barName}</h3>
+                    <p>${dateStr}</p>
+                    <p>--------------------------------</p>
+                </div>
+                <div class="ticket-body">
+                    ${itemsHtml}
+                </div>
+                <div class="ticket-footer">
+                    <p>--------------------------------</p>
+                    <div class="ticket-total">
+                        <span>TOTAL</span>
+                        <span>${total.toFixed(2)}€</span>
+                    </div>
+                </div>
+            </div>
+            <div class="actions" style="margin-top: 1.5rem;">
+                <button onclick="App.closeModal()" class="btn-primary">Cerrar Ticket</button>
+            </div>
+        `;
+
+        this.openModal(html, true);
     },
 
     async handleFinishTable() {
