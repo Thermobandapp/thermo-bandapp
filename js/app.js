@@ -824,10 +824,11 @@ const App = {
                     div.className = `participant-item glass is-couple`;
                     div.style.cursor = 'pointer';
                     div.innerHTML = `
-                        <div class="p-info">
+                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
                             <span class="p-name">${p.name} y ${partnerName} <span class="badge-couple">💑 Pareja</span></span>
-                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
-                                ${p.name}: ${ind1.toFixed(2)}€ · ${partnerName}: ${ind2.toFixed(2)}€
+                            <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
+                                <div>${p.name}: ${ind1.toFixed(2)}€</div>
+                                <div>${partnerName}: ${ind2.toFixed(2)}€</div>
                             </div>
                         </div>
                         <span class="p-amount">${combinedAmount.toFixed(2)}€</span>
@@ -848,10 +849,11 @@ const App = {
                     div.className = `participant-item glass is-couple`;
                     div.style.cursor = 'pointer';
                     div.innerHTML = `
-                        <div class="p-info">
+                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
                             <span class="p-name">${p.name} <span class="badge-couple">💑 Pareja</span></span>
-                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
-                                ${p.name}: ${myAmount.toFixed(2)}€ + ${partnerName} <small style="color:#f87171;">(fuera)</small>: ${partnerAmount.toFixed(2)}€
+                            <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
+                                <div>${p.name}: ${myAmount.toFixed(2)}€</div>
+                                <div>${partnerName} <small style="color:#f87171;">(fuera)</small>: ${partnerAmount.toFixed(2)}€</div>
                             </div>
                         </div>
                         <span class="p-amount">${combinedAmount.toFixed(2)}€</span>
