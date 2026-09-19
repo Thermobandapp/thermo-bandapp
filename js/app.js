@@ -1913,15 +1913,17 @@ const App = {
         });
 
         let borrachuzosHTML = '';
+        let titulo = 'Borrachuzo del día';
         if (Object.keys(countByUser).length === 0) {
-            borrachuzosHTML = '<p style="margin:0.5rem 0;">Nadie pidió rondas 😅</p>';
+            borrachuzosHTML = '<p style="margin:0.5rem 0;color:#374151;">Nadie pidió rondas 😅</p>';
         } else {
             const maxCount = Math.max(...Object.values(countByUser));
             const winners = Object.entries(countByUser)
                 .filter(([, c]) => c === maxCount)
                 .map(([name]) => name);
+            titulo = winners.length > 1 ? 'Borrachuzos del día' : 'Borrachuzo del día';
             borrachuzosHTML = `
-                <p style="font-size:1.1rem;margin:0.5rem 0 0.25rem;">
+                <p style="font-size:1.1rem;margin:0.5rem 0 0.25rem;color:#111827;">
                     🍺 <strong>${winners.join(', ')}</strong>
                 </p>
                 <p style="color:#6b7280;font-size:0.85rem;margin:0;">
@@ -1932,11 +1934,11 @@ const App = {
         const html = `
             <div style="text-align:center;padding:0.5rem 0 1rem;">
                 <div style="font-size:2.5rem;margin-bottom:0.5rem;">🎉</div>
-                <h2 style="margin:0 0 0.25rem;font-size:1.3rem;">¡Mesa cerrada!</h2>
+                <h2 style="margin:0 0 0.25rem;font-size:1.3rem;color:#111827;">¡Mesa cerrada!</h2>
                 <p style="margin:0 0 1rem;color:#6b7280;font-size:0.9rem;">¡Hasta la próxima quedada! 🍻</p>
                 <div style="background:#fdf2f8;border:2px solid #ec4899;border-radius:12px;padding:1rem;margin-bottom:1.25rem;">
                     <p style="margin:0 0 0.4rem;font-weight:700;color:#be185d;font-size:1rem;">
-                        🏆 Borrachuzo(s) del día:
+                        🏆 ${titulo}:
                     </p>
                     ${borrachuzosHTML}
                 </div>
@@ -1949,10 +1951,10 @@ const App = {
 
         this.openModal(html, true);
 
-        // Disparar confeti
+        // Disparar confeti por encima del modal (z-index > 1000)
         if (typeof confetti === 'function') {
-            confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 } });
-            setTimeout(() => confetti({ particleCount: 80, spread: 120, origin: { y: 0.4 } }), 600);
+            confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 }, zIndex: 1100 });
+            setTimeout(() => confetti({ particleCount: 80, spread: 120, origin: { y: 0.4 }, zIndex: 1100 }), 600);
         }
     },
 
