@@ -904,6 +904,8 @@ const App = {
         const d1 = getPersonDetail(name1);
         const d2 = getPersonDetail(name2);
         const totalCouple = d1.total + d2.total;
+        const safeName1 = name1.replace(/'/g, "\\'");
+        const safeName2 = name2.replace(/'/g, "\\'");
 
         const html = `
             <h3>Consumo de Pareja: ${name1} y ${name2} 💑</h3>
@@ -912,14 +914,33 @@ const App = {
                 <div style="font-size: 1.6rem; font-weight: 700; color: #f472b6;">${totalCouple.toFixed(2)}€</div>
             </div>
             
-            <div style="max-height: 50vh; overflow-y: auto; text-align: left;">
+            <div style="max-height: 45vh; overflow-y: auto; text-align: left;">
                 <h4 style="color: var(--primary); margin-top: 0.8rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name1} (${d1.total.toFixed(2)}€):</h4>
                 <div>${d1.ordersHtml}</div>
                 
                 <h4 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name2} (${d2.total.toFixed(2)}€):</h4>
                 <div>${d2.ordersHtml}</div>
             </div>
-            <button onclick="App.closeModal()" class="btn-primary" style="margin-top: 1.2rem;">Cerrar</button>
+
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 0.6rem;">
+                <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-bottom: 0.2rem;">
+                    Gestionar asistencia a la mesa:
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName1}')">
+                        🚪 Sacar a ${name1}
+                    </button>
+                    <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName2}')">
+                        🚪 Sacar a ${name2}
+                    </button>
+                </div>
+                <button class="btn-primary" style="background: var(--danger); padding: 0.65rem; font-size: 0.9rem; width: 100%;" onclick="App.kickCouple('${safeName1}', '${safeName2}')">
+                    🚪 Sacar a ambos de la mesa
+                </button>
+                <button onclick="App.closeModal()" class="btn-secondary" style="margin-top: 0.3rem; width: 100%;">
+                    Cerrar
+                </button>
+            </div>
         `;
         this.openModal(html);
     },
@@ -1720,6 +1741,34 @@ const App = {
         }
     },
 
+    async kickCouple(name1, name2) {
+        if (!confirm(`¿Seguro que quieres sacar a ${name1} y ${name2} de la mesa?`)) return;
+        try {
+            const key1 = name1.replace(/\./g, '_');
+            const key2 = name2.replace(/\./g, '_');
+            const p1 = this.state.tableData.participants[key1] || {};
+            const p2 = this.state.tableData.participants[key2] || {};
+
+            await Promise.all([
+                set(ref(this.db, `tables/${this.state.tableId}/participants/${key1}`), { ...p1, status: 'left' }),
+                set(ref(this.db, `tables/${this.state.tableId}/participants/${key2}`), { ...p2, status: 'left' })
+            ]);
+
+            this.closeModal();
+
+            if (name1 === this.state.user || name2 === this.state.user) {
+                localStorage.removeItem('thermo_tableId');
+                localStorage.removeItem('thermo_partyId');
+                location.reload();
+            } else {
+                alert(`${name1} y ${name2} han sido sacados de la mesa.`);
+            }
+        } catch (error) {
+            console.error('Error al sacar a la pareja de la mesa:', error);
+            alert('Error al sacar a la pareja de la mesa.');
+        }
+    },
+
     async handleShowTicket() {
         const data = this.state.tableData;
         if (!data || !data.orders) {
@@ -1876,6 +1925,13 @@ const App = {
             const safeNewFriend = newFriendName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const safeOtherSelected = JSON.stringify(otherSelected).replace(/"/g, '&quot;');
 
+            // Filtrar solo las personas que NO tienen pareja actualmente (estén en la mesa o no)
+            const availableCandidates = sortedMembers.filter(m => {
+                if (this.normalizeKey(m.name) === this.normalizeKey(newFriendName)) return false;
+                const partner = this.getPartner(m.name);
+                return !partner; // Excluir a cualquiera que ya tenga pareja
+            });
+
             let html = `
                 <div style="text-align: center;">
                     <div style="font-size: 2.2rem; margin-bottom: 0.25rem;">💑</div>
@@ -1889,28 +1945,36 @@ const App = {
                             👤 No, viene solo/a (Sin pareja)
                         </button>
                     </div>
+            `;
 
+            if (availableCandidates.length > 0) {
+                html += `
                     <p class="subtitle" style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
                         O selecciona a su pareja en la banda:
                     </p>
-                    
                     <div class="participant-grid" style="max-height: 35vh; overflow-y: auto;">
-            `;
-
-            sortedMembers.forEach(m => {
-                if (this.normalizeKey(m.name) === this.normalizeKey(newFriendName)) return;
-                const existingPartner = this.getPartner(m.name);
-                const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                html += `
-                    <button class="participant-btn" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '${safeName}', ${safeOtherSelected}, ${isParty})" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.6rem 0.4rem; height: auto;">
-                        <span style="font-weight: 600;">${m.name}</span>
-                        ${existingPartner ? `<small style="font-size: 0.68rem; color: #ec4899;">(con ${existingPartner})</small>` : '<small style="font-size: 0.68rem; color: #22c55e;">(Sin pareja)</small>'}
-                    </button>
                 `;
-            });
+
+                availableCandidates.forEach(m => {
+                    const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    html += `
+                        <button class="participant-btn" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '${safeName}', ${safeOtherSelected}, ${isParty})" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.6rem 0.4rem; height: auto;">
+                            <span style="font-weight: 600;">${m.name}</span>
+                            <small style="font-size: 0.68rem; color: #22c55e;">(Sin pareja)</small>
+                        </button>
+                    `;
+                });
+
+                html += `</div>`;
+            } else {
+                html += `
+                    <p class="empty-msg" style="font-size: 0.85rem; margin-top: 0.5rem; color: var(--text-muted);">
+                        No hay miembros disponibles sin pareja en la banda.
+                    </p>
+                `;
+            }
 
             html += `
-                    </div>
                 </div>
             `;
 
