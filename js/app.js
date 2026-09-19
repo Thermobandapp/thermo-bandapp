@@ -766,10 +766,9 @@ const App = {
             const data = snapshot.val();
             if (data) {
                 if (data.status === 'closed' && this.state.tableId) {
-                    alert('La mesa ha sido cerrada. ¡Hasta la próxima quedada! 🍻');
-                    this.state.tableId = null;
+                    this.state.tableId = null; // evitar re-trigger
                     localStorage.removeItem('thermo_tableId');
-                    location.reload();
+                    this.showBorrachuzoModal(data); // confeti + borrachuzos (recarga dentro)
                     return;
                 }
                 this.state.tableData = data;
@@ -1837,6 +1836,65 @@ const App = {
             await set(ref(this.db, `tables/${this.state.tableId}/finishedAt`), Date.now());
             await this.addLog('finish_table', { tableId: this.state.tableId });
         } catch (error) { console.error(error); }
+    },
+
+    showBorrachuzoModal(data) {
+        // Contar rondas individuales (excluir SHARED)
+        const orders = Object.values(data.orders || {});
+        const countByUser = {};
+        orders.forEach(o => {
+            if (o.user && o.user !== 'SHARED') {
+                countByUser[o.user] = (countByUser[o.user] || 0) + 1;
+            }
+        });
+
+        let borrachuzosHTML = '';
+        if (Object.keys(countByUser).length === 0) {
+            borrachuzosHTML = '<p style="margin:0.5rem 0;">Nadie pidió rondas 😅</p>';
+        } else {
+            const maxCount = Math.max(...Object.values(countByUser));
+            const winners = Object.entries(countByUser)
+                .filter(([, c]) => c === maxCount)
+                .map(([name]) => name);
+            borrachuzosHTML = `
+                <p style="font-size:1.1rem;margin:0.5rem 0 0.25rem;">
+                    🍺 <strong>${winners.join(', ')}</strong>
+                </p>
+                <p style="color:#6b7280;font-size:0.85rem;margin:0;">
+                    (${maxCount} ronda${maxCount !== 1 ? 's' : ''})
+                </p>`;
+        }
+
+        const html = `
+            <div style="text-align:center;padding:0.5rem 0 1rem;">
+                <div style="font-size:2.5rem;margin-bottom:0.5rem;">🎉</div>
+                <h2 style="margin:0 0 0.25rem;font-size:1.3rem;">¡Mesa cerrada!</h2>
+                <p style="margin:0 0 1rem;color:#6b7280;font-size:0.9rem;">¡Hasta la próxima quedada! 🍻</p>
+                <div style="background:#fdf2f8;border:2px solid #ec4899;border-radius:12px;padding:1rem;margin-bottom:1.25rem;">
+                    <p style="margin:0 0 0.4rem;font-weight:700;color:#be185d;font-size:1rem;">
+                        🏆 Borrachuzo(s) del día:
+                    </p>
+                    ${borrachuzosHTML}
+                </div>
+                <button onclick="App._closeBorrachuzoModal()"
+                    style="background:#ec4899;color:#fff;border:none;border-radius:8px;
+                           padding:0.65rem 2rem;font-size:1rem;cursor:pointer;font-weight:600;">
+                    ¡Hasta luego! 👋
+                </button>
+            </div>`;
+
+        this.openModal(html, true);
+
+        // Disparar confeti
+        if (typeof confetti === 'function') {
+            confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 } });
+            setTimeout(() => confetti({ particleCount: 80, spread: 120, origin: { y: 0.4 } }), 600);
+        }
+    },
+
+    _closeBorrachuzoModal() {
+        this.closeModal();
+        location.reload();
     },
 
     async handleAddFriendManual() {
