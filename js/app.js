@@ -811,7 +811,7 @@ const App = {
                 const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
 
                 if (partnerObj && partnerObj.status !== 'left' && p.status !== 'left') {
-                    // Ambos miembros de la pareja están en la mesa activos
+                    // Ambos activos → fila de pareja combinada
                     processedKeys.add(pKey);
                     processedKeys.add(this.normalizeKey(partnerName));
 
@@ -833,8 +833,38 @@ const App = {
                     `;
                     div.onclick = () => this.showCoupleDetail(p.name, partnerName);
                     this.display.participants.appendChild(div);
+
+                } else if (partnerObj && p.status !== 'left' && partnerObj.status === 'left') {
+                    // p activo, pareja se fue → absorber deuda del que se fue
+                    processedKeys.add(pKey);
+                    processedKeys.add(this.normalizeKey(partnerName));
+
+                    const myAmount = totals[p.name] || 0;
+                    const partnerAmount = totals[partnerName] || 0;
+                    const combinedAmount = myAmount + partnerAmount;
+
+                    const div = document.createElement('div');
+                    div.className = `participant-item glass is-couple`;
+                    div.style.cursor = 'pointer';
+                    div.innerHTML = `
+                        <div class="p-info">
+                            <span class="p-name">${p.name} <span class="badge-couple">💑 Pareja</span></span>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
+                                ${p.name}: ${myAmount.toFixed(2)}€ + ${partnerName} <small>(fuera)</small>: ${partnerAmount.toFixed(2)}€
+                            </div>
+                        </div>
+                        <span class="p-amount">${combinedAmount.toFixed(2)}€</span>
+                    `;
+                    div.onclick = () => this.showCoupleDetail(p.name, partnerName);
+                    this.display.participants.appendChild(div);
+
+                } else if (partnerObj && p.status === 'left' && partnerObj.status !== 'left') {
+                    // p se fue, la pareja sigue activa → se muestra en la fila del activo, saltar este
+                    processedKeys.add(pKey);
+                    // NO añadir partnerObj aquí, se procesará cuando le toque en el forEach
+
                 } else {
-                    // Individual
+                    // Individual (sin pareja en la mesa, o ambos fuera)
                     processedKeys.add(pKey);
                     const amount = totals[p.name] || 0;
                     const isLeft = p.status === 'left';
@@ -1053,7 +1083,7 @@ const App = {
 
     showParticipantDetail(name) {
         const data = this.state.tableData;
-        if (!data || !data.orders) return;
+        if (!data) return;
         const participants = Object.values(data.participants || {});
         const pInfo = participants.find(p => p.name === name);
         const tableStart = Number(data.createdAt || 0);
@@ -1063,7 +1093,7 @@ const App = {
         let total = 0;
         let hasOrders = false;
 
-        Object.entries(data.orders).forEach(([id, o]) => {
+        Object.entries(data.orders || {}).forEach(([id, o]) => {
             let price = 0;
             let label = '';
             const orderTime = Number(o.timestamp || tableStart);
@@ -1379,7 +1409,7 @@ const App = {
             const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
 
             if (partnerObj && partnerObj.status !== 'left') {
-                // Pareja activa en la mesa
+                // Pareja ambos activos en la mesa
                 processedKeys.add(pKey);
                 processedKeys.add(this.normalizeKey(partnerName));
                 const owed1 = individualDebts[p.name] || 0;
@@ -1394,6 +1424,23 @@ const App = {
                     put: put1 + put2,
                     names: [p.name, partnerName],
                     breakdown: `Debe ${p.name}: ${owed1.toFixed(2)}€ · Debe ${partnerName}: ${owed2.toFixed(2)}€`
+                });
+            } else if (partnerObj && partnerObj.status === 'left') {
+                // p activo, pareja se fue → absorber deuda del que se fue
+                processedKeys.add(pKey);
+                processedKeys.add(this.normalizeKey(partnerName));
+                const owed1 = individualDebts[p.name] || 0;
+                const owed2 = individualDebts[partnerName] || 0;
+                const put1 = userContributions[p.name] || 0;
+                const put2 = userContributions[partnerName] || 0;
+
+                groups.push({
+                    displayName: p.name,
+                    isCouple: true,
+                    owed: owed1 + owed2,
+                    put: put1 + put2,
+                    names: [p.name, partnerName],
+                    breakdown: `${p.name}: ${owed1.toFixed(2)}€ + ${partnerName} (fuera): ${owed2.toFixed(2)}€`
                 });
             } else {
                 processedKeys.add(pKey);
@@ -1526,7 +1573,7 @@ const App = {
             const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
 
             if (partnerObj && partnerObj.status !== 'left') {
-                // Pareja en la mesa
+                // Pareja ambos activos en la mesa
                 processedKeys.add(pKey);
                 processedKeys.add(this.normalizeKey(partnerName));
                 const amt1 = totals[p.name] || 0;
@@ -1541,6 +1588,23 @@ const App = {
                     names: [p.name, partnerName],
                     amount: combinedAmount,
                     breakdown: `${p.name} (${amt1.toFixed(2)}€) + ${partnerName} (${amt2.toFixed(2)}€)`
+                });
+            } else if (partnerObj && partnerObj.status === 'left') {
+                // p activo, pareja se fue → absorber deuda del que se fue
+                processedKeys.add(pKey);
+                processedKeys.add(this.normalizeKey(partnerName));
+                const amt1 = totals[p.name] || 0;
+                const amt2 = totals[partnerName] || 0;
+                const combinedAmount = amt1 + amt2;
+
+                paymentUnits.push({
+                    unitId: p.name.replace(/\s/g, '_'),
+                    storageKey: `${p.name}_${partnerName}`.replace(/\./g, '_'),
+                    displayName: p.name,
+                    isCouple: true,
+                    names: [p.name, partnerName],
+                    amount: combinedAmount,
+                    breakdown: `${p.name} (${amt1.toFixed(2)}€) + ${partnerName} fuera (${amt2.toFixed(2)}€)`
                 });
             } else {
                 // Individual
