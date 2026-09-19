@@ -807,7 +807,8 @@ const App = {
                 const pKey = this.normalizeKey(p.name);
                 if (processedKeys.has(pKey)) return;
 
-                const partnerName = this.isPartnerAtTable(p.name, participants);
+                // Usar getPartner (ignora status) para encontrar pareja aunque se haya ido
+                const partnerName = this.getPartner(p.name);
                 const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
 
                 if (partnerObj && partnerObj.status !== 'left' && p.status !== 'left') {
@@ -850,7 +851,7 @@ const App = {
                         <div class="p-info">
                             <span class="p-name">${p.name} <span class="badge-couple">💑 Pareja</span></span>
                             <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
-                                ${p.name}: ${myAmount.toFixed(2)}€ + ${partnerName} <small>(fuera)</small>: ${partnerAmount.toFixed(2)}€
+                                ${p.name}: ${myAmount.toFixed(2)}€ + ${partnerName} <small style="color:#f87171;">(fuera)</small>: ${partnerAmount.toFixed(2)}€
                             </div>
                         </div>
                         <span class="p-amount">${combinedAmount.toFixed(2)}€</span>
@@ -859,9 +860,8 @@ const App = {
                     this.display.participants.appendChild(div);
 
                 } else if (partnerObj && p.status === 'left' && partnerObj.status !== 'left') {
-                    // p se fue, la pareja sigue activa → se muestra en la fila del activo, saltar este
+                    // p se fue, la pareja sigue activa → se procesará cuando le toque al activo
                     processedKeys.add(pKey);
-                    // NO añadir partnerObj aquí, se procesará cuando le toque en el forEach
 
                 } else {
                     // Individual (sin pareja en la mesa, o ambos fuera)
@@ -1037,12 +1037,16 @@ const App = {
         Object.values(data.orders).forEach(o => totalBill += o.price);
         
         let myTotal = allTotals[this.state.user] || 0;
-        const partner = this.isPartnerAtTable(this.state.user);
+        // Usar getPartner para acumular deuda aunque la pareja se haya ido
+        const partnerName = this.getPartner(this.state.user);
+        const participants = Object.values(data.participants || {});
+        const partnerInTable = partnerName ? participants.find(p => this.normalizeKey(p.name) === this.normalizeKey(partnerName)) : null;
         const myShareLabelEl = document.querySelector('#my-share + .stat-label');
-        if (partner) {
-            const partnerTotal = allTotals[partner] || 0;
+        if (partnerInTable) {
+            const partnerTotal = allTotals[partnerInTable.name] || 0;
             myTotal += partnerTotal;
-            if (myShareLabelEl) myShareLabelEl.innerHTML = `Tu parte <span class="badge-couple" style="margin-left: 4px;">💑 +${partner}</span>`;
+            const isPartnerLeft = partnerInTable.status === 'left';
+            if (myShareLabelEl) myShareLabelEl.innerHTML = `Tu parte <span class="badge-couple" style="margin-left: 4px;">💑 +${partnerInTable.name}${isPartnerLeft ? ' <small style="color:#f87171;">(fuera)</small>' : ''}</span>`;
         } else {
             if (myShareLabelEl) myShareLabelEl.textContent = 'Tu parte';
         }
@@ -1405,7 +1409,7 @@ const App = {
             const pKey = this.normalizeKey(p.name);
             if (processedKeys.has(pKey)) return;
 
-            const partnerName = this.isPartnerAtTable(p.name, participants);
+            const partnerName = this.getPartner(p.name);
             const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
 
             if (partnerObj && partnerObj.status !== 'left') {
@@ -1569,7 +1573,7 @@ const App = {
             const pKey = this.normalizeKey(p.name);
             if (processedKeys.has(pKey)) return;
 
-            const partnerName = this.isPartnerAtTable(p.name, participants);
+            const partnerName = this.getPartner(p.name);
             const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
 
             if (partnerObj && partnerObj.status !== 'left') {
