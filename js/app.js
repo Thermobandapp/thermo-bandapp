@@ -924,6 +924,61 @@ const App = {
         this.openModal(html);
     },
 
+    updateMenuUI() {
+        const menu = this.state.tableData.menu;
+        this.display.menu.innerHTML = '';
+        if (!menu) {
+            this.display.menu.innerHTML = '<p class="empty-msg">Pulsa "Nuevo" para añadir productos.</p>';
+            return;
+        }
+
+        Object.entries(menu).forEach(([id, item]) => {
+            const div = document.createElement('div');
+            div.className = 'menu-item glass';
+            div.innerHTML = `
+                <button class="btn-edit-small" data-id="${id}">✏️</button>
+                <button class="btn-delete-menu-small" data-id="${id}">🗑️</button>
+                <span class="item-icon">${item.icon || '🍴'}</span>
+                <span class="item-name">${item.name}</span>
+                <span class="item-price">${item.price.toFixed(2)}€</span>
+            `;
+            div.onclick = (e) => {
+                if (e.target.classList.contains('btn-edit-small') || e.target.classList.contains('btn-delete-menu-small')) return;
+                this.showParticipantSelector(item);
+            };
+            div.querySelector('.btn-edit-small').onclick = (e) => {
+                e.stopPropagation();
+                this.handleEditProduct(id, item);
+            };
+            div.querySelector('.btn-delete-menu-small').onclick = (e) => {
+                e.stopPropagation();
+                this.handleDeleteProduct(id, item);
+            };
+            this.display.menu.appendChild(div);
+        });
+    },
+
+    updateOrdersUI() {
+        const orders = this.state.tableData.orders;
+        this.display.recentOrders.innerHTML = '';
+        if (!orders) return;
+
+        const sortedOrders = Object.entries(orders).sort((a, b) => b[1].timestamp - a[1].timestamp).slice(0, 8);
+        sortedOrders.forEach(([id, o]) => {
+            const div = document.createElement('div');
+            div.className = 'order-row';
+            div.innerHTML = `
+                <span><b>${o.user === 'SHARED' ? '💎 Todos' : o.user}</b>: ${o.productName}</span>
+                <div class="order-actions">
+                    <span>${o.price.toFixed(2)}€</span>
+                    <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button>
+                </div>
+            `;
+            this.display.recentOrders.appendChild(div);
+        });
+        this.calculateTotals();
+    },
+
     calculateTotals() {
         const data = this.state.tableData;
         if (!data || !data.orders || !data.participants) return;
