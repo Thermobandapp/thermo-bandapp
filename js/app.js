@@ -890,7 +890,7 @@ const App = {
 
     showCoupleDetail(name1, name2) {
         const data = this.state.tableData;
-        if (!data || !data.orders) return;
+        if (!data) return;
         
         const getPersonDetail = (name) => {
             const participants = Object.values(data.participants || {});
@@ -901,7 +901,7 @@ const App = {
             let total = 0;
             let count = 0;
 
-            Object.entries(data.orders).forEach(([id, o]) => {
+            Object.entries(data.orders || {}).forEach(([id, o]) => {
                 let price = 0;
                 let label = '';
                 const orderTime = Number(o.timestamp || tableStart);
@@ -938,7 +938,13 @@ const App = {
         const safeName1 = name1.replace(/'/g, "\\'");
         const safeName2 = name2.replace(/'/g, "\\'");
 
-        const html = `
+            const participants = Object.values(data.participants || {});
+            const p1Info = participants.find(p => p.name === name1);
+            const p2Info = participants.find(p => p.name === name2);
+            const p1Active = p1Info?.status !== 'left';
+            const p2Active = p2Info?.status !== 'left';
+
+            const html = `
             <h3>Consumo de Pareja: ${name1} y ${name2} 💑</h3>
             <div style="margin: 1rem 0; padding: 0.75rem; background: rgba(236,72,153,0.1); border-radius: var(--radius-sm); border: 1px solid rgba(236,72,153,0.25); text-align: center;">
                 <span style="font-size: 0.85rem; color: var(--text-muted);">Total Acumulado Pareja:</span>
@@ -946,10 +952,10 @@ const App = {
             </div>
             
             <div style="max-height: 45vh; overflow-y: auto; text-align: left;">
-                <h4 style="color: var(--primary); margin-top: 0.8rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name1} (${d1.total.toFixed(2)}€):</h4>
+                <h4 style="color: var(--primary); margin-top: 0.8rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name1} (${d1.total.toFixed(2)}€)${!p1Active ? ' <small style="color:#f87171;">(Fuera)</small>' : ''}:</h4>
                 <div>${d1.ordersHtml}</div>
                 
-                <h4 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name2} (${d2.total.toFixed(2)}€):</h4>
+                <h4 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name2} (${d2.total.toFixed(2)}€)${!p2Active ? ' <small style="color:#f87171;">(Fuera)</small>' : ''}:</h4>
                 <div>${d2.ordersHtml}</div>
             </div>
 
@@ -958,16 +964,30 @@ const App = {
                     Gestionar asistencia a la mesa:
                 </div>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName1}')">
-                        🚪 Sacar a ${name1}
-                    </button>
-                    <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName2}')">
-                        🚪 Sacar a ${name2}
-                    </button>
+                    ${p1Active ? `
+                        <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName1}')">
+                            🚪 Sacar a ${name1}
+                        </button>
+                    ` : `
+                        <div style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                            ${name1} ya está fuera
+                        </div>
+                    `}
+                    ${p2Active ? `
+                        <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName2}')">
+                            🚪 Sacar a ${name2}
+                        </button>
+                    ` : `
+                        <div style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                            ${name2} ya está fuera
+                        </div>
+                    `}
                 </div>
-                <button class="btn-primary" style="background: var(--danger); padding: 0.65rem; font-size: 0.9rem; width: 100%;" onclick="App.kickCouple('${safeName1}', '${safeName2}')">
-                    🚪 Sacar a ambos de la mesa
-                </button>
+                ${(p1Active && p2Active) ? `
+                    <button class="btn-primary" style="background: var(--danger); padding: 0.65rem; font-size: 0.9rem; width: 100%;" onclick="App.kickCouple('${safeName1}', '${safeName2}')">
+                        🚪 Sacar a ambos de la mesa
+                    </button>
+                ` : ''}
                 <button onclick="App.closeModal()" class="btn-secondary" style="margin-top: 0.3rem; width: 100%;">
                     Cerrar
                 </button>
