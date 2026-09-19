@@ -6,6 +6,15 @@ import { getDatabase, ref, set, onValue, push, get } from "https://www.gstatic.c
  * Thermo Bandapp - App Principal
  */
 
+const DEFAULT_COUPLES = [
+    ['Fernando', 'Esther'],
+    ['Pedro', 'Tina'],
+    ['Karlos', 'Ana'],
+    ['Jose', 'Belen'],
+    ['David', 'Rosa'],
+    ['Antonio', 'Pili']
+];
+
 const App = {
     state: {
         user: null,
@@ -20,7 +29,8 @@ const App = {
         partyId: null,
         partyData: null,
         tempLoginName: null,
-        tempLoginCode: null
+        tempLoginCode: null,
+        couples: {}
     },
 
     init() {
@@ -51,12 +61,128 @@ const App = {
         return parseFloat(String(value).replace(',', '.'));
     },
 
+    // Normaliza nombres para búsqueda sin tildes ni mayúsculas (ej: Belén -> belen, José -> jose)
+    normalizeKey(name) {
+        if (!name) return '';
+        return String(name).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    },
+
+    // Obtiene el nombre de la pareja de una persona (o null si no tiene)
+    getPartner(name) {
+        if (!name) return null;
+        const key = this.normalizeKey(name);
+        if (this.state.couples && this.state.couples[key]) {
+            return this.state.couples[key];
+        }
+        for (const [p1, p2] of DEFAULT_COUPLES) {
+            if (this.normalizeKey(p1) === key) return p2;
+            if (this.normalizeKey(p2) === key) return p1;
+        }
+        return null;
+    },
+
+    // Comprueba si dos personas son pareja
+    areCouple(name1, name2) {
+        if (!name1 || !name2) return false;
+        const partner = this.getPartner(name1);
+        return partner && this.normalizeKey(partner) === this.normalizeKey(name2);
+    },
+
+    // Comprueba si la pareja de alguien está actualmente en la mesa y activa
+    isPartnerAtTable(name, participants = null) {
+        const partner = this.getPartner(name);
+        if (!partner) return null;
+        const parts = participants || Object.values(this.state.tableData?.participants || {});
+        const partnerPart = parts.find(p => p.status !== 'left' && this.normalizeKey(p.name) === this.normalizeKey(partner));
+        return partnerPart ? partnerPart.name : null;
+    },
+
+    // Guarda o desvincula una pareja en Firebase bidireccionalmente
+    async setCouple(name1, name2) {
+        if (!name1) return;
+        const k1 = this.normalizeKey(name1);
+        if (!name2) {
+            const oldPartner = this.getPartner(name1);
+            await set(ref(this.db, `couples/${k1}`), null);
+            if (oldPartner) {
+                await set(ref(this.db, `couples/${this.normalizeKey(oldPartner)}`), null);
+            }
+            if (this.state.couples) {
+                delete this.state.couples[k1];
+                if (oldPartner) delete this.state.couples[this.normalizeKey(oldPartner)];
+            }
+            return;
+        }
+
+        const k2 = this.normalizeKey(name2);
+        const old1 = this.getPartner(name1);
+        const old2 = this.getPartner(name2);
+
+        const promises = [
+            set(ref(this.db, `couples/${k1}`), name2),
+            set(ref(this.db, `couples/${k2}`), name1)
+        ];
+        if (old1 && this.normalizeKey(old1) !== k2) {
+            promises.push(set(ref(this.db, `couples/${this.normalizeKey(old1)}`), null));
+        }
+        if (old2 && this.normalizeKey(old2) !== k1) {
+            promises.push(set(ref(this.db, `couples/${this.normalizeKey(old2)}`), null));
+        }
+        await Promise.all(promises);
+
+        if (this.state.couples) {
+            this.state.couples[k1] = name2;
+            this.state.couples[k2] = name1;
+        }
+    },
+
+    // Escucha en tiempo real los cambios de parejas en Firebase
+    listenToCouples() {
+        const couplesRef = ref(this.db, 'couples');
+        onValue(couplesRef, async (snapshot) => {
+            if (!snapshot.exists()) {
+                console.log('Inicializando parejas por defecto en Firebase...');
+                await this.seedDefaultCouples();
+                return;
+            }
+            this.state.couples = snapshot.val() || {};
+            // Re-renderizar vistas activas
+            if (this.state.tableData) {
+                this.calculateTotals();
+                this.updateSummaryUI();
+                if (this.state.currentView === 'settle') {
+                    if (this.state.settleMode === 'group') this.updatePotUI();
+                    else this.updateChangeAssistantUI();
+                }
+            }
+            if (this.state.currentView === 'admin-view') {
+                this.loadAdminMembers();
+            }
+        });
+    },
+
+    async seedDefaultCouples() {
+        const initial = {};
+        for (const [p1, p2] of DEFAULT_COUPLES) {
+            initial[this.normalizeKey(p1)] = p2;
+            initial[this.normalizeKey(p2)] = p1;
+        }
+        try {
+            await set(ref(this.db, 'couples'), initial);
+            this.state.couples = initial;
+        } catch (e) {
+            console.error('Error sembrando parejas:', e);
+            this.state.couples = initial;
+        }
+    },
+
     initFirebase() {
         try {
             this.app = initializeApp(firebaseConfig);
             this.db = getDatabase(this.app);
             console.log('Firebase conectado correctamente ✅');
             this.listenToBars();
+            this.listenToCouples();
         } catch (error) {
             console.error('Error al conectar con Firebase:', error);
             alert('Error de conexión con la base de datos.');
@@ -320,12 +446,27 @@ const App = {
             }
             
             const members = snapshot.val();
+            const partnerSelect = document.getElementById('admin-member-partner');
+            if (partnerSelect) {
+                const currentSelected = partnerSelect.value;
+                let optHtml = '<option value="">Sin pareja (Soltero/a)</option>';
+                const sortedAll = Object.values(members).sort((a, b) => a.name.localeCompare(b.name));
+                sortedAll.forEach(m => {
+                    optHtml += `<option value="${m.name}">${m.name}</option>`;
+                });
+                partnerSelect.innerHTML = optHtml;
+                partnerSelect.value = currentSelected || '';
+            }
+
             let html = '';
-            for (const [key, data] of Object.entries(members)) {
+            const sortedEntries = Object.entries(members).sort((a, b) => a[1].name.localeCompare(b[1].name));
+            for (const [key, data] of sortedEntries) {
+                const partner = this.getPartner(data.name);
                 html += `
                     <div class="participant-item" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 150px;">
                             <b>${data.name}</b> <span style="color: var(--text-muted); font-size: 0.9rem;">(Cód: ${data.code})</span>
+                            ${partner ? `<span class="badge-couple" style="margin-left: 0.4rem;">💑 con ${partner}</span>` : ''}
                         </div>
                         <div style="display: flex; gap: 0.5rem;">
                             <button class="btn-secondary" onclick="App.handleEditMember('${data.name}', '${data.code}')" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">Editar ✏️</button>
@@ -341,26 +482,37 @@ const App = {
     async handleSaveMember() {
         const nameInput = document.getElementById('admin-member-name').value.trim();
         const codeInput = document.getElementById('admin-member-code').value.trim();
+        const partnerInput = document.getElementById('admin-member-partner')?.value.trim() || '';
         
         if (!nameInput || !codeInput) return alert('Rellena nombre y código');
         
         try {
-            const key = nameInput.toLowerCase();
+            const key = this.normalizeKey(nameInput);
             await set(ref(this.db, `members/${key}`), {
                 name: nameInput,
                 code: codeInput
             });
+            await this.setCouple(nameInput, partnerInput || null);
+
             alert(`Miembro ${nameInput} guardado correctamente.`);
             document.getElementById('admin-member-name').value = '';
             document.getElementById('admin-member-code').value = '';
+            if (document.getElementById('admin-member-partner')) {
+                document.getElementById('admin-member-partner').value = '';
+            }
             this.loadAdminMembers();
-            await this.addLog('admin_save_member', { targetUser: nameInput });
+            await this.addLog('admin_save_member', { targetUser: nameInput, partner: partnerInput });
         } catch (error) { console.error(error); }
     },
 
     handleEditMember(name, code) {
         document.getElementById('admin-member-name').value = name;
         document.getElementById('admin-member-code').value = code;
+        const partnerSelect = document.getElementById('admin-member-partner');
+        if (partnerSelect) {
+            const partner = this.getPartner(name);
+            partnerSelect.value = partner || '';
+        }
         document.getElementById('admin-member-name').focus();
     },
 
@@ -369,6 +521,9 @@ const App = {
         if (!confirm(`¿Seguro que quieres eliminar al miembro ${key}?`)) return;
         
         try {
+            const snapshot = await get(ref(this.db, `members/${key}`));
+            const memberName = snapshot.exists() ? snapshot.val().name : key;
+            await this.setCouple(memberName, null);
             await set(ref(this.db, `members/${key}`), null);
             this.loadAdminMembers();
             await this.addLog('admin_delete_member', { targetUser: key });
@@ -646,78 +801,127 @@ const App = {
         const totals = this.calculateAllIndividualTotals();
         this.display.participants.innerHTML = '';
         if (data.participants) {
-            Object.values(data.participants).forEach(p => {
-                const amount = totals[p.name] || 0;
-                const isLeft = p.status === 'left';
-                const div = document.createElement('div');
-                div.className = `participant-item glass ${isLeft ? 'is-left' : ''}`;
-                div.style.cursor = 'pointer';
-                div.innerHTML = `
-                    <div class="p-info">
-                        <span class="p-name">${p.name} ${isLeft ? '<small>(Fuera)</small>' : ''}</span>
-                        <span class="p-role">${p.role === 'admin' ? '🚩' : (isLeft ? '🏁' : '👤')}</span>
-                    </div>
-                    <span class="p-amount">${amount.toFixed(2)}€</span>
-                `;
-                div.onclick = () => this.showParticipantDetail(p.name);
-                this.display.participants.appendChild(div);
+            const participants = Object.values(data.participants);
+            const processedKeys = new Set();
+
+            participants.forEach(p => {
+                const pKey = this.normalizeKey(p.name);
+                if (processedKeys.has(pKey)) return;
+
+                const partnerName = this.isPartnerAtTable(p.name, participants);
+                const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
+
+                if (partnerObj && partnerObj.status !== 'left' && p.status !== 'left') {
+                    // Ambos miembros de la pareja están en la mesa activos
+                    processedKeys.add(pKey);
+                    processedKeys.add(this.normalizeKey(partnerName));
+
+                    const ind1 = totals[p.name] || 0;
+                    const ind2 = totals[partnerName] || 0;
+                    const combinedAmount = ind1 + ind2;
+
+                    const div = document.createElement('div');
+                    div.className = `participant-item glass is-couple`;
+                    div.style.cursor = 'pointer';
+                    div.innerHTML = `
+                        <div class="p-info">
+                            <span class="p-name">${p.name} y ${partnerName} <span class="badge-couple">💑 Pareja</span></span>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
+                                ${p.name}: ${ind1.toFixed(2)}€ · ${partnerName}: ${ind2.toFixed(2)}€
+                            </div>
+                        </div>
+                        <span class="p-amount">${combinedAmount.toFixed(2)}€</span>
+                    `;
+                    div.onclick = () => this.showCoupleDetail(p.name, partnerName);
+                    this.display.participants.appendChild(div);
+                } else {
+                    // Individual
+                    processedKeys.add(pKey);
+                    const amount = totals[p.name] || 0;
+                    const isLeft = p.status === 'left';
+                    const partnerRegistered = this.getPartner(p.name);
+                    const div = document.createElement('div');
+                    div.className = `participant-item glass ${isLeft ? 'is-left' : ''}`;
+                    div.style.cursor = 'pointer';
+                    div.innerHTML = `
+                        <div class="p-info">
+                            <span class="p-name">${p.name} ${isLeft ? '<small>(Fuera)</small>' : ''} ${partnerRegistered && !isLeft ? `<span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.25rem;">(💑 ${partnerRegistered})</span>` : ''}</span>
+                            <span class="p-role">${p.role === 'admin' ? '🚩' : (isLeft ? '🏁' : '👤')}</span>
+                        </div>
+                        <span class="p-amount">${amount.toFixed(2)}€</span>
+                    `;
+                    div.onclick = () => this.showParticipantDetail(p.name);
+                    this.display.participants.appendChild(div);
+                }
             });
         }
     },
 
-    updateMenuUI() {
-        const menu = this.state.tableData.menu;
-        this.display.menu.innerHTML = '';
-        if (!menu) {
-            this.display.menu.innerHTML = '<p class="empty-msg">Pulsa "Nuevo" para añadir productos.</p>';
-            return;
-        }
+    showCoupleDetail(name1, name2) {
+        const data = this.state.tableData;
+        if (!data || !data.orders) return;
+        
+        const getPersonDetail = (name) => {
+            const participants = Object.values(data.participants || {});
+            const pInfo = participants.find(p => p.name === name);
+            const tableStart = Number(data.createdAt || 0);
+            const myJoinTime = Number(pInfo?.joinedAt || tableStart);
+            let ordersHtml = '';
+            let total = 0;
+            let count = 0;
 
-        Object.entries(menu).forEach(([id, item]) => {
-            const div = document.createElement('div');
-            div.className = 'menu-item glass';
-            div.innerHTML = `
-                <button class="btn-edit-small" data-id="${id}">✏️</button>
-                <button class="btn-delete-menu-small" data-id="${id}">🗑️</button>
-                <span class="item-icon">${item.icon || '🍴'}</span>
-                <span class="item-name">${item.name}</span>
-                <span class="item-price">${item.price.toFixed(2)}€</span>
-            `;
-            div.onclick = (e) => {
-                if (e.target.classList.contains('btn-edit-small') || e.target.classList.contains('btn-delete-menu-small')) return;
-                this.showParticipantSelector(item);
-            };
-            div.querySelector('.btn-edit-small').onclick = (e) => {
-                e.stopPropagation();
-                this.handleEditProduct(id, item);
-            };
-            div.querySelector('.btn-delete-menu-small').onclick = (e) => {
-                e.stopPropagation();
-                this.handleDeleteProduct(id, item);
-            };
-            this.display.menu.appendChild(div);
-        });
-    },
+            Object.entries(data.orders).forEach(([id, o]) => {
+                let price = 0;
+                let label = '';
+                const orderTime = Number(o.timestamp || tableStart);
 
-    updateOrdersUI() {
-        const orders = this.state.tableData.orders;
-        this.display.recentOrders.innerHTML = '';
-        if (!orders) return;
+                if (o.user === 'SHARED') {
+                    if (myJoinTime <= orderTime) {
+                        const presentCount = participants.filter(p => Number(p.joinedAt || tableStart) <= orderTime).length || 1;
+                        price = Number(o.price) / presentCount;
+                        label = `(Escote) ${o.productName}`;
+                    }
+                } else if (o.user === name) {
+                    price = Number(o.price);
+                    label = o.productName;
+                }
 
-        const sortedOrders = Object.entries(orders).sort((a, b) => b[1].timestamp - a[1].timestamp).slice(0, 8);
-        sortedOrders.forEach(([id, o]) => {
-            const div = document.createElement('div');
-            div.className = 'order-row';
-            div.innerHTML = `
-                <span><b>${o.user === 'SHARED' ? '💎 Todos' : o.user}</b>: ${o.productName}</span>
-                <div class="order-actions">
-                    <span>${o.price.toFixed(2)}€</span>
-                    <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button>
-                </div>
-            `;
-            this.display.recentOrders.appendChild(div);
-        });
-        this.calculateTotals();
+                if (price > 0) {
+                    count++;
+                    total += price;
+                    const orderHour = o.timestamp ? new Date(o.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+                    ordersHtml += `
+                        <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <span style="font-size: 0.9rem;">${label} ${orderHour ? `<small style="color:var(--text-muted)">(${orderHour})</small>` : ''}</span>
+                            <span style="font-weight: 600;">${price.toFixed(2)}€</span>
+                        </div>
+                    `;
+                }
+            });
+            return { ordersHtml: ordersHtml || '<p style="color:var(--text-muted); font-size: 0.85rem; padding: 0.4rem 0;">Sin pedidos individuales.</p>', total, count };
+        };
+
+        const d1 = getPersonDetail(name1);
+        const d2 = getPersonDetail(name2);
+        const totalCouple = d1.total + d2.total;
+
+        const html = `
+            <h3>Consumo de Pareja: ${name1} y ${name2} 💑</h3>
+            <div style="margin: 1rem 0; padding: 0.75rem; background: rgba(236,72,153,0.1); border-radius: var(--radius-sm); border: 1px solid rgba(236,72,153,0.25); text-align: center;">
+                <span style="font-size: 0.85rem; color: var(--text-muted);">Total Acumulado Pareja:</span>
+                <div style="font-size: 1.6rem; font-weight: 700; color: #f472b6;">${totalCouple.toFixed(2)}€</div>
+            </div>
+            
+            <div style="max-height: 50vh; overflow-y: auto; text-align: left;">
+                <h4 style="color: var(--primary); margin-top: 0.8rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name1} (${d1.total.toFixed(2)}€):</h4>
+                <div>${d1.ordersHtml}</div>
+                
+                <h4 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name2} (${d2.total.toFixed(2)}€):</h4>
+                <div>${d2.ordersHtml}</div>
+            </div>
+            <button onclick="App.closeModal()" class="btn-primary" style="margin-top: 1.2rem;">Cerrar</button>
+        `;
+        this.openModal(html);
     },
 
     calculateTotals() {
@@ -726,7 +930,18 @@ const App = {
         const allTotals = this.calculateAllIndividualTotals();
         let totalBill = 0;
         Object.values(data.orders).forEach(o => totalBill += o.price);
-        const myTotal = allTotals[this.state.user] || 0;
+        
+        let myTotal = allTotals[this.state.user] || 0;
+        const partner = this.isPartnerAtTable(this.state.user);
+        const myShareLabelEl = document.querySelector('#my-share + .stat-label');
+        if (partner) {
+            const partnerTotal = allTotals[partner] || 0;
+            myTotal += partnerTotal;
+            if (myShareLabelEl) myShareLabelEl.innerHTML = `Tu parte <span class="badge-couple" style="margin-left: 4px;">💑 +${partner}</span>`;
+        } else {
+            if (myShareLabelEl) myShareLabelEl.textContent = 'Tu parte';
+        }
+
         this.display.totalBill.textContent = `${totalBill.toFixed(2)}€`;
         this.display.myShare.textContent = `${myTotal.toFixed(2)}€`;
     },
@@ -1071,27 +1286,74 @@ const App = {
 
         // 2. Calcular deudas individuales
         const individualDebts = this.calculateAllIndividualTotals();
+        const participants = Object.values(data.participants || {});
 
-        // 3. Renderizar Lista de Estado Individual
+        // 3. Renderizar Lista de Estado Individual y Parejas
         const statusContainer = document.getElementById('group-individual-status');
         statusContainer.innerHTML = '<h4>¿Cómo va el reparto?</h4>';
-        
-        Object.entries(individualDebts).forEach(([name, owed]) => {
-            const put = userContributions[name] || 0;
-            const balance = put - owed;
+
+        const processedKeys = new Set();
+        const groups = [];
+
+        participants.forEach(p => {
+            if (p.status === 'left') return;
+            const pKey = this.normalizeKey(p.name);
+            if (processedKeys.has(pKey)) return;
+
+            const partnerName = this.isPartnerAtTable(p.name, participants);
+            const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
+
+            if (partnerObj && partnerObj.status !== 'left') {
+                // Pareja activa en la mesa
+                processedKeys.add(pKey);
+                processedKeys.add(this.normalizeKey(partnerName));
+                const owed1 = individualDebts[p.name] || 0;
+                const owed2 = individualDebts[partnerName] || 0;
+                const put1 = userContributions[p.name] || 0;
+                const put2 = userContributions[partnerName] || 0;
+
+                groups.push({
+                    displayName: `${p.name} y ${partnerName}`,
+                    isCouple: true,
+                    owed: owed1 + owed2,
+                    put: put1 + put2,
+                    names: [p.name, partnerName],
+                    breakdown: `Debe ${p.name}: ${owed1.toFixed(2)}€ · Debe ${partnerName}: ${owed2.toFixed(2)}€`
+                });
+            } else {
+                processedKeys.add(pKey);
+                const owed = individualDebts[p.name] || 0;
+                const put = userContributions[p.name] || 0;
+                groups.push({
+                    displayName: p.name,
+                    isCouple: false,
+                    owed: owed,
+                    put: put,
+                    names: [p.name],
+                    breakdown: ''
+                });
+            }
+        });
+
+        groups.forEach(g => {
+            const balance = g.put - g.owed;
             const isSettled = balance >= -0.01;
 
             const div = document.createElement('div');
-            div.className = `status-row ${isSettled ? 'settled' : 'pending'}`;
+            div.className = `status-row ${isSettled ? 'settled' : 'pending'} ${g.isCouple ? 'is-couple' : ''}`;
             div.innerHTML = `
-                <span class="name">${name}</span>
-                <div class="details">
-                    <span>A pagar: ${owed.toFixed(2)}€</span>
+                <div class="name-col" style="flex: 1; text-align: left;">
+                    <span class="name" style="font-weight: 600;">${g.displayName} ${g.isCouple ? '<span class="badge-couple">💑 Pareja</span>' : ''}</span>
+                    ${g.breakdown ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">${g.breakdown}</div>` : ''}
+                </div>
+                <div class="details" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem;">
+                    <span>A pagar: <b>${g.owed.toFixed(2)}€</b></span>
+                    <span style="font-size: 0.78rem; color: var(--text-muted);">Puesto: ${g.put.toFixed(2)}€</span>
                     <span class="balance" style="color: ${balance > 0.01 ? '#3b82f6' : (isSettled ? '#22c55e' : '#f59e0b')}">
-                        ${balance > 0.01 ? `Te sobran ${balance.toFixed(2)}€` : (isSettled ? '✓ Pagado' : `Faltan ${(Math.abs(balance)).toFixed(2)}€`)}
+                        ${balance > 0.01 ? `Sobran ${balance.toFixed(2)}€` : (isSettled ? '✓ Pagado' : `Faltan ${(Math.abs(balance)).toFixed(2)}€`)}
                     </span>
                 </div>
-                <button class="btn-calc-small" onclick="App.showQuickChange('${name}', ${owed})">💸</button>
+                <button class="btn-calc-small" onclick="App.showQuickChange('${g.displayName.replace(/'/g, "\\'")}', ${g.owed})">💸</button>
             `;
             statusContainer.appendChild(div);
         });
@@ -1150,7 +1412,6 @@ const App = {
     },
 
     updateChangeAssistantUI() {
-        // No mostrar en modo grupo
         if (this.state.settleMode === 'group') return;
 
         const payer = this.state.tableData?.currentPayer;
@@ -1167,26 +1428,90 @@ const App = {
 
         const totals = this.calculateAllIndividualTotals();
         const settlements = this.state.tableData?.settlements?.[payer] || {};
+        const participants = Object.values(this.state.tableData?.participants || {});
 
-        // Todos los participantes excepto el pagador
-        const entriesToShow = Object.entries(totals).filter(([friendName]) => friendName !== payer);
+        // Pareja del pagador en la mesa (si está)
+        const payerPartner = this.isPartnerAtTable(payer, participants);
+
+        // Agrupar en unidades de cobro (parejas activas e individuales)
+        const processedKeys = new Set();
+        processedKeys.add(this.normalizeKey(payer));
+        if (payerPartner) {
+            processedKeys.add(this.normalizeKey(payerPartner));
+        }
+
+        const paymentUnits = [];
+
+        participants.forEach(p => {
+            if (p.status === 'left') return;
+            const pKey = this.normalizeKey(p.name);
+            if (processedKeys.has(pKey)) return;
+
+            const partnerName = this.isPartnerAtTable(p.name, participants);
+            const partnerObj = partnerName ? participants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName)) : null;
+
+            if (partnerObj && partnerObj.status !== 'left') {
+                // Pareja en la mesa
+                processedKeys.add(pKey);
+                processedKeys.add(this.normalizeKey(partnerName));
+                const amt1 = totals[p.name] || 0;
+                const amt2 = totals[partnerName] || 0;
+                const combinedAmount = amt1 + amt2;
+
+                paymentUnits.push({
+                    unitId: `${p.name}_y_${partnerName}`.replace(/\s/g, '_'),
+                    storageKey: `${p.name}_${partnerName}`.replace(/\./g, '_'),
+                    displayName: `${p.name} y ${partnerName}`,
+                    isCouple: true,
+                    names: [p.name, partnerName],
+                    amount: combinedAmount,
+                    breakdown: `${p.name} (${amt1.toFixed(2)}€) + ${partnerName} (${amt2.toFixed(2)}€)`
+                });
+            } else {
+                // Individual
+                processedKeys.add(pKey);
+                paymentUnits.push({
+                    unitId: p.name.replace(/\s/g, '_'),
+                    storageKey: p.name.replace(/\./g, '_'),
+                    displayName: p.name,
+                    isCouple: false,
+                    names: [p.name],
+                    amount: totals[p.name] || 0,
+                    breakdown: ''
+                });
+            }
+        });
 
         const currentPayerInList = this.display.debtsList.dataset.payer;
         
         if (currentPayerInList !== payer) {
             this.display.debtsList.innerHTML = '';
             this.display.debtsList.dataset.payer = payer;
+
+            if (payerPartner) {
+                const partnerNotice = document.createElement('div');
+                partnerNotice.style.cssText = 'font-size: 0.85rem; color: #f472b6; background: rgba(236,72,153,0.12); border: 1px solid rgba(236,72,153,0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.8rem; margin-bottom: 0.85rem; text-align: center;';
+                partnerNotice.innerHTML = `💑 <b>${payerPartner}</b> (pareja de ${payer}) no debe nada, pagan juntos.`;
+                this.display.debtsList.appendChild(partnerNotice);
+            }
             
-            entriesToShow.forEach(([friendName, amount]) => {
+            paymentUnits.forEach((unit) => {
                 const div = document.createElement('div');
-                div.className = `payment-row`;
-                div.id = `pay-row-${friendName.replace(/\s/g, '_')}`;
+                div.className = `payment-row ${unit.isCouple ? 'is-couple' : ''}`;
+                div.id = `pay-row-${unit.unitId}`;
                 div.innerHTML = `
-                    <div class="p-header"><span>${friendName}</span><span class="p-amount">A pagar: ${amount.toFixed(2)}€</span></div>
+                    <div class="p-header">
+                        <div style="text-align: left;">
+                            <span style="font-weight: 600;">${unit.displayName}</span>
+                            ${unit.isCouple ? `<span class="badge-couple" style="margin-left: 4px;">💑 Pareja</span>` : ''}
+                            ${unit.breakdown ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem;">${unit.breakdown}</div>` : ''}
+                        </div>
+                        <span class="p-amount">A pagar: ${unit.amount.toFixed(2)}€</span>
+                    </div>
                     <div class="p-controls">
-                        <input type="number" step="0.01" class="input-payment" placeholder="Paga con..." oninput="App.calculateIndividualChange(this, ${amount}); App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', this.value)">
+                        <input type="number" step="0.01" class="input-payment" placeholder="${unit.isCouple ? 'Pagan con...' : 'Paga con...'}" oninput="App.calculateIndividualChange(this, ${unit.amount}); App.handleUnitPaymentChange('${payer}', '${unit.storageKey}', this.value, ['${unit.names.join("','")}'])">
                         <div class="method-options">
-                             <button class="method-btn" onclick="App.handleIndividualPaymentChange('${payer}', '${friendName.replace(/'/g, "\\'")}', ${amount})">📲 Bizum</button>
+                             <button class="method-btn" onclick="App.handleUnitPaymentChange('${payer}', '${unit.storageKey}', ${unit.amount}, ['${unit.names.join("','")}'])">📲 Bizum</button>
                         </div>
                     </div>
                     <div class="change-result-row" style="margin-top: 0.5rem; min-height: 1.2rem; font-size: 0.9rem; color: var(--primary);"></div>
@@ -1195,18 +1520,24 @@ const App = {
             });
         }
         
-        entriesToShow.forEach(([friendName, amount]) => {
-            const row = document.getElementById(`pay-row-${friendName.replace(/\s/g, '_')}`);
+        paymentUnits.forEach((unit) => {
+            const row = document.getElementById(`pay-row-${unit.unitId}`);
             if (!row) return;
             const input = row.querySelector('.input-payment');
             
-            const safeName = friendName.replace(/\./g, '_');
-            const paid = settlements[safeName];
+            let paid = settlements[unit.storageKey];
+            if (paid === undefined && unit.isCouple) {
+                const p1 = settlements[unit.names[0].replace(/\./g, '_')];
+                const p2 = settlements[unit.names[1].replace(/\./g, '_')];
+                if (p1 !== undefined || p2 !== undefined) {
+                    paid = (Number(p1 || 0) + Number(p2 || 0)) || undefined;
+                }
+            }
             
             if (document.activeElement !== input) {
                 if (paid !== undefined && paid !== null && paid !== '') {
                     input.value = paid;
-                    this.calculateIndividualChange(input, amount);
+                    this.calculateIndividualChange(input, unit.amount);
                 } else {
                     input.value = '';
                     row.querySelector('.change-result-row').innerHTML = '';
@@ -1215,12 +1546,24 @@ const App = {
         });
     },
 
-    async handleIndividualPaymentChange(payer, friendName, value) {
+    async handleUnitPaymentChange(payer, storageKey, value, names = []) {
         const amount = value === '' || value === null ? null : this.parseAmount(value);
         if (amount !== null && isNaN(amount)) return;
         try {
-            await set(ref(this.db, `tables/${this.state.tableId}/settlements/${payer}/${friendName.replace(/\./g, '_')}`), amount);
+            await set(ref(this.db, `tables/${this.state.tableId}/settlements/${payer}/${storageKey}`), amount);
+            // Si es pareja, sincronizar los nombres individuales para consistencia
+            if (names && names.length === 2) {
+                const k1 = names[0].replace(/\./g, '_');
+                const k2 = names[1].replace(/\./g, '_');
+                await set(ref(this.db, `tables/${this.state.tableId}/settlements/${payer}/${k1}`), amount);
+                await set(ref(this.db, `tables/${this.state.tableId}/settlements/${payer}/${k2}`), null);
+            }
+            this.updateChangeAssistantUI();
         } catch (error) { console.error(error); }
+    },
+
+    async handleIndividualPaymentChange(payer, friendName, value) {
+        await this.handleUnitPaymentChange(payer, friendName.replace(/\./g, '_'), value, [friendName]);
     },
 
     calculateIndividualChange(inputElement, owed) {
@@ -1453,11 +1796,13 @@ const App = {
     },
 
     async confirmAddFriends() {
-        const customNameInput = document.getElementById('custom-friend-name').value.trim();
+        const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
         const selected = [...(this.state.tempSelectionFriends || [])];
         
         if (customNameInput) {
-            selected.push(customNameInput);
+            // Si se ha escrito un amigo nuevo, preguntamos si es pareja de alguien
+            await this.promptNewFriendCouple(customNameInput, selected, false);
+            return;
         }
 
         if (selected.length === 0) {
@@ -1465,14 +1810,134 @@ const App = {
         }
 
         this.closeModal();
+        await this.addFriendsToTable(selected);
+    },
 
+    async promptNewFriendCouple(newFriendName, otherSelected = [], isParty = false) {
         try {
-            for (const name of selected) {
+            const snapshot = await get(ref(this.db, 'members'));
+            const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
+            const sortedMembers = members.sort((a, b) => a.name.localeCompare(b.name));
+            const safeNewFriend = newFriendName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const safeOtherSelected = JSON.stringify(otherSelected).replace(/"/g, '&quot;');
+
+            let html = `
+                <div style="text-align: center;">
+                    <div style="font-size: 2.2rem; margin-bottom: 0.25rem;">💑</div>
+                    <h3 style="margin-bottom: 0.5rem;">¿${newFriendName} es pareja de alguien?</h3>
+                    <p class="subtitle" style="margin-bottom: 1.25rem; font-size: 0.88rem;">
+                        Muchos somos matrimonios y uno paga lo del otro. Si es pareja de alguien, se acumularán sus consumos de ahora en adelante.
+                    </p>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <button class="btn-primary" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '', ${safeOtherSelected}, ${isParty})" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
+                            👤 No, viene solo/a (Sin pareja)
+                        </button>
+                    </div>
+
+                    <p class="subtitle" style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                        O selecciona a su pareja en la banda:
+                    </p>
+                    
+                    <div class="participant-grid" style="max-height: 35vh; overflow-y: auto;">
+            `;
+
+            sortedMembers.forEach(m => {
+                if (this.normalizeKey(m.name) === this.normalizeKey(newFriendName)) return;
+                const existingPartner = this.getPartner(m.name);
+                const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                html += `
+                    <button class="participant-btn" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '${safeName}', ${safeOtherSelected}, ${isParty})" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.6rem 0.4rem; height: auto;">
+                        <span style="font-weight: 600;">${m.name}</span>
+                        ${existingPartner ? `<small style="font-size: 0.68rem; color: #ec4899;">(con ${existingPartner})</small>` : '<small style="font-size: 0.68rem; color: #22c55e;">(Sin pareja)</small>'}
+                    </button>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            this.openModal(html);
+        } catch (e) {
+            console.error(e);
+            if (isParty) {
+                for (const n of [newFriendName, ...otherSelected]) await this.addPartyFriendSilent(n);
+                this.closeModal();
+            } else {
+                this.closeModal();
+                await this.addFriendsToTable([newFriendName, ...otherSelected]);
+            }
+        }
+    },
+
+    async finalizeAddFriendWithCouple(newFriendName, partnerName, otherSelected = [], isParty = false) {
+        try {
+            // 1. Guardar pareja en Firebase si se seleccionó
+            if (partnerName) {
+                await this.setCouple(newFriendName, partnerName);
+            }
+            
+            // 2. Registrar el nuevo amigo en members si no existe
+            const key = this.normalizeKey(newFriendName);
+            const memberSnap = await get(ref(this.db, `members/${key}`));
+            if (!memberSnap.exists()) {
+                await set(ref(this.db, `members/${key}`), {
+                    name: newFriendName,
+                    code: `${newFriendName}_Thermobanda`
+                });
+            }
+
+            // 3. Preparar lista de amigos a añadir
+            const toAdd = [newFriendName, ...otherSelected];
+
+            if (isParty) {
+                if (partnerName) {
+                    const isPartnerInParty = Object.values(this.state.partyData?.participants || {})
+                        .some(p => this.normalizeKey(p.name) === this.normalizeKey(partnerName));
+                    if (!isPartnerInParty && !toAdd.some(n => this.normalizeKey(n) === this.normalizeKey(partnerName))) {
+                        if (confirm(`¿Quieres añadir también a su pareja ${partnerName} al bote ahora?`)) {
+                            toAdd.push(partnerName);
+                        }
+                    }
+                }
+                this.closeModal();
+                for (const name of toAdd) {
+                    await this.addPartyFriendSilent(name);
+                }
+            } else {
+                if (partnerName) {
+                    const isPartnerInTable = Object.values(this.state.tableData?.participants || {})
+                        .some(p => p.status === 'active' && this.normalizeKey(p.name) === this.normalizeKey(partnerName));
+                    if (!isPartnerInTable && !toAdd.some(n => this.normalizeKey(n) === this.normalizeKey(partnerName))) {
+                        if (confirm(`¿Quieres añadir también a su pareja ${partnerName} a la mesa ahora?`)) {
+                            toAdd.push(partnerName);
+                        }
+                    }
+                }
+                this.closeModal();
+                await this.addFriendsToTable(toAdd);
+            }
+        } catch (error) {
+            console.error('Error al finalizar alta con pareja:', error);
+            this.closeModal();
+            if (isParty) {
+                for (const n of [newFriendName, ...otherSelected]) await this.addPartyFriendSilent(n);
+            } else {
+                await this.addFriendsToTable([newFriendName, ...otherSelected]);
+            }
+        }
+    },
+
+    async addFriendsToTable(names) {
+        try {
+            for (const name of names) {
                 const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${name.replace(/\./g, '_')}`);
                 await set(participantRef, { name, role: 'member', status: 'active', joinedAt: Date.now() });
             }
         } catch (error) {
-            console.error('Error al añadir amigos:', error);
+            console.error('Error al añadir amigos a la mesa:', error);
         }
     },
 
@@ -2013,11 +2478,12 @@ const App = {
     },
 
     async confirmPartyAddFriends() {
-        const customNameInput = document.getElementById('custom-friend-name').value.trim();
+        const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
         const selected = [...(this.state.tempSelectionFriends || [])];
         
         if (customNameInput) {
-            selected.push(customNameInput);
+            await this.promptNewFriendCouple(customNameInput, selected, true);
+            return;
         }
 
         if (selected.length === 0) {

@@ -440,6 +440,31 @@ input:focus {
     border: 1px solid rgba(99, 102, 241, 0.3);
 }
 
+.badge-couple {
+    background: rgba(236, 72, 153, 0.15);
+    color: #f472b6;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid rgba(236, 72, 153, 0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.participant-item.is-couple {
+    border-left: 3px solid #ec4899;
+}
+
+.payment-row.is-couple {
+    border-left: 3px solid #ec4899;
+}
+
+.status-row.is-couple {
+    border-left: 3px solid #ec4899;
+}
+
 .menu-controls {
     display: flex;
     justify-content: space-between;
