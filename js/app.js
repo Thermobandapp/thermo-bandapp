@@ -1993,7 +1993,14 @@ const App = {
             html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
                     <p class="subtitle" style="margin-bottom: 0.5rem; color: var(--text-main);">¿No es miembro? Añádelo manualmente:</p>
-                    <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 1rem;">
+                    <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);">
+                        <input type="checkbox" id="chk-permanent-member" style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;">
+                        <span style="font-size: 0.88rem; line-height: 1.35;">
+                            <strong>Miembro permanente</strong><br>
+                            <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en esta mesa.</span>
+                        </span>
+                    </label>
                 </div>
             `;
             
@@ -2024,9 +2031,11 @@ const App = {
     async confirmAddFriends() {
         const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
         const selected = [...(this.state.tempSelectionFriends || [])];
+        const permanent = document.getElementById('chk-permanent-member')?.checked ?? true;
         
         if (customNameInput) {
-            // Si se ha escrito un amigo nuevo, preguntamos si es pareja de alguien
+            // Si se ha escrito un amigo nuevo, guardamos la opción de permanente y preguntamos si es pareja de alguien
+            this.state.tempNewFriendPermanent = permanent;
             await this.promptNewFriendCouple(customNameInput, selected, false);
             return;
         }
@@ -2114,20 +2123,26 @@ const App = {
     },
 
     async finalizeAddFriendWithCouple(newFriendName, partnerName, otherSelected = [], isParty = false) {
+        // Leer si se quiere dar de alta permanente (guardado en state por confirmAddFriends/confirmPartyAddFriends)
+        const permanent = this.state.tempNewFriendPermanent !== false;
+        this.state.tempNewFriendPermanent = undefined; // limpiar
+
         try {
-            // 1. Guardar pareja en Firebase si se seleccionó
-            if (partnerName) {
+            // 1. Guardar pareja en Firebase si se seleccionó (solo si es permanente)
+            if (partnerName && permanent) {
                 await this.setCouple(newFriendName, partnerName);
             }
             
-            // 2. Registrar el nuevo amigo en members si no existe
-            const key = this.normalizeKey(newFriendName);
-            const memberSnap = await get(ref(this.db, `members/${key}`));
-            if (!memberSnap.exists()) {
-                await set(ref(this.db, `members/${key}`), {
-                    name: newFriendName,
-                    code: `${newFriendName}_Thermobanda`
-                });
+            // 2. Registrar el nuevo amigo en members solo si es miembro permanente
+            if (permanent) {
+                const key = this.normalizeKey(newFriendName);
+                const memberSnap = await get(ref(this.db, `members/${key}`));
+                if (!memberSnap.exists()) {
+                    await set(ref(this.db, `members/${key}`), {
+                        name: newFriendName,
+                        code: `${newFriendName}_Thermobanda`
+                    });
+                }
             }
 
             // 3. Preparar lista de amigos a añadir
@@ -2705,7 +2720,14 @@ const App = {
             html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
                     <p class="subtitle" style="margin-bottom: 0.5rem; color: var(--text-main);">¿No es miembro? Añádelo manualmente:</p>
-                    <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 1rem;">
+                    <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);">
+                        <input type="checkbox" id="chk-permanent-member" style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;">
+                        <span style="font-size: 0.88rem; line-height: 1.35;">
+                            <strong>Miembro permanente</strong><br>
+                            <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en este bote.</span>
+                        </span>
+                    </label>
                 </div>
             `;
             
@@ -2721,8 +2743,10 @@ const App = {
     async confirmPartyAddFriends() {
         const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
         const selected = [...(this.state.tempSelectionFriends || [])];
+        const permanent = document.getElementById('chk-permanent-member')?.checked ?? true;
         
         if (customNameInput) {
+            this.state.tempNewFriendPermanent = permanent;
             await this.promptNewFriendCouple(customNameInput, selected, true);
             return;
         }
