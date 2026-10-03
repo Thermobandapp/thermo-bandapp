@@ -2504,31 +2504,57 @@ const App = {
         });
 
         // 1. Reparto del efectivo sobrante del bote (remainingBalance)
-        // Se reparte proporcionalmente entre los acreedores (net > 0) hasta agotar el bote.
+        // Para MINIMIZAR el número de envíos por Bizum:
+        // En lugar de repartir el bote fraccionado entre todos (lo que obligaría a todos a recibir Bizum),
+        // liquidamos al 100% en metálico a tantos amigos como sea posible (ordenados de menor a mayor saldo),
+        // de modo que el dinero restante a cobrar por Bizum quede concentrado en el MENOR número de personas posible (idealmente 1 o 2).
         const refunds = {};
-        const pendingToReceive = {}; // Lo que aún les falta por cobrar tras vaciar el bote
+        const pendingToReceive = {};
 
         participantNames.forEach(n => {
-            const net = netBalances[n] || 0;
-            if (net <= 0.001 || remainingBalance <= 0.001) {
-                refunds[n] = 0;
-                pendingToReceive[n] = 0;
-            } else if (totalPositiveNet <= remainingBalance + 0.05) {
-                // Hay suficiente dinero físico en el bote para devolverle el 100% de lo que le sobra
-                refunds[n] = net;
-                pendingToReceive[n] = 0;
-            } else {
-                // El bote físico no llega a cubrir todo (porque otros consumieron y no pusieron):
-                // se reparte el bote proporcionalmente y el resto lo cobrarán por Bizum
-                const cashPart = (remainingBalance * net) / totalPositiveNet;
-                refunds[n] = cashPart;
-                pendingToReceive[n] = Math.max(0, net - cashPart);
-            }
+            refunds[n] = 0;
+            pendingToReceive[n] = 0;
         });
 
-        // 2. Ajuste de Cuentas por Bizum / Efectivo (Opción A)
-        // Los que consumieron más de lo que pusieron (deudores) pagan directamente
-        // a los que aún les falta cobrar (pendingToReceive) tras haber repartido el bote.
+        if (totalPositiveNet <= remainingBalance + 0.05) {
+            // Hay suficiente metálico para pagarle el 100% a todos en mano
+            participantNames.forEach(n => {
+                const net = netBalances[n] || 0;
+                if (net > 0.001) {
+                    refunds[n] = net;
+                }
+            });
+        } else {
+            // Ordenar los acreedores de MENOR a MAYOR saldo a favor
+            // para liquidar a tantos por completo en mano como sea posible con el efectivo disponible
+            const creditorsList = participantNames
+                .filter(n => (netBalances[n] || 0) > 0.001)
+                .map(n => ({ name: n, net: netBalances[n] }))
+                .sort((a, b) => a.net - b.net);
+
+            let cashPool = remainingBalance;
+
+            creditorsList.forEach(c => {
+                if (cashPool >= c.net - 0.001) {
+                    // Se le paga íntegramente en metálico: 0 Bizums para esta persona
+                    refunds[c.name] = c.net;
+                    pendingToReceive[c.name] = 0;
+                    cashPool -= c.net;
+                } else if (cashPool > 0.001) {
+                    // Se le entrega todo el resto de efectivo que queda en el bote
+                    refunds[c.name] = cashPool;
+                    pendingToReceive[c.name] = c.net - cashPool;
+                    cashPool = 0;
+                } else {
+                    // Ya no queda metálico en el bote: cobrará su saldo por Bizum
+                    refunds[c.name] = 0;
+                    pendingToReceive[c.name] = c.net;
+                }
+            });
+        }
+
+        // 2. Ajuste de Cuentas por Bizum (Minimizando transacciones)
+        // Cada deudor hace el menor número de Bizums posible
         const debts = [];
         const debtors = [];
         const creditors = [];
@@ -2543,6 +2569,10 @@ const App = {
                 creditors.push({ name: n, amount: pending });
             }
         });
+
+        // Ordenar ambos de mayor a menor para emparejar importes grandes primero y minimizar transferencias
+        debtors.sort((a, b) => b.amount - a.amount);
+        creditors.sort((a, b) => b.amount - a.amount);
 
         let dIdx = 0;
         let cIdx = 0;
