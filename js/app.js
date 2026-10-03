@@ -2488,37 +2488,47 @@ const App = {
             });
         }
 
-        // Balance neto ideal: aportado - gastado
+        // Balance neto ideal de cada participante: lo que puso menos lo que gastó
         const netBalances = {};
         let totalPositiveNet = 0;
+        let totalNegativeNet = 0;
+
         participantNames.forEach(n => {
             const net = (aports[n] || 0) - (spent[n] || 0);
             netBalances[n] = net;
-            if (net > 0) {
+            if (net > 0.001) {
                 totalPositiveNet += net;
+            } else if (net < -0.001) {
+                totalNegativeNet += Math.abs(net);
             }
         });
 
-        // Devolución proporcional basada en lo que le sobra a cada uno (aportado - consumido)
+        // 1. Reparto del efectivo sobrante del bote (remainingBalance)
+        // Se reparte proporcionalmente entre los acreedores (net > 0) hasta agotar el bote.
         const refunds = {};
+        const pendingToReceive = {}; // Lo que aún les falta por cobrar tras vaciar el bote
+
         participantNames.forEach(n => {
             const net = netBalances[n] || 0;
-            if (net <= 0 || remainingBalance <= 0.001) {
+            if (net <= 0.001 || remainingBalance <= 0.001) {
                 refunds[n] = 0;
-            } else if (Math.abs(totalPositiveNet - remainingBalance) < 0.05) {
-                // Si el bote cuadra exactamente con la suma de balances netos
-                refunds[n] = Math.max(0, net);
-            } else if (totalPositiveNet > 0) {
-                // Reparto proporcional al saldo neto positivo si hubiera descuadre
-                refunds[n] = (remainingBalance * net) / totalPositiveNet;
+                pendingToReceive[n] = 0;
+            } else if (totalPositiveNet <= remainingBalance + 0.05) {
+                // Hay suficiente dinero físico en el bote para devolverle el 100% de lo que le sobra
+                refunds[n] = net;
+                pendingToReceive[n] = 0;
             } else {
-                refunds[n] = 0;
+                // El bote físico no llega a cubrir todo (porque otros consumieron y no pusieron):
+                // se reparte el bote proporcionalmente y el resto lo cobrarán por Bizum
+                const cashPart = (remainingBalance * net) / totalPositiveNet;
+                refunds[n] = cashPart;
+                pendingToReceive[n] = Math.max(0, net - cashPart);
             }
         });
 
-        // Calcular liquidación de deudas óptima (quién debe pagar a quién por Bizum / efectivo)
-        // Deudores: net < -0.01 (deben -net)
-        // Acreedores: net > 0.01 (tienen a favor net)
+        // 2. Ajuste de Cuentas por Bizum / Efectivo (Opción A)
+        // Los que consumieron más de lo que pusieron (deudores) pagan directamente
+        // a los que aún les falta cobrar (pendingToReceive) tras haber repartido el bote.
         const debts = [];
         const debtors = [];
         const creditors = [];
@@ -2527,12 +2537,13 @@ const App = {
             const net = netBalances[n] || 0;
             if (net < -0.01) {
                 debtors.push({ name: n, amount: Math.abs(net) });
-            } else if (net > 0.01) {
-                creditors.push({ name: n, amount: net });
+            }
+            const pending = pendingToReceive[n] || 0;
+            if (pending > 0.01) {
+                creditors.push({ name: n, amount: pending });
             }
         });
 
-        // Algoritmo voraz para saldar deudas con el mínimo número de transferencias
         let dIdx = 0;
         let cIdx = 0;
         while (dIdx < debtors.length && cIdx < creditors.length) {
@@ -2563,6 +2574,7 @@ const App = {
             spent,
             netBalances,
             refunds,
+            pendingToReceive,
             debts,
             participants: allParticipants
         };
@@ -2579,6 +2591,7 @@ const App = {
         const gastado = balances.spent[name] || 0;
         const net = balances.netBalances[name] || 0;
         const refundable = balances.refunds[name] || 0;
+        const pendingBizum = balances.pendingToReceive[name] || 0;
 
         let html = `<h3>💸 ${name} se fue antes</h3>`;
         html += `
@@ -2587,25 +2600,27 @@ const App = {
                     <span style="color: var(--text-muted);">Puso en el bote:</span>
                     <b>${aport.toFixed(2)}€</b>
                 </div>
-                <div style="display:flex; justify-content:space-between;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
                     <span style="color: var(--text-muted);">Consumió en rondas:</span>
                     <b style="color: #f87171;">${gastado.toFixed(2)}€</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
+                    <span style="color: var(--text-muted);">Saldo a su favor:</span>
+                    <b style="color: ${net > 0 ? 'var(--success)' : (net < 0 ? '#ef4444' : 'var(--text-muted)')};">${net >= 0 ? '+' : ''}${net.toFixed(2)}€</b>
                 </div>
             </div>
         `;
 
         if (alreadyRefunded) {
-            html += `<p style="color: var(--success);">✅ Ya reclamó su sobrante.</p>`;
+            html += `<p style="color: var(--success);">✅ Ya retiró su dinero.</p>`;
         } else if (refundable > 0.01) {
             html += `
                 <div style="background: rgba(99,102,241,0.15); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Le corresponde del sobrante:</p>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Se lleva en efectivo del bote:</p>
                     <span style="font-size: 1.8rem; font-weight: 700; color: #818cf8;">${refundable.toFixed(2)}€</span>
+                    ${pendingBizum > 0.01 ? `<p style="color: #f472b6; font-size: 0.82rem; margin-top: 0.4rem;">+ ${pendingBizum.toFixed(2)}€ le llegarán por Bizum al cerrar la fiesta.</p>` : ''}
                 </div>
-                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
-                    Calculado restando lo consumido (${gastado.toFixed(2)}€) a lo aportado (${aport.toFixed(2)}€).
-                </p>
-                <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${refundable.toFixed(2)}€</button>
+                <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${refundable.toFixed(2)}€ en efectivo</button>
             `;
         } else if (net < -0.01) {
             html += `
@@ -2628,62 +2643,30 @@ const App = {
         const data = this.state.partyData;
         if (!data) return;
         const balances = this.calculatePartyBalances();
-        const { totalCollected, totalSpent, remainingBalance, aports, spent, netBalances, refunds, debts, participants } = balances;
+        const { totalCollected, totalSpent, remainingBalance, aports, spent, netBalances, refunds, pendingToReceive, debts, participants } = balances;
         
-        let debtsHtml = '';
-        if (debts && debts.length > 0) {
-            debtsHtml = `
-                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border: 1.5px solid rgba(236, 72, 153, 0.5); background: rgba(236, 72, 153, 0.05);">
-                    <h3 style="text-align: center; margin-bottom: 0.4rem; color: #f472b6; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>📱 Ajustes de Cuentas (Bizum / Pago)</span>
-                    </h3>
-                    <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.85rem;">
-                        Para los que consumieron más de lo que pusieron en el bote:
-                    </p>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-            `;
-
-            debts.forEach(d => {
-                debtsHtml += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); font-size: 0.9rem;">
-                        <div style="display: flex; align-items: center; gap: 0.45rem;">
-                            <b style="color: #f87171;">${d.from}</b>
-                            <span style="color: var(--text-muted); font-size: 0.8rem;">le da a</span>
-                            <b style="color: #60a5fa;">${d.to}</b>
-                        </div>
-                        <span style="font-weight: 700; color: #f43f5e; font-size: 1.05rem; white-space: nowrap;">
-                            ${d.amount.toFixed(2)}€
-                        </span>
-                    </div>
-                `;
-            });
-
-            debtsHtml += `
-                    </div>
-                </div>
-            `;
-        }
-
+        // 1. Bloque de Reparto del Bote Físico
         let refundHtml = '';
         if (remainingBalance > 0.01 && participants.length > 0) {
             refundHtml = `
-                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border-color: rgba(99, 102, 241, 0.4);">
-                    <h3 style="text-align: center; margin-bottom: 0.75rem; color: #818cf8; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>💸 Reparto del Sobrante del Bote</span>
+                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.2rem; border-color: rgba(99, 102, 241, 0.4);">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem; color: #818cf8; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>💵 Reparto en Metálico del Bote (${remainingBalance.toFixed(2)}€)</span>
                     </h3>
-                    <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
-                        Devolución calculada según lo que ha puesto y consumido cada uno.
+                    <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
+                        Dinero físico que se lleva cada uno ahora mismo en mano:
                     </p>
                     <div style="max-height: 200px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.45rem;">
             `;
             
-            // Ordenar por devolución de mayor a menor
+            // Ordenar por devolución en metálico de mayor a menor
             const sortedParticipants = participants.map(p => {
                 const aport = aports[p.name] || 0;
                 const gastado = spent[p.name] || 0;
                 const net = netBalances[p.name] || 0;
                 const refund = refunds[p.name] || 0;
-                return { name: p.name, aport, gastado, net, refund };
+                const pending = pendingToReceive[p.name] || 0;
+                return { name: p.name, aport, gastado, net, refund, pending };
             }).sort((a, b) => b.refund - a.refund);
             
             sortedParticipants.forEach(p => {
@@ -2696,14 +2679,52 @@ const App = {
                                 Puso: ${p.aport.toFixed(2)}€ | Gastó: ${p.gastado.toFixed(2)}€
                             </span>
                         </div>
-                        <span style="color: ${p.refund > 0.01 ? 'var(--success)' : (isDebtor ? '#f87171' : 'var(--text-muted)')}; font-weight: 700; font-size: 0.95rem;">
-                            ${p.refund > 0.01 ? `+${p.refund.toFixed(2)}€` : (isDebtor ? `Debe ${Math.abs(p.net).toFixed(2)}€` : '0.00€')}
-                        </span>
+                        <div style="text-align: right;">
+                            <span style="color: ${p.refund > 0.01 ? 'var(--success)' : (isDebtor ? '#f87171' : 'var(--text-muted)')}; font-weight: 700; font-size: 0.95rem; display: block;">
+                                ${p.refund > 0.01 ? `+${p.refund.toFixed(2)}€ metálico` : (isDebtor ? `Debe ${Math.abs(p.net).toFixed(2)}€` : '0.00€')}
+                            </span>
+                            ${p.pending > 0.01 ? `<small style="color: #f472b6; font-size: 0.72rem;">(+${p.pending.toFixed(2)}€ por Bizum)</small>` : ''}
+                        </div>
                     </div>
                 `;
             });
             
             refundHtml += `
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2. Bloque de Bizums (solo para cubrir lo que falta tras vaciar el bote)
+        let debtsHtml = '';
+        if (debts && debts.length > 0) {
+            debtsHtml = `
+                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border: 1.5px solid rgba(236, 72, 153, 0.5); background: rgba(236, 72, 153, 0.05);">
+                    <h3 style="text-align: center; margin-bottom: 0.4rem; color: #f472b6; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>📱 Bizums para dejarlo 100% cuadrado</span>
+                    </h3>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.85rem;">
+                        Los que deben pagan a quienes les faltaba parte de su dinero tras repartir el bote:
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            `;
+
+            debts.forEach(d => {
+                debtsHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); font-size: 0.9rem;">
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <b style="color: #f87171;">${d.from}</b>
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">le hace Bizum a</span>
+                            <b style="color: #60a5fa;">${d.to}</b>
+                        </div>
+                        <span style="font-weight: 700; color: #f43f5e; font-size: 1.05rem; white-space: nowrap;">
+                            ${d.amount.toFixed(2)}€
+                        </span>
+                    </div>
+                `;
+            });
+
+            debtsHtml += `
                     </div>
                 </div>
             `;
