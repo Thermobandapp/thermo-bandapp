@@ -2056,14 +2056,18 @@ const App = {
         const btn = document.getElementById(`f-btn-${name.replace(/\s/g, '_')}`);
         if (idx > -1) {
             this.state.tempSelectionFriends.splice(idx, 1);
-            btn.classList.remove('selected');
+            if (btn) btn.classList.remove('selected');
         } else {
             this.state.tempSelectionFriends.push(name);
-            btn.classList.add('selected');
+            if (btn) btn.classList.add('selected');
         }
         
         const count = this.state.tempSelectionFriends.length;
-        document.getElementById('btn-confirm-add-friends').textContent = `Añadir a la mesa (${count})`;
+        const confirmBtn = document.getElementById('btn-confirm-add-friends');
+        if (confirmBtn) {
+            const isParty = this.state.currentView === 'party-pot' || Boolean(this.state.partyId);
+            confirmBtn.textContent = isParty ? `Añadir al bote (${count})` : `Añadir a la mesa (${count})`;
+        }
     },
 
     async confirmAddFriends() {
@@ -3026,9 +3030,29 @@ const App = {
             const availableMembers = members.filter(m => !currentParticipants.includes(m.name));
 
             this.state.tempSelectionFriends = [];
+            this.state.tempAvailablePartyMembers = availableMembers.map(m => m.name);
             
             let html = `<h3>Añadir Amigos al Bote</h3>`;
-            html += `<p class="subtitle" style="margin-bottom: 1rem;">Selecciona los miembros que quieres añadir:</p>`;
+            html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Selecciona los miembros que quieres añadir:</p>`;
+
+            // Botones de selección rápida: Chicos, Chicas, Todos, Ninguno
+            html += `
+                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('chicos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
+                        👦 Chicos
+                    </button>
+                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('chicas')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(236, 72, 153, 0.2); border-color: rgba(236, 72, 153, 0.4); color: #f472b6;">
+                        👧 Chicas
+                    </button>
+                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('todos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                        Todos
+                    </button>
+                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('ninguno')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                        Limpiar
+                    </button>
+                </div>
+            `;
+
             html += `<div class="participant-grid" style="max-height: 40vh; overflow-y: auto;">`;
             
             availableMembers.forEach(m => {
@@ -3063,6 +3087,42 @@ const App = {
         } catch (error) {
             console.error('Error al cargar miembros:', error);
             alert('Error al conectar con la base de datos.');
+        }
+    },
+
+    setPartyFriendsQuickFilter(filterType) {
+        const boysList = ['Antonio', 'Caba', 'David', 'Jose', 'Edu', 'Pedro', 'Karlos', 'Fernando'].map(n => n.toLowerCase());
+        const available = this.state.tempAvailablePartyMembers || [];
+
+        let targetNames = [];
+        if (filterType === 'chicos') {
+            targetNames = available.filter(name => boysList.includes(name.trim().toLowerCase()));
+        } else if (filterType === 'chicas') {
+            targetNames = available.filter(name => !boysList.includes(name.trim().toLowerCase()));
+        } else if (filterType === 'todos') {
+            targetNames = [...available];
+        } else if (filterType === 'ninguno') {
+            targetNames = [];
+        }
+
+        this.state.tempSelectionFriends = [...targetNames];
+
+        // Actualizar estados visuales de los botones
+        available.forEach(name => {
+            const idName = name.replace(/\s/g, '_');
+            const btn = document.getElementById(`f-btn-${idName}`);
+            if (btn) {
+                if (targetNames.includes(name)) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            }
+        });
+
+        const confirmBtn = document.getElementById('btn-confirm-add-friends');
+        if (confirmBtn) {
+            confirmBtn.textContent = `Añadir al bote (${targetNames.length})`;
         }
     },
 
