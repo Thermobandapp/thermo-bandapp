@@ -2327,6 +2327,12 @@ const App = {
         onValue(partyRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
+                if (data.status === 'finished' && this.state.partyId) {
+                    this.state.partyId = null;
+                    localStorage.removeItem('thermo_partyId');
+                    this.showPartyBorrachuzoModal(data);
+                    return;
+                }
                 this.state.partyData = data;
                 this.updatePartyUI();
                 document.getElementById('party-pot-setup').classList.add('hidden');
@@ -2654,14 +2660,103 @@ const App = {
         
         try {
             const currentId = this.state.partyId;
+            const currentData = this.state.partyData || {};
             await set(ref(this.db, `party_pots/${currentId}/status`), 'finished');
             
             localStorage.removeItem('thermo_partyId');
             this.state.partyId = null;
             
             await this.addLog('close_party', { partyId: currentId });
-            location.reload();
+            this.showPartyBorrachuzoModal(currentData);
         } catch (error) { console.error('Error cerrando fiesta:', error); }
+    },
+
+    showPartyBorrachuzoModal(data) {
+        // Contabilizar rondas/consumos por amigo
+        const roundCount = {};
+        const spentByUser = {};
+        const participants = data?.participants ? Object.values(data.participants).map(p => p.name) : [];
+
+        participants.forEach(name => {
+            roundCount[name] = 0;
+            spentByUser[name] = 0;
+        });
+
+        if (data?.history) {
+            Object.values(data.history).forEach(item => {
+                if (item.type === 'expense') {
+                    const amount = item.amount || 0;
+                    let targets = Array.isArray(item.beneficiaries) && item.beneficiaries.length > 0
+                        ? item.beneficiaries
+                        : participants;
+
+                    if (targets.length === 0 && participants.length > 0) {
+                        targets = participants;
+                    }
+
+                    if (targets.length > 0) {
+                        const split = amount / targets.length;
+                        targets.forEach(target => {
+                            roundCount[target] = (roundCount[target] || 0) + 1;
+                            spentByUser[target] = (spentByUser[target] || 0) + split;
+                        });
+                    }
+                }
+            });
+        }
+
+        let borrachuzosHTML = '';
+        let titulo = 'Borrachuzo de la noche';
+        const activeUsersWithRounds = Object.entries(roundCount).filter(([, count]) => count > 0);
+
+        if (activeUsersWithRounds.length === 0) {
+            borrachuzosHTML = '<p style="margin:0.5rem 0;color:#374151;">¡Nadie se apuntó a ninguna ronda! 😇</p>';
+        } else {
+            const maxRounds = Math.max(...activeUsersWithRounds.map(([, count]) => count));
+            const winners = activeUsersWithRounds
+                .filter(([, count]) => count === maxRounds)
+                .map(([name]) => name);
+
+            titulo = winners.length > 1 ? 'Borrachuzos de la noche' : 'Borrachuzo de la noche';
+            const winnerSpent = winners.map(w => `${w} (${(spentByUser[w] || 0).toFixed(2)}€)`).join(', ');
+
+            borrachuzosHTML = `
+                <p style="font-size:1.15rem;margin:0.5rem 0 0.25rem;color:#111827;">
+                    🍺 <strong>${winners.join(', ')}</strong>
+                </p>
+                <p style="color:#6b7280;font-size:0.85rem;margin:0;">
+                    ${maxRounds} ronda${maxRounds !== 1 ? 's' : ''} contabilizada${maxRounds !== 1 ? 's' : ''}
+                </p>
+                <p style="color:#9ca3af;font-size:0.75rem;margin:0.25rem 0 0;">
+                    Consumo: ${winnerSpent}
+                </p>`;
+        }
+
+        const html = `
+            <div style="text-align:center;padding:0.5rem 0 1rem;">
+                <div style="font-size:2.5rem;margin-bottom:0.5rem;">🎉</div>
+                <h2 style="margin:0 0 0.25rem;font-size:1.3rem;color:#111827;">¡Fiesta cerrada!</h2>
+                <p style="margin:0 0 1rem;color:#6b7280;font-size:0.9rem;">¡Buena noche, amigos! 🥳🍻</p>
+                <div style="background:#fdf2f8;border:2px solid #ec4899;border-radius:12px;padding:1rem;margin-bottom:1.25rem;">
+                    <p style="margin:0 0 0.4rem;font-weight:700;color:#be185d;font-size:1rem;">
+                        🏆 ${titulo}:
+                    </p>
+                    ${borrachuzosHTML}
+                </div>
+                <button onclick="App._closeBorrachuzoModal()"
+                    style="background:#ec4899;color:#fff;border:none;border-radius:8px;
+                           padding:0.65rem 2rem;font-size:1rem;cursor:pointer;font-weight:600;">
+                    ¡Hasta luego! 👋
+                </button>
+            </div>`;
+
+        this.openModal(html, true);
+
+        // Disparar confeti por encima del modal (z-index > 1000)
+        if (typeof confetti === 'function') {
+            confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 }, zIndex: 1100 });
+            setTimeout(() => confetti({ particleCount: 80, spread: 120, origin: { y: 0.4 }, zIndex: 1100 }), 600);
+        }
     },
 
     async handleTransferCustody(name) {
