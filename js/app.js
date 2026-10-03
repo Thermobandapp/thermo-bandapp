@@ -2516,6 +2516,45 @@ const App = {
             }
         });
 
+        // Calcular liquidación de deudas óptima (quién debe pagar a quién por Bizum / efectivo)
+        // Deudores: net < -0.01 (deben -net)
+        // Acreedores: net > 0.01 (tienen a favor net)
+        const debts = [];
+        const debtors = [];
+        const creditors = [];
+
+        participantNames.forEach(n => {
+            const net = netBalances[n] || 0;
+            if (net < -0.01) {
+                debtors.push({ name: n, amount: Math.abs(net) });
+            } else if (net > 0.01) {
+                creditors.push({ name: n, amount: net });
+            }
+        });
+
+        // Algoritmo voraz para saldar deudas con el mínimo número de transferencias
+        let dIdx = 0;
+        let cIdx = 0;
+        while (dIdx < debtors.length && cIdx < creditors.length) {
+            const debtor = debtors[dIdx];
+            const creditor = creditors[cIdx];
+            const transfer = Math.min(debtor.amount, creditor.amount);
+
+            if (transfer > 0.01) {
+                debts.push({
+                    from: debtor.name,
+                    to: creditor.name,
+                    amount: transfer
+                });
+            }
+
+            debtor.amount -= transfer;
+            creditor.amount -= transfer;
+
+            if (debtor.amount <= 0.01) dIdx++;
+            if (creditor.amount <= 0.01) cIdx++;
+        }
+
         return {
             totalCollected,
             totalSpent,
@@ -2524,6 +2563,7 @@ const App = {
             spent,
             netBalances,
             refunds,
+            debts,
             participants: allParticipants
         };
     },
@@ -2537,6 +2577,7 @@ const App = {
 
         const aport = balances.aports[name] || 0;
         const gastado = balances.spent[name] || 0;
+        const net = balances.netBalances[name] || 0;
         const refundable = balances.refunds[name] || 0;
 
         let html = `<h3>💸 ${name} se fue antes</h3>`;
@@ -2566,8 +2607,18 @@ const App = {
                 </p>
                 <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${refundable.toFixed(2)}€</button>
             `;
+        } else if (net < -0.01) {
+            html += `
+                <div style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
+                    <p style="color: #fca5a5; font-size: 0.85rem; margin-bottom: 0.3rem;">Debe dinero de su consumo:</p>
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #ef4444;">${Math.abs(net).toFixed(2)}€</span>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        Debe abonar esta cantidad (por Bizum o efectivo) al grupo para dejarlo cuadrado.
+                    </p>
+                </div>
+            `;
         } else {
-            html += `<p style="color: var(--text-muted);">No tiene sobrante a devolver (ha consumido lo mismo o más de lo que puso).</p>`;
+            html += `<p style="color: var(--text-muted);">Está en paz con el grupo (ha consumido exactamente lo que puso).</p>`;
         }
 
         this.openModal(html);
@@ -2577,30 +2628,66 @@ const App = {
         const data = this.state.partyData;
         if (!data) return;
         const balances = this.calculatePartyBalances();
-        const { totalCollected, totalSpent, remainingBalance, aports, spent, refunds, participants } = balances;
+        const { totalCollected, totalSpent, remainingBalance, aports, spent, netBalances, refunds, debts, participants } = balances;
         
+        let debtsHtml = '';
+        if (debts && debts.length > 0) {
+            debtsHtml = `
+                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border: 1.5px solid rgba(236, 72, 153, 0.5); background: rgba(236, 72, 153, 0.05);">
+                    <h3 style="text-align: center; margin-bottom: 0.4rem; color: #f472b6; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>📱 Ajustes de Cuentas (Bizum / Pago)</span>
+                    </h3>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.85rem;">
+                        Para los que consumieron más de lo que pusieron en el bote:
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            `;
+
+            debts.forEach(d => {
+                debtsHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); font-size: 0.9rem;">
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <b style="color: #f87171;">${d.from}</b>
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">le da a</span>
+                            <b style="color: #60a5fa;">${d.to}</b>
+                        </div>
+                        <span style="font-weight: 700; color: #f43f5e; font-size: 1.05rem; white-space: nowrap;">
+                            ${d.amount.toFixed(2)}€
+                        </span>
+                    </div>
+                `;
+            });
+
+            debtsHtml += `
+                    </div>
+                </div>
+            `;
+        }
+
         let refundHtml = '';
         if (remainingBalance > 0.01 && participants.length > 0) {
             refundHtml = `
                 <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border-color: rgba(99, 102, 241, 0.4);">
                     <h3 style="text-align: center; margin-bottom: 0.75rem; color: #818cf8; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>💸 Reparto del Sobrante</span>
+                        <span>💸 Reparto del Sobrante del Bote</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
                         Devolución calculada según lo que ha puesto y consumido cada uno.
                     </p>
-                    <div style="max-height: 220px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="max-height: 200px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.45rem;">
             `;
             
             // Ordenar por devolución de mayor a menor
             const sortedParticipants = participants.map(p => {
                 const aport = aports[p.name] || 0;
                 const gastado = spent[p.name] || 0;
+                const net = netBalances[p.name] || 0;
                 const refund = refunds[p.name] || 0;
-                return { name: p.name, aport, gastado, refund };
+                return { name: p.name, aport, gastado, net, refund };
             }).sort((a, b) => b.refund - a.refund);
             
             sortedParticipants.forEach(p => {
+                const isDebtor = p.net < -0.01;
                 refundHtml += `
                     <div style="display: flex; justify-content: space-between; font-size: 0.88rem; padding: 0.5rem 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.03); align-items: center;">
                         <div style="display: flex; flex-direction: column;">
@@ -2609,8 +2696,8 @@ const App = {
                                 Puso: ${p.aport.toFixed(2)}€ | Gastó: ${p.gastado.toFixed(2)}€
                             </span>
                         </div>
-                        <span style="color: ${p.refund > 0.01 ? 'var(--success)' : 'var(--text-muted)'}; font-weight: 700; font-size: 1rem;">
-                            ${p.refund > 0.01 ? `+${p.refund.toFixed(2)}€` : '0.00€'}
+                        <span style="color: ${p.refund > 0.01 ? 'var(--success)' : (isDebtor ? '#f87171' : 'var(--text-muted)')}; font-weight: 700; font-size: 0.95rem;">
+                            ${p.refund > 0.01 ? `+${p.refund.toFixed(2)}€` : (isDebtor ? `Debe ${Math.abs(p.net).toFixed(2)}€` : '0.00€')}
                         </span>
                     </div>
                 `;
@@ -2641,6 +2728,7 @@ const App = {
                         <b style="color: var(--primary);">${remainingBalance.toFixed(2)}€</b>
                     </div>
                 </div>
+                ${debtsHtml}
                 ${refundHtml}
                 <p style="text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
                     ¡Buena noche, amigos! 👋
