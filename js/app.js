@@ -2810,15 +2810,148 @@ const App = {
     },
 
     async handlePartyAddExpense() {
-        const amount = parseFloat(prompt('¿Cuánto ha costado la ronda/gasto?', '15'));
-        if (isNaN(amount)) return;
-        const desc = prompt('¿En qué se ha gastado? (ej: 4 cervezas)', 'Ronda');
-        
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
+
+        // Por defecto todos los amigos seleccionados
+        this.state.tempPartyExpenseFriends = [...participants];
+
+        const generateFriendButtons = () => {
+            if (participants.length === 0) {
+                return '<p class="empty-msg" style="grid-column: span 2;">No hay participantes en la fiesta.</p>';
+            }
+            return participants.map(name => {
+                const isSelected = this.state.tempPartyExpenseFriends.includes(name);
+                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                return `<button type="button" id="pe-btn-${idName}" class="participant-btn ${isSelected ? 'selected' : ''}" onclick="App.togglePartyExpenseFriend('${safeName}')" style="padding: 0.6rem 0.5rem; font-size: 0.9rem;">${name}</button>`;
+            }).join('');
+        };
+
+        const isAllSelected = participants.length > 0 && this.state.tempPartyExpenseFriends.length === participants.length;
+
+        const html = `
+            <h3>💸 Anotar Gasto / Ronda</h3>
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 1rem; text-align: left;">
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; display:block;">¿Cuánto ha costado? (€)</label>
+                    <input type="number" id="party-expense-amount" placeholder="Ej: 15.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.1rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; display:block;">¿En qué se ha gastado?</label>
+                    <input type="text" id="party-expense-desc" placeholder="Ej: Ronda de cañas, cubatas..." value="Ronda" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem;">
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿A quiénes incluye esta ronda?</label>
+                        <button type="button" id="btn-party-expense-toggle-all" class="btn-icon-small" onclick="App.toggleAllPartyExpenseFriends()" style="font-size: 0.78rem; padding: 0.25rem 0.6rem;">
+                            ${isAllSelected ? 'Deseleccionar todos' : 'Marcar todos'}
+                        </button>
+                    </div>
+                    <div id="party-expense-friends-grid" class="participant-grid" style="max-height: 28vh; overflow-y: auto; margin-top: 0.3rem; margin-bottom: 0.5rem; gap: 0.5rem;">
+                        ${generateFriendButtons()}
+                    </div>
+                    <small id="party-expense-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right;">
+                        ${this.state.tempPartyExpenseFriends.length} de ${participants.length} seleccionados
+                    </small>
+                </div>
+                <button class="btn-primary" onclick="App.confirmPartyAddExpense()" style="width: 100%; padding: 0.9rem; font-size: 1rem; margin-top: 0.5rem;">Anotar Gasto</button>
+            </div>
+        `;
+        this.openModal(html);
+    },
+
+    togglePartyExpenseFriend(name) {
+        if (!this.state.tempPartyExpenseFriends) this.state.tempPartyExpenseFriends = [];
+        const idx = this.state.tempPartyExpenseFriends.indexOf(name);
+        const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+        const btn = document.getElementById(`pe-btn-${idName}`);
+
+        if (idx > -1) {
+            this.state.tempPartyExpenseFriends.splice(idx, 1);
+            if (btn) btn.classList.remove('selected');
+        } else {
+            this.state.tempPartyExpenseFriends.push(name);
+            if (btn) btn.classList.add('selected');
+        }
+        this.updatePartyExpenseFriendsUIState();
+    },
+
+    toggleAllPartyExpenseFriends() {
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
+
+        if (this.state.tempPartyExpenseFriends.length === participants.length) {
+            this.state.tempPartyExpenseFriends = [];
+        } else {
+            this.state.tempPartyExpenseFriends = [...participants];
+        }
+
+        participants.forEach(name => {
+            const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+            const btn = document.getElementById(`pe-btn-${idName}`);
+            if (btn) {
+                if (this.state.tempPartyExpenseFriends.includes(name)) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            }
+        });
+        this.updatePartyExpenseFriendsUIState();
+    },
+
+    updatePartyExpenseFriendsUIState() {
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
+        const isAllSelected = participants.length > 0 && this.state.tempPartyExpenseFriends.length === participants.length;
+        const toggleBtn = document.getElementById('btn-party-expense-toggle-all');
+        if (toggleBtn) {
+            toggleBtn.textContent = isAllSelected ? 'Deseleccionar todos' : 'Marcar todos';
+        }
+        const countText = document.getElementById('party-expense-count-text');
+        if (countText) {
+            countText.textContent = `${this.state.tempPartyExpenseFriends.length} de ${participants.length} seleccionados`;
+        }
+    },
+
+    async confirmPartyAddExpense() {
+        const amountEl = document.getElementById('party-expense-amount');
+        const descEl = document.getElementById('party-expense-desc');
+        const amount = this.parseAmount(amountEl?.value);
+        let desc = descEl?.value?.trim() || 'Ronda';
+
+        if (isNaN(amount) || amount <= 0) {
+            alert('Por favor introduce un importe válido.');
+            return;
+        }
+
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
+        const selected = [...(this.state.tempPartyExpenseFriends || [])];
+
+        if (participants.length > 0 && selected.length === 0) {
+            alert('Debes seleccionar al menos a un amigo para esta ronda.');
+            return;
+        }
+
+        const isAll = participants.length === 0 || selected.length === participants.length;
+        if (!isAll) {
+            desc += ` (${selected.join(', ')})`;
+        }
+
+        this.closeModal();
+
         const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
         await set(historyRef, {
             type: 'expense',
             amount: amount,
             description: desc,
+            beneficiaries: selected,
             user: this.state.user,
             timestamp: Date.now()
         });
