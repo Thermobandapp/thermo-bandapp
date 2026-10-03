@@ -2348,24 +2348,15 @@ const App = {
         const friendsContainer = document.getElementById('party-participants-list');
         friendsContainer.innerHTML = '';
         
-        // Calcular aportes por persona
-        const individualAports = {};
-        if (data.participants) {
-            Object.values(data.participants).forEach(p => individualAports[p.name] = 0);
-        }
-        if (data.history) {
-            Object.values(data.history).forEach(item => {
-                if (item.type === 'income') {
-                    const name = item.description.replace('Aporte de ', '');
-                    individualAports[name] = (individualAports[name] || 0) + item.amount;
-                }
-            });
-        }
+        const balances = this.calculatePartyBalances();
+        const participantNames = balances.participants.map(p => p.name);
 
-        Object.entries(individualAports).forEach(([name, amount]) => {
+        participantNames.forEach(name => {
             const isCustodian = data.custodian === name;
             const pData = data.participants[name.replace(/\./g, '_')];
             const hasLeft = pData?.status === 'left';
+            const aport = balances.aports[name] || 0;
+            const gastado = balances.spent[name] || 0;
             
             const div = document.createElement('div');
             div.className = `participant-item glass ${hasLeft ? 'is-left' : ''}`;
@@ -2378,13 +2369,17 @@ const App = {
             div.innerHTML = `
                 <div class="p-info">
                     <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera) 💸</small>' : ''}</span>
+                    <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${gastado.toFixed(2)}€</small>
                 </div>
-                <div class="p-amount">${amount.toFixed(2)}€</div>
+                <div style="text-align: right;">
+                    <div class="p-amount">${aport.toFixed(2)}€</div>
+                    <small style="font-size: 0.7rem; color: var(--text-muted);">aportado</small>
+                </div>
             `;
             friendsContainer.appendChild(div);
         });
 
-        if (Object.keys(individualAports).length === 0) {
+        if (participantNames.length === 0) {
             friendsContainer.innerHTML = '<div class="empty-msg">Pulsa en "Añadir Amigo" para empezar la lista</div>';
         }
 
@@ -2444,31 +2439,113 @@ const App = {
         } catch (error) { console.error('Error marcando como ido:', error); }
     },
 
-    showPartyRefundModal(name) {
-        const data = this.state.partyData;
-        if (!data) return;
+    calculatePartyBalances() {
+        const data = this.state.partyData || {};
         const totalCollected = data.totalCollected || 0;
-        const balance = totalCollected - (data.totalSpent || 0);
-        const pData = data.participants?.[name.replace(/\./g, '_')];
-        const alreadyRefunded = pData?.refunded;
+        const totalSpent = data.totalSpent || 0;
+        const remainingBalance = Math.max(0, totalCollected - totalSpent);
 
-        // Calcular aportes individuales
-        const individualAports = {};
+        const allParticipants = data.participants ? Object.values(data.participants) : [];
+        const participantNames = allParticipants.map(p => p.name);
+
+        const aports = {};
+        const spent = {};
+        participantNames.forEach(n => {
+            aports[n] = 0;
+            spent[n] = 0;
+        });
+
         if (data.history) {
             Object.values(data.history).forEach(item => {
                 if (item.type === 'income') {
-                    const n = item.description.replace('Aporte de ', '');
-                    individualAports[n] = (individualAports[n] || 0) + item.amount;
+                    const name = item.description.replace('Aporte de ', '').trim();
+                    if (name) {
+                        aports[name] = (aports[name] || 0) + (item.amount || 0);
+                    }
+                } else if (item.type === 'expense') {
+                    const amount = item.amount || 0;
+                    let targets = Array.isArray(item.beneficiaries) && item.beneficiaries.length > 0
+                        ? item.beneficiaries
+                        : participantNames;
+
+                    if (targets.length === 0 && participantNames.length > 0) {
+                        targets = participantNames;
+                    }
+
+                    if (targets.length > 0) {
+                        const split = amount / targets.length;
+                        targets.forEach(target => {
+                            spent[target] = (spent[target] || 0) + split;
+                        });
+                    }
                 }
             });
         }
-        const aport = individualAports[name] || 0;
-        const refundable = (balance > 0 && totalCollected > 0)
-            ? (balance * aport) / totalCollected
-            : 0;
+
+        // Balance neto ideal: aportado - gastado
+        const netBalances = {};
+        let totalPositiveNet = 0;
+        participantNames.forEach(n => {
+            const net = (aports[n] || 0) - (spent[n] || 0);
+            netBalances[n] = net;
+            if (net > 0) {
+                totalPositiveNet += net;
+            }
+        });
+
+        // Devolución proporcional basada en lo que le sobra a cada uno (aportado - consumido)
+        const refunds = {};
+        participantNames.forEach(n => {
+            const net = netBalances[n] || 0;
+            if (net <= 0 || remainingBalance <= 0.001) {
+                refunds[n] = 0;
+            } else if (Math.abs(totalPositiveNet - remainingBalance) < 0.05) {
+                // Si el bote cuadra exactamente con la suma de balances netos
+                refunds[n] = Math.max(0, net);
+            } else if (totalPositiveNet > 0) {
+                // Reparto proporcional al saldo neto positivo si hubiera descuadre
+                refunds[n] = (remainingBalance * net) / totalPositiveNet;
+            } else {
+                refunds[n] = 0;
+            }
+        });
+
+        return {
+            totalCollected,
+            totalSpent,
+            remainingBalance,
+            aports,
+            spent,
+            netBalances,
+            refunds,
+            participants: allParticipants
+        };
+    },
+
+    showPartyRefundModal(name) {
+        const data = this.state.partyData;
+        if (!data) return;
+        const balances = this.calculatePartyBalances();
+        const pData = data.participants?.[name.replace(/\./g, '_')];
+        const alreadyRefunded = pData?.refunded;
+
+        const aport = balances.aports[name] || 0;
+        const gastado = balances.spent[name] || 0;
+        const refundable = balances.refunds[name] || 0;
 
         let html = `<h3>💸 ${name} se fue antes</h3>`;
-        html += `<p style="color: var(--text-muted); margin-bottom: 1rem;">Aportó al bote: <b>${aport.toFixed(2)}€</b></p>`;
+        html += `
+            <div style="background: rgba(255,255,255,0.03); border-radius: 10px; padding: 0.85rem; margin-bottom: 1rem; font-size: 0.9rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
+                    <span style="color: var(--text-muted);">Puso en el bote:</span>
+                    <b>${aport.toFixed(2)}€</b>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color: var(--text-muted);">Consumió en rondas:</span>
+                    <b style="color: #f87171;">${gastado.toFixed(2)}€</b>
+                </div>
+            </div>
+        `;
 
         if (alreadyRefunded) {
             html += `<p style="color: var(--success);">✅ Ya reclamó su sobrante.</p>`;
@@ -2479,12 +2556,12 @@ const App = {
                     <span style="font-size: 1.8rem; font-weight: 700; color: #818cf8;">${refundable.toFixed(2)}€</span>
                 </div>
                 <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
-                    Calculado proporcionalmente según su aporte (${aport.toFixed(2)}€ de ${totalCollected.toFixed(2)}€ totales recaudados).
+                    Calculado restando lo consumido (${gastado.toFixed(2)}€) a lo aportado (${aport.toFixed(2)}€).
                 </p>
                 <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${refundable.toFixed(2)}€</button>
             `;
         } else {
-            html += `<p style="color: var(--text-muted);">No hay sobrante para repartir ahora mismo.</p>`;
+            html += `<p style="color: var(--text-muted);">No tiene sobrante a devolver (ha consumido lo mismo o más de lo que puso).</p>`;
         }
 
         this.openModal(html);
@@ -2492,53 +2569,41 @@ const App = {
 
     async handlePartyGoHome() {
         const data = this.state.partyData;
-        const totalCollected = data.totalCollected || 0;
-        const balance = totalCollected - (data.totalSpent || 0);
-        
-        // Calcular aportes individuales
-        const individualAports = {};
-        if (data.participants) {
-            Object.values(data.participants).forEach(p => individualAports[p.name] = 0);
-        }
-        if (data.history) {
-            Object.values(data.history).forEach(item => {
-                if (item.type === 'income') {
-                    const name = item.description.replace('Aporte de ', '');
-                    individualAports[name] = (individualAports[name] || 0) + item.amount;
-                }
-            });
-        }
-        
-        const participants = data.participants ? Object.values(data.participants) : [];
+        if (!data) return;
+        const balances = this.calculatePartyBalances();
+        const { totalCollected, totalSpent, remainingBalance, aports, spent, refunds, participants } = balances;
         
         let refundHtml = '';
-        if (balance > 0.01 && totalCollected > 0 && participants.length > 0) {
+        if (remainingBalance > 0.01 && participants.length > 0) {
             refundHtml = `
                 <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border-color: rgba(99, 102, 241, 0.4);">
                     <h3 style="text-align: center; margin-bottom: 0.75rem; color: #818cf8; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>💸 Reparto Proporcional</span>
+                        <span>💸 Reparto del Sobrante</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
-                        Devolución calculada según el aporte de cada amigo al bote.
+                        Devolución calculada según lo que ha puesto y consumido cada uno.
                     </p>
-                    <div style="max-height: 180px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                    <div style="max-height: 220px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
             `;
             
             // Ordenar por devolución de mayor a menor
             const sortedParticipants = participants.map(p => {
-                const aport = individualAports[p.name] || 0;
-                const refund = (balance * aport) / totalCollected;
-                return { name: p.name, aport, refund };
+                const aport = aports[p.name] || 0;
+                const gastado = spent[p.name] || 0;
+                const refund = refunds[p.name] || 0;
+                return { name: p.name, aport, gastado, refund };
             }).sort((a, b) => b.refund - a.refund);
             
             sortedParticipants.forEach(p => {
                 refundHtml += `
-                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; padding: 0.35rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.02); align-items: center;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; padding: 0.5rem 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.03); align-items: center;">
                         <div style="display: flex; flex-direction: column;">
-                            <span style="color: var(--text-main); font-weight: 500;">${p.name}</span>
-                            <span style="font-size: 0.7rem; color: var(--text-muted);">Aportó: ${p.aport.toFixed(2)}€</span>
+                            <span style="color: var(--text-main); font-weight: 600;">${p.name}</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">
+                                Puso: ${p.aport.toFixed(2)}€ | Gastó: ${p.gastado.toFixed(2)}€
+                            </span>
                         </div>
-                        <span style="color: ${p.refund > 0.01 ? 'var(--success)' : 'var(--text-muted)'}; font-weight: 600;">
+                        <span style="color: ${p.refund > 0.01 ? 'var(--success)' : 'var(--text-muted)'}; font-weight: 700; font-size: 1rem;">
                             ${p.refund > 0.01 ? `+${p.refund.toFixed(2)}€` : '0.00€'}
                         </span>
                     </div>
@@ -2558,16 +2623,16 @@ const App = {
                 <div class="summary-card glass" style="padding: 1.5rem; border-radius: 15px; margin-bottom: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span>Total Recaudado:</span>
-                        <b style="color: var(--success);">${(data.totalCollected || 0).toFixed(2)}€</b>
+                        <b style="color: var(--success);">${totalCollected.toFixed(2)}€</b>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span>Total Gastado:</span>
-                        <b style="color: var(--danger);">${(data.totalSpent || 0).toFixed(2)}€</b>
+                        <b style="color: var(--danger);">${totalSpent.toFixed(2)}€</b>
                     </div>
                     <hr style="border: none; border-top: 1px dashed var(--glass-border); margin: 1rem 0;">
                     <div style="display: flex; justify-content: space-between; font-size: 1.2rem;">
                         <span>Sobran en el bote:</span>
-                        <b style="color: var(--primary);">${balance.toFixed(2)}€</b>
+                        <b style="color: var(--primary);">${remainingBalance.toFixed(2)}€</b>
                     </div>
                 </div>
                 ${refundHtml}
@@ -2621,34 +2686,23 @@ const App = {
 
     // Claim refund for a participant who left early
     async claimRefund(name) {
-        const data = this.state.partyData;
-        const totalCollected = data.totalCollected || 0;
-        const balance = totalCollected - (data.totalSpent || 0);
-        if (balance <= 0) {
+        const balances = this.calculatePartyBalances();
+        if (balances.remainingBalance <= 0) {
             alert('No hay dinero sobrante para reclamar.');
             return;
         }
-        // Calcular aportes individuales
-        const individualAports = {};
-        if (data.history) {
-            Object.values(data.history).forEach(item => {
-                if (item.type === 'income') {
-                    const contribName = item.description.replace('Aporte de ', '');
-                    individualAports[contribName] = (individualAports[contribName] || 0) + item.amount;
-                }
-            });
-        }
-        const aport = individualAports[name] || 0;
-        const refund = (balance * aport) / totalCollected;
-        if (refund <= 0) {
+
+        const refund = balances.refunds[name] || 0;
+        if (refund <= 0.01) {
             alert('No hay nada que reclamar para ' + name);
             return;
         }
+
         // Actualizar total del bote
-        const newTotal = totalCollected - refund;
+        const newTotal = balances.totalCollected - refund;
         await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
         // Marcar como reembolsado
-        await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\\./g, '_')}/refunded`), true);
+        await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\./g, '_')}/refunded`), true);
         // Añadir entrada al historial
         const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
         await set(historyRef, {
