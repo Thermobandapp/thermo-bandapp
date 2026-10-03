@@ -2446,6 +2446,9 @@ const App = {
                 user: this.state.user,
                 timestamp: Date.now()
             });
+
+            // Mostrar inmediatamente cuánto hay que devolverle del bote
+            this.showPartyRefundModal(name);
         } catch (error) { console.error('Error marcando como ido:', error); }
     },
 
@@ -3025,9 +3028,11 @@ const App = {
         try {
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
-            const currentParticipants = Object.values(this.state.partyData?.participants || {}).map(p => p.name);
+            const activeParticipants = Object.values(this.state.partyData?.participants || {})
+                .filter(p => p.status !== 'left')
+                .map(p => p.name);
             
-            const availableMembers = members.filter(m => !currentParticipants.includes(m.name));
+            const availableMembers = members.filter(m => !activeParticipants.includes(m.name));
 
             this.state.tempSelectionFriends = [];
             this.state.tempAvailablePartyMembers = availableMembers.map(m => m.name);
@@ -3153,13 +3158,18 @@ const App = {
     },
 
     async addPartyFriendSilent(name) {
-        const friendRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\./g, '_')}`);
-        await set(friendRef, { name: name, joinedAt: Date.now() });
+        const key = name.replace(/\./g, '_');
+        const friendRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${key}`);
+        const currentData = this.state.partyData?.participants?.[key] || {};
+        const { status, leftAt, ...restData } = currentData;
+        await set(friendRef, { ...restData, name: name, joinedAt: Date.now(), status: 'active' });
     },
 
     async handlePartyAddExpense() {
         const participants = this.state.partyData?.participants
-            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            ? Object.values(this.state.partyData.participants)
+                .filter(p => p.status !== 'left')
+                .map(p => p.name)
             : [];
 
         // Por defecto todos los amigos seleccionados
