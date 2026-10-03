@@ -921,10 +921,20 @@ const App = {
                     count++;
                     total += price;
                     const orderHour = o.timestamp ? new Date(o.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+                    const orderedByStr = o.orderedBy ? `por ${o.orderedBy}` : '';
+                    const timeStr = orderHour ? ` a las ${orderHour}` : '';
+                    const metaInfo = (orderedByStr || timeStr) ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; width: 100%; text-align: left;">Pedida ${orderedByStr}${timeStr}</div>` : '';
+
                     ordersHtml += `
-                        <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                            <span style="font-size: 0.9rem;">${label} ${orderHour ? `<small style="color:var(--text-muted)">(${orderHour})</small>` : ''}</span>
-                            <span style="font-weight: 600;">${price.toFixed(2)}€</span>
+                        <div class="order-row" style="flex-direction: column; align-items: flex-start; padding: 0.5rem 0;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                                <span>${label}</span>
+                                <div class="order-actions" style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-weight: 600;">${price.toFixed(2)}€</span>
+                                    <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')" title="Borrar pedido">🗑️</button>
+                                </div>
+                            </div>
+                            ${metaInfo}
                         </div>
                     `;
                 }
