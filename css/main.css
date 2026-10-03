@@ -555,9 +555,9 @@ input:focus {
 }
 
 .modal-card {
-    width: 100%;
-    max-width: 400px;
-    max-height: calc(100dvh - 3rem - env(safe-area-inset-bottom));
+    width: 95vw;
+    max-width: 480px;
+    max-height: calc(100dvh - 2.5rem - env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     padding: 1.5rem;
