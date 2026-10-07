@@ -2011,15 +2011,35 @@ const App = {
             const availableMembers = members.filter(m => !activeParticipants.includes(m.name));
 
             this.state.tempSelectionFriends = [];
+            this.state.tempAvailableTableMembers = availableMembers.map(m => m.name);
             
             let html = `<h3>Añadir Amigos a la Mesa</h3>`;
-            html += `<p class="subtitle" style="margin-bottom: 1rem;">Selecciona los miembros que quieres añadir:</p>`;
+            html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
+
+            // Botones de selección rápida: Chicos, Chicas, Todos, Limpiar
+            html += `
+                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('chicos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
+                        👦 Chicos
+                    </button>
+                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('chicas')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(236, 72, 153, 0.2); border-color: rgba(236, 72, 153, 0.4); color: #f472b6;">
+                        👧 Chicas
+                    </button>
+                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('todos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                        Todos
+                    </button>
+                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('ninguno')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                        Limpiar
+                    </button>
+                </div>
+            `;
+
             html += `<div class="participant-grid" style="max-height: 40vh; overflow-y: auto;">`;
             
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                const idName = m.name.replace(/\s/g, '_');
-                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.toggleFriendSelection('${safeName}')">${m.name}</button>`;
+                const idName = m.name.replace(/\s/g, '_').replace(/\./g, '_');
+                html += `<button id="tf-btn-${idName}" class="participant-btn" onclick="App.toggleTableFriendDirect('${safeName}')">${m.name}</button>`;
             });
             
             if (availableMembers.length === 0) {
@@ -2028,7 +2048,8 @@ const App = {
             
             html += `</div>`;
             
-            html += `<button id="btn-confirm-add-friends" class="btn-primary" onclick="App.confirmAddFriends()" style="width: 100%; margin-top: 1rem;">Añadir a la mesa (0)</button>`;
+            // Botón para selecciones múltiples o terminar
+            html += `<button id="btn-table-finish-add" class="btn-primary" onclick="App.confirmTableBatchAddFriends()" style="width: 100%; margin-top: 1rem; display: none; font-size: 1rem; padding: 0.9rem;">Pulsa cuando termines de añadir amigos</button>`;
 
             html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
@@ -2041,7 +2062,7 @@ const App = {
                             <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en esta mesa.</span>
                         </span>
                     </label>
-                    <button class="btn-secondary" onclick="App.confirmAddFriends()" style="width: 100%;">Añadir nombre escrito</button>
+                    <button class="btn-secondary" onclick="App.confirmTableCustomFriend()" style="width: 100%;">Añadir nombre escrito</button>
                 </div>
             `;
 
@@ -2049,6 +2070,96 @@ const App = {
         } catch (error) {
             console.error('Error al cargar miembros:', error);
             alert('Error al conectar con la base de datos.');
+        }
+    },
+
+    async toggleTableFriendDirect(name) {
+        const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+        const btn = document.getElementById(`tf-btn-${idName}`);
+        const isSelected = this.state.tempSelectionFriends.includes(name);
+
+        if (isSelected) {
+            // Apagar y quitar de la mesa
+            const idx = this.state.tempSelectionFriends.indexOf(name);
+            this.state.tempSelectionFriends.splice(idx, 1);
+            if (btn) btn.classList.remove('selected');
+            await this.removeTableFriendSilent(name);
+        } else {
+            // Encender y añadir a la mesa
+            this.state.tempSelectionFriends.push(name);
+            if (btn) btn.classList.add('selected');
+            await this.addFriendsToTable([name]);
+        }
+
+        const finishBtn = document.getElementById('btn-table-finish-add');
+        if (finishBtn) {
+            finishBtn.style.display = this.state.tempSelectionFriends.length > 1 ? 'block' : 'none';
+        }
+    },
+
+    setTableFriendsQuickFilter(filterType) {
+        const boysList = ['Antonio', 'Caba', 'David', 'Jose', 'Edu', 'Pedro', 'Karlos', 'Fernando'].map(n => n.toLowerCase());
+        const available = this.state.tempAvailableTableMembers || [];
+
+        let targetNames = [];
+        if (filterType === 'chicos') {
+            targetNames = available.filter(name => boysList.includes(name.trim().toLowerCase()));
+        } else if (filterType === 'chicas') {
+            targetNames = available.filter(name => !boysList.includes(name.trim().toLowerCase()));
+        } else if (filterType === 'todos') {
+            targetNames = [...available];
+        } else if (filterType === 'ninguno') {
+            targetNames = [];
+        }
+
+        this.state.tempSelectionFriends = [...targetNames];
+
+        available.forEach(name => {
+            const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+            const btn = document.getElementById(`tf-btn-${idName}`);
+            if (btn) {
+                if (targetNames.includes(name)) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            }
+        });
+
+        const finishBtn = document.getElementById('btn-table-finish-add');
+        if (finishBtn) {
+            finishBtn.style.display = targetNames.length > 0 ? 'block' : 'none';
+        }
+    },
+
+    async confirmTableBatchAddFriends() {
+        const selected = [...(this.state.tempSelectionFriends || [])];
+        this.closeModal();
+
+        try {
+            await this.addFriendsToTable(selected);
+        } catch (error) {
+            console.error('Error al añadir grupo a la mesa:', error);
+        }
+    },
+
+    async confirmTableCustomFriend() {
+        const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
+        const permanent = document.getElementById('chk-permanent-member')?.checked ?? true;
+        if (!customNameInput) return alert('Escribe un nombre para añadir.');
+
+        this.state.tempNewFriendPermanent = permanent;
+        await this.promptNewFriendCouple(customNameInput, [], false);
+    },
+
+    async removeTableFriendSilent(name) {
+        try {
+            const key = name.replace(/\./g, '_');
+            const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${key}`);
+            const currentParticipant = this.state.tableData?.participants?.[key] || {};
+            await set(participantRef, { ...currentParticipant, status: 'left' });
+        } catch (error) {
+            console.error('Error al retirar amigo de la mesa silenciosamente:', error);
         }
     },
 
@@ -3137,7 +3248,7 @@ const App = {
             this.state.tempAvailablePartyMembers = availableMembers.map(m => m.name);
             
             let html = `<h3>Añadir Amigos al Bote</h3>`;
-            html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Selecciona los miembros que quieres añadir:</p>`;
+            html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
             // Botones de selección rápida: Chicos, Chicas, Todos, Ninguno
             html += `
@@ -3161,8 +3272,8 @@ const App = {
             
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                const idName = m.name.replace(/\s/g, '_');
-                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.toggleFriendSelection('${safeName}')">${m.name}</button>`;
+                const idName = m.name.replace(/\s/g, '_').replace(/\./g, '_');
+                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.togglePartyFriendDirect('${safeName}')">${m.name}</button>`;
             });
             
             if (availableMembers.length === 0) {
@@ -3171,26 +3282,52 @@ const App = {
             
             html += `</div>`;
             
+            // Botón para selecciones múltiples o terminar
+            html += `<button id="btn-party-finish-add" class="btn-primary" onclick="App.confirmPartyBatchAddFriends()" style="width: 100%; margin-top: 1rem; display: none; font-size: 1rem; padding: 0.9rem;">Pulsa cuando termines de añadir amigos</button>`;
+
             html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
                     <p class="subtitle" style="margin-bottom: 0.5rem; color: var(--text-main);">¿No es miembro? Añádelo manualmente:</p>
                     <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 0.75rem;">
-                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);">
+                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-bottom: 0.75rem;">
                         <input type="checkbox" id="chk-permanent-member" style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;">
                         <span style="font-size: 0.88rem; line-height: 1.35;">
                             <strong>Miembro permanente</strong><br>
                             <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en este bote.</span>
                         </span>
                     </label>
+                    <button class="btn-secondary" onclick="App.confirmPartyCustomFriend()" style="width: 100%;">Añadir nombre escrito</button>
                 </div>
             `;
-            
-            html += `<button id="btn-confirm-add-friends" class="btn-primary" onclick="App.confirmPartyAddFriends()">Añadir al bote (0)</button>`;
 
             this.openModal(html);
         } catch (error) {
             console.error('Error al cargar miembros:', error);
             alert('Error al conectar con la base de datos.');
+        }
+    },
+
+    async togglePartyFriendDirect(name) {
+        const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+        const btn = document.getElementById(`f-btn-${idName}`);
+        const isSelected = this.state.tempSelectionFriends.includes(name);
+
+        if (isSelected) {
+            // Apagar y quitar del bote
+            const idx = this.state.tempSelectionFriends.indexOf(name);
+            this.state.tempSelectionFriends.splice(idx, 1);
+            if (btn) btn.classList.remove('selected');
+            await this.removePartyFriendSilent(name);
+        } else {
+            // Encender y añadir al bote
+            this.state.tempSelectionFriends.push(name);
+            if (btn) btn.classList.add('selected');
+            await this.addPartyFriendSilent(name);
+        }
+
+        const finishBtn = document.getElementById('btn-party-finish-add');
+        if (finishBtn) {
+            finishBtn.style.display = this.state.tempSelectionFriends.length > 1 ? 'block' : 'none';
         }
     },
 
@@ -3211,9 +3348,9 @@ const App = {
 
         this.state.tempSelectionFriends = [...targetNames];
 
-        // Actualizar estados visuales de los botones
+        // Actualizar visual de los botones
         available.forEach(name => {
-            const idName = name.replace(/\s/g, '_');
+            const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
             const btn = document.getElementById(`f-btn-${idName}`);
             if (btn) {
                 if (targetNames.includes(name)) {
@@ -3224,27 +3361,15 @@ const App = {
             }
         });
 
-        const confirmBtn = document.getElementById('btn-confirm-add-friends');
-        if (confirmBtn) {
-            confirmBtn.textContent = `Añadir al bote (${targetNames.length})`;
+        // Mostrar u ocultar el botón de terminar si hay amigos seleccionados
+        const finishBtn = document.getElementById('btn-party-finish-add');
+        if (finishBtn) {
+            finishBtn.style.display = targetNames.length > 0 ? 'block' : 'none';
         }
     },
 
-    async confirmPartyAddFriends() {
-        const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
+    async confirmPartyBatchAddFriends() {
         const selected = [...(this.state.tempSelectionFriends || [])];
-        const permanent = document.getElementById('chk-permanent-member')?.checked ?? true;
-        
-        if (customNameInput) {
-            this.state.tempNewFriendPermanent = permanent;
-            await this.promptNewFriendCouple(customNameInput, selected, true);
-            return;
-        }
-
-        if (selected.length === 0) {
-            return alert('Selecciona al menos a un miembro o escribe un nombre.');
-        }
-
         this.closeModal();
 
         try {
@@ -3252,7 +3377,27 @@ const App = {
                 await this.addPartyFriendSilent(name);
             }
         } catch (error) {
-            console.error('Error al añadir amigos:', error);
+            console.error('Error al añadir grupo de amigos:', error);
+        }
+    },
+
+    async confirmPartyCustomFriend() {
+        const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
+        const permanent = document.getElementById('chk-permanent-member')?.checked ?? true;
+        if (!customNameInput) return alert('Escribe un nombre para añadir.');
+
+        this.state.tempNewFriendPermanent = permanent;
+        await this.promptNewFriendCouple(customNameInput, [], true);
+    },
+
+    async removePartyFriendSilent(name) {
+        try {
+            const key = name.replace(/\./g, '_');
+            const participantRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${key}`);
+            const currentData = this.state.partyData?.participants?.[key] || {};
+            await set(participantRef, { ...currentData, name, status: 'left', leftAt: Date.now() });
+        } catch (error) {
+            console.error('Error al retirar amigo silenciosamente:', error);
         }
     },
 
