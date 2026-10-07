@@ -2398,15 +2398,22 @@ const App = {
         historyContainer.innerHTML = '';
         
         if (data.history) {
-            Object.values(data.history).sort((a,b) => b.timestamp - a.timestamp).forEach(item => {
+            Object.entries(data.history).sort((a,b) => b[1].timestamp - a[1].timestamp).forEach(([id, item]) => {
                 const div = document.createElement('div');
                 div.className = `history-item ${item.type}`;
+                const isExpense = item.type === 'expense';
                 div.innerHTML = `
-                    <div class="info">
+                    <div class="info" style="flex: 1; min-width: 0; padding-right: 0.5rem;">
                         <b>${item.description}</b><br>
                         <small>${new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} por ${item.user}</small>
                     </div>
-                    <span class="amount">${item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+                        <span class="amount">${item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                        ${isExpense ? `
+                            <button class="btn-icon-small" title="Editar gasto" onclick="App.handlePartyEditExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">✏️</button>
+                            <button class="btn-icon-small" title="Borrar gasto" onclick="App.handlePartyDeleteExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
+                        ` : ''}
+                    </div>
                 `;
                 historyContainer.appendChild(div);
             });
@@ -3316,6 +3323,157 @@ const App = {
 
         const newTotal = (this.state.partyData.totalSpent || 0) + amount;
         await set(ref(this.db, `party_pots/${this.state.partyId}/totalSpent`), newTotal);
+    },
+
+    async handlePartyDeleteExpense(historyId) {
+        if (!confirm('¿Seguro que quieres borrar este gasto?')) return;
+        try {
+            const expenseRef = ref(this.db, `party_pots/${this.state.partyId}/history/${historyId}`);
+            await set(expenseRef, null);
+
+            // Recalcular totalSpent a partir del historial actualizado
+            const histSnap = await get(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            let newTotalSpent = 0;
+            if (histSnap.exists()) {
+                Object.values(histSnap.val()).forEach(item => {
+                    if (item.type === 'expense') {
+                        newTotalSpent += Number(item.amount || 0);
+                    }
+                });
+            }
+            await set(ref(this.db, `party_pots/${this.state.partyId}/totalSpent`), newTotalSpent);
+        } catch (error) {
+            console.error('Error al borrar gasto:', error);
+            alert('Error al borrar el gasto.');
+        }
+    },
+
+    async handlePartyEditExpense(historyId) {
+        const item = this.state.partyData?.history?.[historyId];
+        if (!item) return alert('No se encontró el gasto a editar.');
+
+        const activeParticipants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants)
+                .filter(p => p.status !== 'left')
+                .map(p => p.name)
+            : [];
+
+        // Si el item tiene beneficiarios, asegurarse de incluir también a los que estuvieran en él aunque ahora estén inactivos
+        const existingBeneficiaries = Array.isArray(item.beneficiaries) && item.beneficiaries.length > 0
+            ? item.beneficiaries
+            : activeParticipants;
+
+        const allAvailableForEdit = Array.from(new Set([...activeParticipants, ...existingBeneficiaries]));
+
+        this.state.tempPartyExpenseFriends = [...existingBeneficiaries];
+
+        // Limpiar sufijo "(Nombre1, Nombre2)" de la descripción para el input
+        let cleanDesc = item.description || 'Ronda';
+        if (cleanDesc.includes('(')) {
+            cleanDesc = cleanDesc.substring(0, cleanDesc.lastIndexOf('(')).trim();
+        }
+
+        const generateFriendButtons = () => {
+            if (allAvailableForEdit.length === 0) {
+                return '<p class="empty-msg" style="width: 100%;">No hay participantes en la fiesta.</p>';
+            }
+            return allAvailableForEdit.map(name => {
+                const isSelected = this.state.tempPartyExpenseFriends.includes(name);
+                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                return `<button type="button" id="pe-btn-${idName}" class="participant-btn ${isSelected ? 'selected' : ''}" onclick="App.togglePartyExpenseFriend('${safeName}')" style="padding: 0.65rem 0.5rem; font-size: 0.92rem; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none !important;">${name}</button>`;
+            }).join('');
+        };
+
+        const isAllSelected = allAvailableForEdit.length > 0 && this.state.tempPartyExpenseFriends.length === allAvailableForEdit.length;
+
+        const html = `
+            <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+                <h3 style="margin-bottom: 0;">✏️ Modificar Gasto / Ronda</h3>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">Importe (€)</label>
+                    <input type="number" id="party-expense-amount" value="${Number(item.amount || 0).toFixed(2)}" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">Concepto / Descripción</label>
+                    <input type="text" id="party-expense-desc" value="${cleanDesc}" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; box-sizing: border-box;">
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿A quiénes incluye esta ronda?</label>
+                        <button type="button" id="btn-party-expense-toggle-all" class="btn-icon-small" onclick="App.toggleAllPartyExpenseFriends()" style="font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-sm);">
+                            ${isAllSelected ? 'Deseleccionar todos' : 'Marcar todos'}
+                        </button>
+                    </div>
+                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                        ${generateFriendButtons()}
+                    </div>
+                    <small id="party-expense-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
+                        ${this.state.tempPartyExpenseFriends.length} de ${allAvailableForEdit.length} seleccionados
+                    </small>
+                </div>
+                <button class="btn-primary" onclick="App.confirmPartySaveEditedExpense('${historyId}')" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem;">Guardar Cambios</button>
+            </div>
+        `;
+        this.openModal(html);
+    },
+
+    async confirmPartySaveEditedExpense(historyId) {
+        const item = this.state.partyData?.history?.[historyId];
+        if (!item) return;
+
+        const amountEl = document.getElementById('party-expense-amount');
+        const descEl = document.getElementById('party-expense-desc');
+        const amount = this.parseAmount(amountEl?.value);
+        let desc = descEl?.value?.trim() || 'Ronda';
+
+        if (isNaN(amount) || amount <= 0) {
+            alert('Por favor introduce un importe válido.');
+            return;
+        }
+
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
+        const selected = [...(this.state.tempPartyExpenseFriends || [])];
+
+        if (participants.length > 0 && selected.length === 0) {
+            alert('Debes seleccionar al menos a un amigo para esta ronda.');
+            return;
+        }
+
+        const isAll = participants.length === 0 || selected.length === participants.length;
+        if (!isAll) {
+            desc += ` (${selected.join(', ')})`;
+        }
+
+        this.closeModal();
+
+        try {
+            const expenseRef = ref(this.db, `party_pots/${this.state.partyId}/history/${historyId}`);
+            await set(expenseRef, {
+                ...item,
+                amount: amount,
+                description: desc,
+                beneficiaries: selected,
+                editedAt: Date.now()
+            });
+
+            // Recalcular totalSpent a partir del historial actualizado
+            const histSnap = await get(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            let newTotalSpent = 0;
+            if (histSnap.exists()) {
+                Object.values(histSnap.val()).forEach(h => {
+                    if (h.type === 'expense') {
+                        newTotalSpent += Number(h.amount || 0);
+                    }
+                });
+            }
+            await set(ref(this.db, `party_pots/${this.state.partyId}/totalSpent`), newTotalSpent);
+        } catch (error) {
+            console.error('Error al guardar gasto editado:', error);
+            alert('Error al guardar los cambios del gasto.');
+        }
     },
 
     openModal(html, hideCloseBtn = false) {
