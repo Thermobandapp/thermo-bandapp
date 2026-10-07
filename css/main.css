@@ -775,39 +775,45 @@ input:focus {
     position: absolute;
     top: 5px;
     right: 5px;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     padding: 0.2rem;
-    background: rgba(0,0,0,0.3);
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
+    background: transparent;
+    border-radius: 0;
+    width: auto;
+    height: auto;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.btn-edit-small:hover {
+    transform: scale(1.15);
 }
 
 .btn-delete-menu-small {
     position: absolute;
     top: 5px;
     left: 5px;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     padding: 0.2rem;
-    background: rgba(0,0,0,0.3);
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
+    background: transparent;
+    border-radius: 0;
+    width: auto;
+    height: auto;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: transform 0.15s ease;
 }
 
 .btn-delete-menu-small:hover {
-    background: rgba(239, 68, 68, 0.6);
+    background: transparent;
+    transform: scale(1.15);
 }
 
 .participant-btn.selected {
