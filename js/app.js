@@ -89,7 +89,19 @@ const App = {
     // Helper: parsea un string numérico aceptando tanto punto como coma decimal
     parseAmount(value) {
         if (value === null || value === undefined || value === '') return NaN;
-        return parseFloat(String(value).replace(',', '.'));
+        return parseFloat(String(value).trim().replace(',', '.'));
+    },
+
+    // Helper: formatea un número usando siempre la coma decimal para pantalla (ej: 2.5 -> "2,50")
+    formatPrice(value) {
+        const num = Number(value);
+        if (isNaN(num)) return '0,00';
+        return num.toFixed(2).replace('.', ',');
+    },
+
+    // Helper: formatea número con símbolo de euro (ej: 2.5 -> "2,50€")
+    formatEuro(value) {
+        return `${this.formatPrice(value)}€`;
     },
 
     // Normaliza nombres para búsqueda sin tildes ni mayúsculas (ej: Belén -> belen, José -> jose)
@@ -713,8 +725,10 @@ const App = {
     async handleAddProductMenu() {
         const name = prompt('Nombre del producto (ej: Caña):');
         if (!name) return;
-        const price = parseFloat(prompt('Precio (€):', '2.50'));
-        if (isNaN(price)) return;
+        const priceInput = prompt('Precio (€):', '2,50');
+        if (priceInput === null) return;
+        const price = this.parseAmount(priceInput);
+        if (isNaN(price) || price < 0) return alert('Precio inválido.');
         const icon = prompt('Emoji (opcional):', '🍺');
 
         const productRef = push(ref(this.db, `tables/${this.state.tableId}/menu`));
@@ -730,8 +744,10 @@ const App = {
     async handleEditProduct(id, item) {
         const name = prompt('Nuevo nombre:', item.name);
         if (!name) return;
-        const price = parseFloat(prompt('Nuevo precio:', item.price));
-        if (isNaN(price)) return;
+        const priceInput = prompt('Nuevo precio:', this.formatPrice(item.price));
+        if (priceInput === null) return;
+        const price = this.parseAmount(priceInput);
+        if (isNaN(price) || price < 0) return alert('Precio inválido.');
         const icon = prompt('Nuevo emoji:', item.icon);
 
         const productData = { name, price, icon };
@@ -858,11 +874,11 @@ const App = {
                         <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
                             <span class="p-name">${p.name} y ${partnerName} <span class="badge-couple">💑 Pareja</span></span>
                             <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
-                                <div>${p.name}: ${ind1.toFixed(2)}€</div>
-                                <div>${partnerName}: ${ind2.toFixed(2)}€</div>
+                                <div>${p.name}: ${this.formatEuro(ind1)}</div>
+                                <div>${partnerName}: ${this.formatEuro(ind2)}</div>
                             </div>
                         </div>
-                        <span class="p-amount">${combinedAmount.toFixed(2)}€</span>
+                        <span class="p-amount">${this.formatEuro(combinedAmount)}</span>
                     `;
                     div.onclick = () => this.showCoupleDetail(p.name, partnerName);
                     this.display.participants.appendChild(div);
@@ -883,11 +899,11 @@ const App = {
                         <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
                             <span class="p-name">${p.name} <span class="badge-couple">💑 Pareja</span></span>
                             <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
-                                <div>${p.name}: ${myAmount.toFixed(2)}€</div>
-                                <div>${partnerName} <small style="color:#f87171;">(fuera)</small>: ${partnerAmount.toFixed(2)}€</div>
+                                <div>${p.name}: ${this.formatEuro(myAmount)}</div>
+                                <div>${partnerName} <small style="color:#f87171;">(fuera)</small>: ${this.formatEuro(partnerAmount)}</div>
                             </div>
                         </div>
-                        <span class="p-amount">${combinedAmount.toFixed(2)}€</span>
+                        <span class="p-amount">${this.formatEuro(combinedAmount)}</span>
                     `;
                     div.onclick = () => this.showCoupleDetail(p.name, partnerName);
                     this.display.participants.appendChild(div);
@@ -910,7 +926,7 @@ const App = {
                             <span class="p-name">${p.name} ${isLeft ? '<small>(Fuera)</small>' : ''} ${partnerRegistered && !isLeft ? `<span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.25rem;">(💑 ${partnerRegistered})</span>` : ''}</span>
                             <span class="p-role">${p.role === 'admin' ? '🚩' : (isLeft ? '🏁' : '👤')}</span>
                         </div>
-                        <span class="p-amount">${amount.toFixed(2)}€</span>
+                        <span class="p-amount">${this.formatEuro(amount)}</span>
                     `;
                     div.onclick = () => this.showParticipantDetail(p.name);
                     this.display.participants.appendChild(div);
@@ -961,7 +977,7 @@ const App = {
                             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
                                 <span>${label}</span>
                                 <div class="order-actions" style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="font-weight: 600;">${price.toFixed(2)}€</span>
+                                    <span style="font-weight: 600;">${this.formatEuro(price)}</span>
                                     <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')" title="Borrar pedido">🗑️</button>
                                 </div>
                             </div>
@@ -989,14 +1005,14 @@ const App = {
             <h3>Consumo de Pareja: ${name1} y ${name2} 💑</h3>
             <div style="margin: 1rem 0; padding: 0.75rem; background: rgba(236,72,153,0.1); border-radius: var(--radius-sm); border: 1px solid rgba(236,72,153,0.25); text-align: center;">
                 <span style="font-size: 0.85rem; color: var(--text-muted);">Total Acumulado Pareja:</span>
-                <div style="font-size: 1.6rem; font-weight: 700; color: #f472b6;">${totalCouple.toFixed(2)}€</div>
+                <div style="font-size: 1.6rem; font-weight: 700; color: #f472b6;">${this.formatEuro(totalCouple)}</div>
             </div>
             
             <div style="max-height: 45vh; overflow-y: auto; text-align: left;">
-                <h4 style="color: var(--primary); margin-top: 0.8rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name1} (${d1.total.toFixed(2)}€)${!p1Active ? ' <small style="color:#f87171;">(Fuera)</small>' : ''}:</h4>
+                <h4 style="color: var(--primary); margin-top: 0.8rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name1} (${this.formatEuro(d1.total)})${!p1Active ? ' <small style="color:#f87171;">(Fuera)</small>' : ''}:</h4>
                 <div>${d1.ordersHtml}</div>
                 
-                <h4 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name2} (${d2.total.toFixed(2)}€)${!p2Active ? ' <small style="color:#f87171;">(Fuera)</small>' : ''}:</h4>
+                <h4 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.4rem; font-size: 0.95rem;">Consumos de ${name2} (${this.formatEuro(d2.total)})${!p2Active ? ' <small style="color:#f87171;">(Fuera)</small>' : ''}:</h4>
                 <div>${d2.ordersHtml}</div>
             </div>
 
@@ -1053,7 +1069,7 @@ const App = {
                 <button class="btn-delete-menu-small" data-id="${id}">🗑️</button>
                 <span class="item-icon">${item.icon || '🍴'}</span>
                 <span class="item-name">${item.name}</span>
-                <span class="item-price">${item.price.toFixed(2)}€</span>
+                <span class="item-price">${this.formatEuro(item.price)}</span>
             `;
             div.onclick = (e) => {
                 if (e.target.classList.contains('btn-edit-small') || e.target.classList.contains('btn-delete-menu-small')) return;
@@ -1083,7 +1099,7 @@ const App = {
             div.innerHTML = `
                 <span><b>${o.user === 'SHARED' ? '💎 Todos' : o.user}</b>: ${o.productName}</span>
                 <div class="order-actions">
-                    <span>${o.price.toFixed(2)}€</span>
+                    <span>${this.formatEuro(o.price)}</span>
                     <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button>
                 </div>
             `;
@@ -1114,8 +1130,8 @@ const App = {
             if (myShareLabelEl) myShareLabelEl.textContent = 'Tu parte';
         }
 
-        this.display.totalBill.textContent = `${totalBill.toFixed(2)}€`;
-        this.display.myShare.textContent = `${myTotal.toFixed(2)}€`;
+        this.display.totalBill.textContent = this.formatEuro(totalBill);
+        this.display.myShare.textContent = this.formatEuro(myTotal);
     },
 
     calculateAllIndividualTotals() {
@@ -1189,7 +1205,7 @@ const App = {
                         <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
                             <span>${label}</span>
                             <div class="order-actions">
-                                <span>${price.toFixed(2)}€</span>
+                                <span>${this.formatEuro(price)}</span>
                                 <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button>
                             </div>
                         </div>
@@ -1200,7 +1216,7 @@ const App = {
         });
 
         if (!hasOrders) html += `<p class="empty-msg">Aún no ha pedido nada.</p>`;
-        else html += `<div class="order-row total-row"><span><b>TOTAL</b></span><span><b>${total.toFixed(2)}€</b></span></div>`;
+        else html += `<div class="order-row total-row"><span><b>TOTAL</b></span><span><b>${this.formatEuro(total)}</b></span></div>`;
         html += `</div>`;
 
         if (pInfo?.status === 'active') {
@@ -1228,7 +1244,7 @@ const App = {
                 refundable = (balance * aport) / totalCollected;
             }
             if (refundable > 0) {
-                html += `<p class="refund-amount">Puedes reclamar ${refundable.toFixed(2)}€ del bote.</p>`;
+                html += `<p class="refund-amount">Puedes reclamar ${this.formatEuro(refundable)} del bote.</p>`;
             }
             html += `<button class="btn-primary" onclick="App.claimRefund('${name}')">Reclamar sobrante</button>`;
         }
@@ -1490,7 +1506,7 @@ const App = {
                     owed: owed1 + owed2,
                     put: put1 + put2,
                     names: [p.name, partnerName],
-                    breakdown: `Debe ${p.name}: ${owed1.toFixed(2)}€ · Debe ${partnerName}: ${owed2.toFixed(2)}€`
+                    breakdown: `Debe ${p.name}: ${this.formatEuro(owed1)} · Debe ${partnerName}: ${this.formatEuro(owed2)}`
                 });
             } else if (partnerObj && partnerObj.status === 'left') {
                 // p activo, pareja se fue → absorber deuda del que se fue
@@ -1507,7 +1523,7 @@ const App = {
                     owed: owed1 + owed2,
                     put: put1 + put2,
                     names: [p.name, partnerName],
-                    breakdown: `${p.name}: ${owed1.toFixed(2)}€ + ${partnerName} (fuera): ${owed2.toFixed(2)}€`
+                    breakdown: `${p.name}: ${this.formatEuro(owed1)} + ${partnerName} (fuera): ${this.formatEuro(owed2)}`
                 });
             } else {
                 processedKeys.add(pKey);
@@ -1536,10 +1552,10 @@ const App = {
                     ${g.breakdown ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">${g.breakdown}</div>` : ''}
                 </div>
                 <div class="details" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem;">
-                    <span>A pagar: <b>${g.owed.toFixed(2)}€</b></span>
-                    <span style="font-size: 0.78rem; color: var(--text-muted);">Puesto: ${g.put.toFixed(2)}€</span>
+                    <span>A pagar: <b>${this.formatEuro(g.owed)}</b></span>
+                    <span style="font-size: 0.78rem; color: var(--text-muted);">Puesto: ${this.formatEuro(g.put)}</span>
                     <span class="balance" style="color: ${balance > 0.01 ? '#3b82f6' : (isSettled ? '#22c55e' : '#f59e0b')}">
-                        ${balance > 0.01 ? `Sobran ${balance.toFixed(2)}€` : (isSettled ? '✓ Pagado' : `Faltan ${(Math.abs(balance)).toFixed(2)}€`)}
+                        ${balance > 0.01 ? `Sobran ${this.formatEuro(balance)}` : (isSettled ? '✓ Pagado' : `Faltan ${this.formatEuro(Math.abs(balance))}`)}
                     </span>
                 </div>
                 <button class="btn-calc-small" onclick="App.showQuickChange('${g.displayName.replace(/'/g, "\\'")}', ${g.owed})">💸</button>
@@ -1556,7 +1572,7 @@ const App = {
             div.innerHTML = `
                 <span><b>${c.user}</b> puso</span>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span>${Number(c.amount).toFixed(2)}€</span>
+                    <span>${this.formatEuro(c.amount)}</span>
                     <button class="btn-calc-small" style="font-size: 0.8rem; padding: 0.2rem 0.4rem;" onclick="App.editContribution('${c.id}', ${c.amount}, '${c.user.replace(/'/g, "\\'")}')">✏️</button>
                     <button class="btn-calc-small" style="font-size: 0.8rem; padding: 0.2rem 0.4rem; color: var(--danger);" onclick="App.deleteContribution('${c.id}')">❌</button>
                 </div>
@@ -1565,38 +1581,38 @@ const App = {
         });
 
         const diff = totalTicket - totalPot;
-        document.getElementById('group-total-bill').textContent = `${totalTicket.toFixed(2)}€`;
-        document.getElementById('pot-amount').textContent = `${totalPot.toFixed(2)}€`;
+        document.getElementById('group-total-bill').textContent = this.formatEuro(totalTicket);
+        document.getElementById('pot-amount').textContent = this.formatEuro(totalPot);
         const diffLabel = document.getElementById('pot-diff-label');
         const diffValue = document.getElementById('pot-diff-value');
         const diffContainer = document.getElementById('pot-difference-container');
         
         if (diff > 0.01) {
             diffLabel.textContent = 'Faltan';
-            diffValue.textContent = `${diff.toFixed(2)}€`;
+            diffValue.textContent = this.formatEuro(diff);
             diffContainer.className = 'pot-item status-error';
         } else if (diff < -0.01) {
             diffLabel.textContent = 'Sobran';
-            diffValue.textContent = `${Math.abs(diff).toFixed(2)}€`;
+            diffValue.textContent = this.formatEuro(Math.abs(diff));
             diffContainer.className = 'pot-item status-ok';
         } else {
             diffLabel.textContent = '¡Cuadra!';
-            diffValue.textContent = '0.00€';
+            diffValue.textContent = this.formatEuro(0);
             diffContainer.className = 'pot-item status-ok';
         }
     },
 
     showQuickChange(name, owed) {
-        const bill = prompt(`¿Cuánto vas a poner?`, '20');
-        if (!bill) return;
-        const paid = parseFloat(bill);
+        const billInput = prompt(`¿Cuánto vas a poner?`, '20');
+        if (!billInput) return;
+        const paid = this.parseAmount(billInput);
         if (isNaN(paid)) return;
         
         const change = paid - owed;
         if (change < 0) {
-            alert(`¡Ojo! ${paid.toFixed(2)}€ no llega para pagar los ${owed.toFixed(2)}€ que debe.`);
+            alert(`¡Ojo! ${this.formatEuro(paid)} no llega para pagar los ${this.formatEuro(owed)} que debe.`);
         } else {
-            alert(`${name}, tienes que coger ${change.toFixed(2)}€ del bote común.\n\nLuego anota en la app que has puesto tus ${owed.toFixed(2)}€.`);
+            alert(`${name}, tienes que coger ${this.formatEuro(change)} del bote común.\n\nLuego anota en la app que has puesto tus ${this.formatEuro(owed)}.`);
         }
     },
 
@@ -1654,7 +1670,7 @@ const App = {
                     isCouple: true,
                     names: [p.name, partnerName],
                     amount: combinedAmount,
-                    breakdown: `${p.name} (${amt1.toFixed(2)}€) + ${partnerName} (${amt2.toFixed(2)}€)`
+                    breakdown: `${p.name} (${this.formatEuro(amt1)}) + ${partnerName} (${this.formatEuro(amt2)})`
                 });
             } else if (partnerObj && partnerObj.status === 'left') {
                 // p activo, pareja se fue → absorber deuda del que se fue
@@ -1671,7 +1687,7 @@ const App = {
                     isCouple: true,
                     names: [p.name, partnerName],
                     amount: combinedAmount,
-                    breakdown: `${p.name} (${amt1.toFixed(2)}€) + ${partnerName} fuera (${amt2.toFixed(2)}€)`
+                    breakdown: `${p.name} (${this.formatEuro(amt1)}) + ${partnerName} fuera (${this.formatEuro(amt2)})`
                 });
             } else {
                 // Individual
@@ -1712,7 +1728,7 @@ const App = {
                             ${unit.isCouple ? `<span class="badge-couple" style="margin-left: 4px;">💑 Pareja</span>` : ''}
                             ${unit.breakdown ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem;">${unit.breakdown}</div>` : ''}
                         </div>
-                        <span class="p-amount">A pagar: ${unit.amount.toFixed(2)}€</span>
+                        <span class="p-amount">A pagar: ${this.formatEuro(unit.amount)}</span>
                     </div>
                     <div class="p-controls">
                         <input type="number" step="0.01" class="input-payment" placeholder="${unit.isCouple ? 'Pagan con...' : 'Paga con...'}" oninput="App.calculateIndividualChange(this, ${unit.amount}); App.handleUnitPaymentChange('${payer}', '${unit.storageKey}', this.value, ['${unit.names.join("','")}'])">
@@ -1778,11 +1794,11 @@ const App = {
         if (isNaN(paid)) { resultElement.innerHTML = ''; return; }
         const change = Math.round((paid - owed) * 100) / 100;
         if (change < 0) {
-            resultElement.innerHTML = `<span style="color: var(--danger)">Faltan ${(Math.abs(change)).toFixed(2)}€</span>`;
+            resultElement.innerHTML = `<span style="color: var(--danger)">Faltan ${this.formatEuro(Math.abs(change))}</span>`;
         } else if (change === 0) {
             resultElement.innerHTML = `<span style="color: #22c55e">✓ Pagado exacto</span>`;
         } else {
-            resultElement.innerHTML = `<span>Cambio: <b>${change.toFixed(2)}€</b></span>`;
+            resultElement.innerHTML = `<span>Cambio: <b>${this.formatEuro(change)}</b></span>`;
         }
     },
 
@@ -1928,8 +1944,8 @@ const App = {
             itemsHtml += `
                 <div class="ticket-row">
                     <span class="t-qty">${itemData.qty}x</span>
-                    <span class="t-name">${name} <span style="color: #555; font-size: 0.8em; margin-left: 0.2rem;">(${itemData.price.toFixed(2)}€)</span></span>
-                    <span class="t-price">${sum.toFixed(2)}€</span>
+                    <span class="t-name">${name} <span style="color: #555; font-size: 0.8em; margin-left: 0.2rem;">(${this.formatEuro(itemData.price)})</span></span>
+                    <span class="t-price">${this.formatEuro(sum)}</span>
                 </div>
             `;
         });
@@ -1948,7 +1964,7 @@ const App = {
                     <p>--------------------------------</p>
                     <div class="ticket-total">
                         <span>TOTAL</span>
-                        <span>${total.toFixed(2)}€</span>
+                        <span>${this.formatEuro(total)}</span>
                     </div>
                 </div>
             </div>
@@ -2492,9 +2508,9 @@ const App = {
         const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
         
         document.getElementById('party-code-badge').textContent = `CÓDIGO: ${this.state.partyId}`;
-        document.getElementById('party-balance').textContent = `${balance.toFixed(2)}€`;
-        document.getElementById('party-total-collected').textContent = `${(data.totalCollected || 0).toFixed(2)}€`;
-        document.getElementById('party-total-spent').textContent = `${(data.totalSpent || 0).toFixed(2)}€`;
+        document.getElementById('party-balance').textContent = this.formatEuro(balance);
+        document.getElementById('party-total-collected').textContent = this.formatEuro(data.totalCollected || 0);
+        document.getElementById('party-total-spent').textContent = this.formatEuro(data.totalSpent || 0);
 
         // 1. Lista de Participantes
         const friendsContainer = document.getElementById('party-participants-list');
@@ -2521,10 +2537,10 @@ const App = {
             div.innerHTML = `
                 <div class="p-info">
                     <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera) 💸</small>' : ''}</span>
-                    <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${gastado.toFixed(2)}€</small>
+                    <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${this.formatEuro(gastado)}</small>
                 </div>
                 <div style="text-align: right;">
-                    <div class="p-amount">${aport.toFixed(2)}€</div>
+                    <div class="p-amount">${this.formatEuro(aport)}</div>
                     <small style="font-size: 0.7rem; color: var(--text-muted);">aportado</small>
                 </div>
             `;
@@ -2551,7 +2567,7 @@ const App = {
                         <small>${new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} por ${item.user}</small>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
-                        <span class="amount">${item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                        <span class="amount">${item.type === 'income' ? '+' : '-'}${this.formatEuro(item.amount)}</span>
                         ${isExpense ? `
                             <button class="btn-icon-small" title="Editar gasto" onclick="App.handlePartyEditExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">✏️</button>
                             <button class="btn-icon-small" title="Borrar gasto" onclick="App.handlePartyDeleteExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
@@ -2789,15 +2805,15 @@ const App = {
             <div style="background: rgba(255,255,255,0.03); border-radius: 10px; padding: 0.85rem; margin-bottom: 1rem; font-size: 0.9rem;">
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
                     <span style="color: var(--text-muted);">Puso en el bote:</span>
-                    <b>${aport.toFixed(2)}€</b>
+                    <b>${this.formatEuro(aport)}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
                     <span style="color: var(--text-muted);">Consumió en rondas:</span>
-                    <b style="color: #f87171;">${gastado.toFixed(2)}€</b>
+                    <b style="color: #f87171;">${this.formatEuro(gastado)}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
                     <span style="color: var(--text-muted);">Saldo a su favor:</span>
-                    <b style="color: ${net > 0 ? 'var(--success)' : (net < 0 ? '#ef4444' : 'var(--text-muted)')};">${net >= 0 ? '+' : ''}${net.toFixed(2)}€</b>
+                    <b style="color: ${net > 0 ? 'var(--success)' : (net < 0 ? '#ef4444' : 'var(--text-muted)')};">${net >= 0 ? '+' : ''}${this.formatEuro(net)}</b>
                 </div>
             </div>
         `;
@@ -2808,16 +2824,16 @@ const App = {
             html += `
                 <div style="background: rgba(99,102,241,0.15); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
                     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Se lleva en efectivo del bote:</p>
-                    <span style="font-size: 1.8rem; font-weight: 700; color: #a5b4fc;">${refundable.toFixed(2)}€</span>
-                    ${pendingBizum > 0.01 ? `<p style="color: #f472b6; font-size: 0.82rem; margin-top: 0.4rem;">+ ${pendingBizum.toFixed(2)}€ le llegarán por Bizum al cerrar la fiesta.</p>` : ''}
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #a5b4fc;">${this.formatEuro(refundable)}</span>
+                    ${pendingBizum > 0.01 ? `<p style="color: #f472b6; font-size: 0.82rem; margin-top: 0.4rem;">+ ${this.formatEuro(pendingBizum)} le llegarán por Bizum al cerrar la fiesta.</p>` : ''}
                 </div>
-                <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${refundable.toFixed(2)}€ en efectivo</button>
+                <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${this.formatEuro(refundable)} en efectivo</button>
             `;
         } else if (net < -0.01) {
             html += `
                 <div style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
                     <p style="color: #fca5a5; font-size: 0.85rem; margin-bottom: 0.3rem;">Debe dinero de su consumo:</p>
-                    <span style="font-size: 1.8rem; font-weight: 700; color: #ef4444;">${Math.abs(net).toFixed(2)}€</span>
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #ef4444;">${this.formatEuro(Math.abs(net))}</span>
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
                         Debe abonar esta cantidad (por Bizum o efectivo) al grupo para dejarlo cuadrado.
                     </p>
@@ -2842,7 +2858,7 @@ const App = {
             refundHtml = `
                 <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.2rem; border-color: rgba(99, 102, 241, 0.4);">
                     <h3 style="text-align: center; margin-bottom: 0.5rem; color: #a5b4fc; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>💵 Reparto en Metálico del Bote (${remainingBalance.toFixed(2)}€)</span>
+                        <span>💵 Reparto en Metálico del Bote (${this.formatEuro(remainingBalance)})</span>
                     </h3>
                     <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
                         Dinero físico que se lleva cada uno ahora mismo en mano:
@@ -2867,14 +2883,14 @@ const App = {
                         <div style="display: flex; flex-direction: column;">
                             <span style="color: var(--text-main); font-weight: 600;">${p.name}</span>
                             <span style="font-size: 0.72rem; color: var(--text-muted);">
-                                Puso: ${p.aport.toFixed(2)}€ | Gastó: ${p.gastado.toFixed(2)}€
+                                Puso: ${this.formatEuro(p.aport)} | Gastó: ${this.formatEuro(p.gastado)}
                             </span>
                         </div>
                         <div style="text-align: right;">
                             <span style="color: ${p.refund > 0.01 ? 'var(--success)' : (isDebtor ? '#f87171' : 'var(--text-muted)')}; font-weight: 700; font-size: 0.95rem; display: block;">
-                                ${p.refund > 0.01 ? `+${p.refund.toFixed(2)}€ metálico` : (isDebtor ? `Debe ${Math.abs(p.net).toFixed(2)}€` : '0.00€')}
+                                ${p.refund > 0.01 ? `+${this.formatEuro(p.refund)} metálico` : (isDebtor ? `Debe ${this.formatEuro(Math.abs(p.net))}` : '0,00€')}
                             </span>
-                            ${p.pending > 0.01 ? `<small style="color: #f472b6; font-size: 0.72rem;">(+${p.pending.toFixed(2)}€ por Bizum)</small>` : ''}
+                            ${p.pending > 0.01 ? `<small style="color: #f472b6; font-size: 0.72rem;">(+${this.formatEuro(p.pending)} por Bizum)</small>` : ''}
                         </div>
                     </div>
                 `;
@@ -2909,7 +2925,7 @@ const App = {
                             <b style="color: #60a5fa;">${d.to}</b>
                         </div>
                         <span style="font-weight: 700; color: #f43f5e; font-size: 1.05rem; white-space: nowrap;">
-                            ${d.amount.toFixed(2)}€
+                            ${this.formatEuro(d.amount)}
                         </span>
                     </div>
                 `;
@@ -2928,16 +2944,16 @@ const App = {
                 <div class="summary-card glass" style="padding: 1.5rem; border-radius: 15px; margin-bottom: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span>Total Recaudado:</span>
-                        <b style="color: var(--success);">${totalCollected.toFixed(2)}€</b>
+                        <b style="color: var(--success);">${this.formatEuro(totalCollected)}</b>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span>Total Gastado:</span>
-                        <b style="color: var(--danger);">${totalSpent.toFixed(2)}€</b>
+                        <b style="color: var(--danger);">${this.formatEuro(totalSpent)}</b>
                     </div>
                     <hr style="border: none; border-top: 1px dashed var(--glass-border); margin: 1rem 0;">
                     <div style="display: flex; justify-content: space-between; font-size: 1.2rem;">
                         <span>Sobran en el bote:</span>
-                        <b style="color: var(--primary);">${remainingBalance.toFixed(2)}€</b>
+                        <b style="color: var(--primary);">${this.formatEuro(remainingBalance)}</b>
                     </div>
                 </div>
                 ${debtsHtml}
@@ -3018,7 +3034,7 @@ const App = {
                 .map(([name]) => name);
 
             titulo = winners.length > 1 ? 'Borrachuzos de la noche' : 'Borrachuzo de la noche';
-            const winnerSpent = winners.map(w => `${w} (${(spentByUser[w] || 0).toFixed(2)}€)`).join(', ');
+            const winnerSpent = winners.map(w => `${w} (${this.formatEuro(spentByUser[w] || 0)})`).join(', ');
 
             borrachuzosHTML = `
                 <p style="font-size:1.15rem;margin:0.5rem 0 0.25rem;color:#111827;">
@@ -3107,7 +3123,7 @@ const App = {
             user: this.state.user,
             timestamp: Date.now()
         });
-        alert(`${name} ha reclamado ${refund.toFixed(2)}€ del bote.`);
+        alert(`${name} ha reclamado ${this.formatEuro(refund)} del bote.`);
         // Recargar UI
         if (this.listenToParty) {
             this.listenToParty(this.state.partyId);
