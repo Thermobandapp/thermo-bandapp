@@ -29,10 +29,15 @@
                 </div>
                 <span id="header-user-name" style="font-size: 0.88rem; color: var(--secondary); margin-left: 3.5rem; margin-top: -0.2rem;"></span>
             </div>
-            <button id="btn-leave-table" class="btn-leave hidden">
-                <span>Dejar la mesa</span>
-                <span class="icon">🚪</span>
-            </button>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button id="btn-toggle-theme" class="btn-theme-toggle" onclick="App.toggleTheme()" title="Cambiar a Modo Claro / Oscuro">
+                    <span id="theme-toggle-icon">☀️</span>
+                </button>
+                <button id="btn-leave-table" class="btn-leave hidden">
+                    <span>Dejar la mesa</span>
+                    <span class="icon">🚪</span>
+                </button>
+            </div>
         </header>
 
         <main id="main-content">

@@ -30,16 +30,47 @@ const App = {
         partyData: null,
         tempLoginName: null,
         tempLoginCode: null,
-        couples: {}
+        couples: {},
+        theme: 'dark'
     },
 
     init() {
         console.log('Thermo Bandapp inicializada 🍻');
+        this.initTheme();
         this.initFirebase();
         this.cacheDOM();
         this.bindEvents();
         this.loadLocalSession();
         this.initDecimalNormalizer();
+    },
+
+    initTheme() {
+        const savedTheme = localStorage.getItem('thermo_theme') || 'dark';
+        this.applyTheme(savedTheme);
+    },
+
+    toggleTheme() {
+        const newTheme = this.state.theme === 'dark' ? 'light' : 'dark';
+        this.applyTheme(newTheme);
+    },
+
+    applyTheme(theme) {
+        this.state.theme = theme;
+        localStorage.setItem('thermo_theme', theme);
+        const iconEl = document.getElementById('theme-toggle-icon');
+        const toggleBtn = document.getElementById('btn-toggle-theme');
+
+        if (theme === 'light') {
+            document.body.classList.remove('dark-theme');
+            document.body.classList.add('light-theme');
+            if (iconEl) iconEl.textContent = '🌙';
+            if (toggleBtn) toggleBtn.title = 'Cambiar a Modo Oscuro';
+        } else {
+            document.body.classList.remove('light-theme');
+            document.body.classList.add('dark-theme');
+            if (iconEl) iconEl.textContent = '☀️';
+            if (toggleBtn) toggleBtn.title = 'Cambiar a Modo Claro';
+        }
     },
 
     // Convierte comas en puntos en todos los inputs numéricos de la app
