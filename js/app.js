@@ -104,6 +104,14 @@ const App = {
         return `${this.formatPrice(value)}€`;
     },
 
+    // Helper: obtiene el nombre base del bar a partir del nombre de la mesa
+    getBarName() {
+        const rawName = this.state.tableData?.name || '';
+        if (!rawName) return 'Bar';
+        // Quita sufijos de fecha o mesa: ej "La Tasca (07/10/2026)" o "La Tasca (Mesa 01)"
+        return rawName.split(' (')[0].trim() || 'Bar';
+    },
+
     // Normaliza nombres para búsqueda sin tildes ni mayúsculas (ej: Belén -> belen, José -> jose)
     normalizeKey(name) {
         if (!name) return '';
@@ -723,47 +731,70 @@ const App = {
     },
 
     async handleAddProductMenu() {
+        if (!this.state.tableId) {
+            alert('No hay ninguna mesa activa.');
+            return;
+        }
+
         const name = prompt('Nombre del producto (ej: Caña):');
-        if (!name) return;
+        if (!name || !name.trim()) return;
         const priceInput = prompt('Precio (€):', '2,50');
         if (priceInput === null) return;
         const price = this.parseAmount(priceInput);
         if (isNaN(price) || price < 0) return alert('Precio inválido.');
-        const icon = prompt('Emoji (opcional):', '🍺');
+        const icon = prompt('Emoji (opcional):', '🍺') || '🍴';
 
-        const productRef = push(ref(this.db, `tables/${this.state.tableId}/menu`));
-        const productData = { name, price, icon };
-        await set(productRef, productData);
+        try {
+            const productRef = push(ref(this.db, `tables/${this.state.tableId}/menu`));
+            const productData = { name: name.trim(), price, icon: icon.trim() };
+            await set(productRef, productData);
 
-        // Sincronizar con la biblioteca del bar
-        const barName = this.state.tableData.name.split(' (Mesa')[0].trim();
-        const barMenuRef = ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${productRef.key}`);
-        await set(barMenuRef, productData);
+            // Sincronizar con la biblioteca del bar
+            const barName = this.getBarName();
+            if (barName) {
+                const barMenuRef = ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${productRef.key}`);
+                await set(barMenuRef, productData);
+            }
+        } catch (error) {
+            console.error('Error al guardar el producto:', error);
+            alert('Error al guardar el producto en la base de datos.');
+        }
     },
 
     async handleEditProduct(id, item) {
+        if (!this.state.tableId) return;
+
         const name = prompt('Nuevo nombre:', item.name);
-        if (!name) return;
+        if (!name || !name.trim()) return;
         const priceInput = prompt('Nuevo precio:', this.formatPrice(item.price));
         if (priceInput === null) return;
         const price = this.parseAmount(priceInput);
         if (isNaN(price) || price < 0) return alert('Precio inválido.');
-        const icon = prompt('Nuevo emoji:', item.icon);
+        const icon = prompt('Nuevo emoji:', item.icon || '🍴') || '🍴';
 
-        const productData = { name, price, icon };
-        
-        await set(ref(this.db, `tables/${this.state.tableId}/menu/${id}`), productData);
+        try {
+            const productData = { name: name.trim(), price, icon: icon.trim() };
+            await set(ref(this.db, `tables/${this.state.tableId}/menu/${id}`), productData);
 
-        const barName = this.state.tableData.name.split(' (Mesa')[0].trim();
-        await set(ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${id}`), productData);
+            const barName = this.getBarName();
+            if (barName) {
+                await set(ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${id}`), productData);
+            }
+        } catch (error) {
+            console.error('Error al modificar el producto:', error);
+            alert('Error al modificar el producto.');
+        }
     },
 
     async handleDeleteProduct(id, item) {
+        if (!this.state.tableId) return;
         if (!confirm(`¿Seguro que quieres borrar el producto "${item.name}" del menú?`)) return;
         try {
             await set(ref(this.db, `tables/${this.state.tableId}/menu/${id}`), null);
-            const barName = this.state.tableData.name.split(' (Mesa')[0].trim();
-            await set(ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${id}`), null);
+            const barName = this.getBarName();
+            if (barName) {
+                await set(ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${id}`), null);
+            }
         } catch (error) {
             console.error('Error al borrar el producto:', error);
             alert('Error al borrar el producto.');
@@ -1922,7 +1953,7 @@ const App = {
             return;
         }
 
-        const barName = data.name ? data.name.split(' (Mesa')[0].trim() : 'Mesa';
+        const barName = this.getBarName();
         const dateObj = new Date();
         const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
