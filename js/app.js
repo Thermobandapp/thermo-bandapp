@@ -2187,8 +2187,7 @@ const App = {
         try {
             const key = name.replace(/\./g, '_');
             const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${key}`);
-            const currentParticipant = this.state.tableData?.participants?.[key] || {};
-            await set(participantRef, { ...currentParticipant, status: 'left' });
+            await set(participantRef, null);
         } catch (error) {
             console.error('Error al retirar amigo de la mesa silenciosamente:', error);
         }
@@ -3425,8 +3424,7 @@ const App = {
         try {
             const key = name.replace(/\./g, '_');
             const participantRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${key}`);
-            const currentData = this.state.partyData?.participants?.[key] || {};
-            await set(participantRef, { ...currentData, name, status: 'left', leftAt: Date.now() });
+            await set(participantRef, null);
         } catch (error) {
             console.error('Error al retirar amigo silenciosamente:', error);
         }
