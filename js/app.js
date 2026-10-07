@@ -2402,6 +2402,7 @@ const App = {
                 const div = document.createElement('div');
                 div.className = `history-item ${item.type}`;
                 const isExpense = item.type === 'expense';
+                const isIncome = item.type === 'income';
                 div.innerHTML = `
                     <div class="info" style="flex: 1; min-width: 0; padding-right: 0.5rem;">
                         <b>${item.description}</b><br>
@@ -2412,6 +2413,10 @@ const App = {
                         ${isExpense ? `
                             <button class="btn-icon-small" title="Editar gasto" onclick="App.handlePartyEditExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">✏️</button>
                             <button class="btn-icon-small" title="Borrar gasto" onclick="App.handlePartyDeleteExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
+                        ` : ''}
+                        ${isIncome ? `
+                            <button class="btn-icon-small" title="Editar aporte" onclick="App.handlePartyEditIncome('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">✏️</button>
+                            <button class="btn-icon-small" title="Borrar aporte" onclick="App.handlePartyDeleteIncome('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
                         ` : ''}
                     </div>
                 `;
@@ -2971,42 +2976,124 @@ const App = {
 
     async handlePartyAddMoney() {
         const participants = this.state.partyData?.participants
-            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            ? Object.values(this.state.partyData.participants)
+                .filter(p => p.status !== 'left')
+                .map(p => p.name)
             : [];
 
-        let optionsHtml = '';
-        participants.forEach(name => {
-            const selected = name === this.state.user ? 'selected' : '';
-            optionsHtml += `<option value="${name}" ${selected}>${name}</option>`;
-        });
+        // Por defecto preseleccionar al usuario actual si está en la lista
+        this.state.tempPartyMoneyFriends = (participants.includes(this.state.user))
+            ? [this.state.user]
+            : (participants.length > 0 ? [participants[0]] : []);
+
+        const generateFriendButtons = () => {
+            if (participants.length === 0) {
+                return '<p class="empty-msg" style="width: 100%;">No hay participantes activos en la fiesta.</p>';
+            }
+            return participants.map(name => {
+                const isSelected = this.state.tempPartyMoneyFriends.includes(name);
+                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                return `<button type="button" id="pm-btn-${idName}" class="participant-btn ${isSelected ? 'selected' : ''}" onclick="App.togglePartyMoneyFriend('${safeName}')" style="padding: 0.65rem 0.5rem; font-size: 0.92rem; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none !important;">${name}</button>`;
+            }).join('');
+        };
+
+        const isAllSelected = participants.length > 0 && this.state.tempPartyMoneyFriends.length === participants.length;
 
         const html = `
-            <h3>Añadir Fondos al Bote</h3>
-            <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+            <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+                <h3 style="margin-bottom: 0;">💰 Añadir Fondos al Bote</h3>
                 <div>
-                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; display:block;">¿Quién pone el dinero?</label>
-                    <select id="party-money-contributor" style="width: 100%; padding: 0.9rem 1rem; font-size: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(0,0,0,0.3); color: white; -webkit-appearance: none; appearance: none;">
-                        ${optionsHtml}
-                    </select>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿Cuánto dinero aporta cada uno? (€)</label>
+                    <input type="number" id="party-money-amount" placeholder="Ej: 10.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;">
                 </div>
                 <div>
-                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; display:block;">¿Cuánto dinero añade?</label>
-                    <input type="number" id="party-money-amount" placeholder="Cantidad (€)" step="0.01" style="width: 100%; padding: 0.9rem 1rem; font-size: 1.1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿Quiénes ponen esta cantidad?</label>
+                        <button type="button" id="btn-party-money-toggle-all" class="btn-icon-small" onclick="App.toggleAllPartyMoneyFriends()" style="font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-sm);">
+                            ${isAllSelected ? 'Deseleccionar todos' : 'Marcar todos'}
+                        </button>
+                    </div>
+                    <div id="party-money-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                        ${generateFriendButtons()}
+                    </div>
+                    <small id="party-money-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
+                        ${this.state.tempPartyMoneyFriends.length} seleccionado(s)
+                    </small>
                 </div>
-                <button class="btn-primary" onclick="App.confirmPartyAddMoney()" style="width: 100%; padding: 0.9rem; font-size: 1rem;">Añadir al bote</button>
+                <button class="btn-primary" onclick="App.confirmPartyAddMoney()" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem;">Añadir al bote</button>
             </div>
         `;
         this.openModal(html);
     },
 
-    async confirmPartyAddMoney() {
-        const friendEl = document.getElementById('party-money-contributor');
-        const amountEl = document.getElementById('party-money-amount');
-        const friend = friendEl?.value?.trim();
-        const amount = this.parseAmount(amountEl?.value);
+    togglePartyMoneyFriend(name) {
+        if (!this.state.tempPartyMoneyFriends) this.state.tempPartyMoneyFriends = [];
+        const idx = this.state.tempPartyMoneyFriends.indexOf(name);
+        const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+        const btn = document.getElementById(`pm-btn-${idName}`);
 
-        if (!friend) return alert('Selecciona quién pone el dinero.');
-        if (isNaN(amount) || amount <= 0) return alert('Introduce una cantidad válida.');
+        if (idx > -1) {
+            this.state.tempPartyMoneyFriends.splice(idx, 1);
+            if (btn) btn.classList.remove('selected');
+        } else {
+            this.state.tempPartyMoneyFriends.push(name);
+            if (btn) btn.classList.add('selected');
+        }
+        this.updatePartyMoneyFriendsUIState();
+    },
+
+    toggleAllPartyMoneyFriends() {
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants)
+                .filter(p => p.status !== 'left')
+                .map(p => p.name)
+            : [];
+
+        if (this.state.tempPartyMoneyFriends.length === participants.length) {
+            this.state.tempPartyMoneyFriends = [];
+        } else {
+            this.state.tempPartyMoneyFriends = [...participants];
+        }
+
+        participants.forEach(name => {
+            const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+            const btn = document.getElementById(`pm-btn-${idName}`);
+            if (btn) {
+                if (this.state.tempPartyMoneyFriends.includes(name)) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            }
+        });
+        this.updatePartyMoneyFriendsUIState();
+    },
+
+    updatePartyMoneyFriendsUIState() {
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants)
+                .filter(p => p.status !== 'left')
+                .map(p => p.name)
+            : [];
+        const isAllSelected = participants.length > 0 && this.state.tempPartyMoneyFriends.length === participants.length;
+        const toggleBtn = document.getElementById('btn-party-money-toggle-all');
+        if (toggleBtn) {
+            toggleBtn.textContent = isAllSelected ? 'Deseleccionar todos' : 'Marcar todos';
+        }
+        const countText = document.getElementById('party-money-count-text');
+        if (countText) {
+            countText.textContent = `${this.state.tempPartyMoneyFriends.length} de ${participants.length} seleccionados`;
+        }
+    },
+
+    async confirmPartyAddMoney() {
+        const amountEl = document.getElementById('party-money-amount');
+        const amount = this.parseAmount(amountEl?.value);
+        const selected = [...(this.state.tempPartyMoneyFriends || [])];
+
+        if (selected.length === 0) return alert('Selecciona al menos a una persona que ponga dinero.');
+        if (isNaN(amount) || amount <= 0) return alert('Introduce una cantidad válida por persona.');
 
         this.closeModal();
 
@@ -3014,20 +3101,24 @@ const App = {
             ? Object.values(this.state.partyData.participants).map(p => p.name)
             : [];
 
-        if (!friends.includes(friend)) {
-            await this.addPartyFriendSilent(friend);
+        let addedTotal = 0;
+        for (const friend of selected) {
+            if (!friends.includes(friend)) {
+                await this.addPartyFriendSilent(friend);
+            }
+
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'income',
+                amount: amount,
+                description: `Aporte de ${friend}`,
+                user: this.state.user,
+                timestamp: Date.now()
+            });
+            addedTotal += amount;
         }
 
-        const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
-        await set(historyRef, {
-            type: 'income',
-            amount: amount,
-            description: `Aporte de ${friend}`,
-            user: this.state.user,
-            timestamp: Date.now()
-        });
-
-        const newTotal = (this.state.partyData.totalCollected || 0) + amount;
+        const newTotal = (this.state.partyData.totalCollected || 0) + addedTotal;
         await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
     },
 
@@ -3473,6 +3564,107 @@ const App = {
         } catch (error) {
             console.error('Error al guardar gasto editado:', error);
             alert('Error al guardar los cambios del gasto.');
+        }
+    },
+
+    async handlePartyDeleteIncome(historyId) {
+        if (!confirm('¿Seguro que quieres borrar este aporte?')) return;
+        try {
+            const incomeRef = ref(this.db, `party_pots/${this.state.partyId}/history/${historyId}`);
+            await set(incomeRef, null);
+
+            // Recalcular totalCollected a partir del historial actualizado
+            const histSnap = await get(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            let newTotalCollected = 0;
+            if (histSnap.exists()) {
+                Object.values(histSnap.val()).forEach(item => {
+                    if (item.type === 'income') {
+                        newTotalCollected += Number(item.amount || 0);
+                    }
+                });
+            }
+            await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotalCollected);
+        } catch (error) {
+            console.error('Error al borrar aporte:', error);
+            alert('Error al borrar el aporte.');
+        }
+    },
+
+    async handlePartyEditIncome(historyId) {
+        const item = this.state.partyData?.history?.[historyId];
+        if (!item) return alert('No se encontró el aporte a editar.');
+
+        const currentFriend = (item.description || '').replace('Aporte de ', '').trim();
+        const participants = this.state.partyData?.participants
+            ? Object.values(this.state.partyData.participants).map(p => p.name)
+            : [];
+
+        if (currentFriend && !participants.includes(currentFriend)) {
+            participants.push(currentFriend);
+        }
+
+        let optionsHtml = '';
+        participants.forEach(name => {
+            const selected = name === currentFriend ? 'selected' : '';
+            optionsHtml += `<option value="${name}" ${selected}>${name}</option>`;
+        });
+
+        const html = `
+            <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+                <h3 style="margin-bottom: 0;">✏️ Modificar Aporte al Bote</h3>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿Quién puso el dinero?</label>
+                    <select id="party-edit-money-friend" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(0,0,0,0.3); color: white; -webkit-appearance: none; appearance: none; box-sizing: border-box;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">Cantidad aportada (€)</label>
+                    <input type="number" id="party-edit-money-amount" value="${Number(item.amount || 0).toFixed(2)}" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;">
+                </div>
+                <button class="btn-primary" onclick="App.confirmPartySaveEditedIncome('${historyId}')" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem;">Guardar Cambios</button>
+            </div>
+        `;
+        this.openModal(html);
+    },
+
+    async confirmPartySaveEditedIncome(historyId) {
+        const item = this.state.partyData?.history?.[historyId];
+        if (!item) return;
+
+        const friendEl = document.getElementById('party-edit-money-friend');
+        const amountEl = document.getElementById('party-edit-money-amount');
+        const friend = friendEl?.value?.trim();
+        const amount = this.parseAmount(amountEl?.value);
+
+        if (!friend) return alert('Selecciona quién puso el dinero.');
+        if (isNaN(amount) || amount <= 0) return alert('Introduce una cantidad válida.');
+
+        this.closeModal();
+
+        try {
+            const incomeRef = ref(this.db, `party_pots/${this.state.partyId}/history/${historyId}`);
+            await set(incomeRef, {
+                ...item,
+                amount: amount,
+                description: `Aporte de ${friend}`,
+                editedAt: Date.now()
+            });
+
+            // Recalcular totalCollected a partir del historial actualizado
+            const histSnap = await get(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            let newTotalCollected = 0;
+            if (histSnap.exists()) {
+                Object.values(histSnap.val()).forEach(h => {
+                    if (h.type === 'income') {
+                        newTotalCollected += Number(h.amount || 0);
+                    }
+                });
+            }
+            await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotalCollected);
+        } catch (error) {
+            console.error('Error al guardar aporte editado:', error);
+            alert('Error al guardar los cambios del aporte.');
         }
     },
 
