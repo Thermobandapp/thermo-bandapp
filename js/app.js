@@ -730,23 +730,80 @@ const App = {
         }
     },
 
-    async handleAddProductMenu() {
+    handleAddProductMenu() {
         if (!this.state.tableId) {
             alert('No hay ninguna mesa activa.');
             return;
         }
 
-        const name = prompt('Nombre del producto (ej: Caña):');
-        if (!name || !name.trim()) return;
-        const priceInput = prompt('Precio (€):', '2,50');
-        if (priceInput === null) return;
+        const html = `
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; text-align: left;">
+                <h3 style="margin-bottom: 0;">➕ Añadir Producto al Menú</h3>
+                
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Nombre del producto</label>
+                    <input type="text" id="product-name-input" placeholder="Ej: Caña, Ración de bravas..." onkeydown="if(event.key==='Enter') App.confirmSaveNewProduct()" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                </div>
+
+                <div style="display: flex; gap: 0.75rem;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Precio (€)</label>
+                        <input type="text" id="product-price-input" placeholder="Ej: 2,50" value="2,50" onkeydown="if(event.key==='Enter') App.confirmSaveNewProduct()" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                    </div>
+                    <div style="width: 85px;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Emoji</label>
+                        <input type="text" id="product-icon-input" value="🍺" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1.15rem; text-align: center; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">Sugerencias de emoji:</label>
+                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                        ${['🍺', '🍷', '🍹', '☕', '🥤', '🍟', '🧀', '🥩', '🍕', '🍴'].map(e => `
+                            <button type="button" class="btn-icon-small" onclick="document.getElementById('product-icon-input').value = '${e}'" style="padding: 0.3rem 0.5rem; font-size: 1rem;">${e}</button>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-top: 0.25rem;">
+                    <input type="checkbox" id="product-escote-chk" style="width: 1.2rem; height: 1.2rem; accent-color: var(--primary); cursor: pointer; margin-top: 0.15rem;">
+                    <span style="font-size: 0.88rem; line-height: 1.35;">
+                        <strong>💎 Permitir pedir a escote</strong><br>
+                        <span style="color: var(--text-muted); font-size: 0.78rem;">Habilita el botón para compartir este producto entre todos en la mesa (raciones, botellas, picoteo...).</span>
+                    </span>
+                </label>
+
+                <button class="btn-primary" onclick="App.confirmSaveNewProduct()" style="width: 100%; padding: 0.85rem; font-size: 1rem; font-weight: 700; margin-top: 0.5rem;">Guardar Producto</button>
+            </div>
+        `;
+
+        this.openModal(html);
+        setTimeout(() => document.getElementById('product-name-input')?.focus(), 80);
+    },
+
+    async confirmSaveNewProduct() {
+        if (!this.state.tableId) return;
+
+        const nameInput = document.getElementById('product-name-input')?.value.trim();
+        if (!nameInput) return alert('Escribe el nombre del producto.');
+
+        const priceInput = document.getElementById('product-price-input')?.value.trim();
         const price = this.parseAmount(priceInput);
         if (isNaN(price) || price < 0) return alert('Precio inválido.');
-        const icon = prompt('Emoji (opcional):', '🍺') || '🍴';
+
+        const iconInput = document.getElementById('product-icon-input')?.value.trim() || '🍴';
+        const allowEscote = document.getElementById('product-escote-chk')?.checked ?? false;
+
+        this.closeModal();
 
         try {
             const productRef = push(ref(this.db, `tables/${this.state.tableId}/menu`));
-            const productData = { name: name.trim(), price, icon: icon.trim() };
+            const productData = {
+                name: nameInput,
+                price,
+                icon: iconInput,
+                allowEscote: Boolean(allowEscote)
+            };
             await set(productRef, productData);
 
             // Sincronizar con la biblioteca del bar
@@ -761,19 +818,80 @@ const App = {
         }
     },
 
-    async handleEditProduct(id, item) {
+    handleEditProduct(id, item) {
         if (!this.state.tableId) return;
 
-        const name = prompt('Nuevo nombre:', item.name);
-        if (!name || !name.trim()) return;
-        const priceInput = prompt('Nuevo precio:', this.formatPrice(item.price));
-        if (priceInput === null) return;
+        const safeName = (item.name || '').replace(/"/g, '&quot;');
+        const safeIcon = (item.icon || '🍴').replace(/"/g, '&quot;');
+        const isEscoteChecked = Boolean(item.allowEscote);
+
+        const html = `
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; text-align: left;">
+                <h3 style="margin-bottom: 0;">✏️ Editar Producto</h3>
+                
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Nombre del producto</label>
+                    <input type="text" id="edit-product-name-input" value="${safeName}" onkeydown="if(event.key==='Enter') App.confirmSaveEditProduct('${id}')" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                </div>
+
+                <div style="display: flex; gap: 0.75rem;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Precio (€)</label>
+                        <input type="text" id="edit-product-price-input" value="${this.formatPrice(item.price)}" onkeydown="if(event.key==='Enter') App.confirmSaveEditProduct('${id}')" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                    </div>
+                    <div style="width: 85px;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Emoji</label>
+                        <input type="text" id="edit-product-icon-input" value="${safeIcon}" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1.15rem; text-align: center; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">Sugerencias de emoji:</label>
+                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                        ${['🍺', '🍷', '🍹', '☕', '🥤', '🍟', '🧀', '🥩', '🍕', '🍴'].map(e => `
+                            <button type="button" class="btn-icon-small" onclick="document.getElementById('edit-product-icon-input').value = '${e}'" style="padding: 0.3rem 0.5rem; font-size: 1rem;">${e}</button>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-top: 0.25rem;">
+                    <input type="checkbox" id="edit-product-escote-chk" ${isEscoteChecked ? 'checked' : ''} style="width: 1.2rem; height: 1.2rem; accent-color: var(--primary); cursor: pointer; margin-top: 0.15rem;">
+                    <span style="font-size: 0.88rem; line-height: 1.35;">
+                        <strong>💎 Permitir pedir a escote</strong><br>
+                        <span style="color: var(--text-muted); font-size: 0.78rem;">Habilita el botón para compartir este producto entre todos en la mesa (raciones, botellas, picoteo...).</span>
+                    </span>
+                </label>
+
+                <button class="btn-primary" onclick="App.confirmSaveEditProduct('${id}')" style="width: 100%; padding: 0.85rem; font-size: 1rem; font-weight: 700; margin-top: 0.5rem;">Guardar Cambios</button>
+            </div>
+        `;
+
+        this.openModal(html);
+        setTimeout(() => document.getElementById('edit-product-name-input')?.focus(), 80);
+    },
+
+    async confirmSaveEditProduct(id) {
+        if (!this.state.tableId) return;
+
+        const nameInput = document.getElementById('edit-product-name-input')?.value.trim();
+        if (!nameInput) return alert('Escribe el nombre del producto.');
+
+        const priceInput = document.getElementById('edit-product-price-input')?.value.trim();
         const price = this.parseAmount(priceInput);
         if (isNaN(price) || price < 0) return alert('Precio inválido.');
-        const icon = prompt('Nuevo emoji:', item.icon || '🍴') || '🍴';
+
+        const iconInput = document.getElementById('edit-product-icon-input')?.value.trim() || '🍴';
+        const allowEscote = document.getElementById('edit-product-escote-chk')?.checked ?? false;
+
+        this.closeModal();
 
         try {
-            const productData = { name: name.trim(), price, icon: icon.trim() };
+            const productData = {
+                name: nameInput,
+                price,
+                icon: iconInput,
+                allowEscote: Boolean(allowEscote)
+            };
             await set(ref(this.db, `tables/${this.state.tableId}/menu/${id}`), productData);
 
             const barName = this.getBarName();
@@ -1101,6 +1219,7 @@ const App = {
                 <span class="item-icon">${item.icon || '🍴'}</span>
                 <span class="item-name">${item.name}</span>
                 <span class="item-price">${this.formatEuro(item.price)}</span>
+                ${item.allowEscote ? '<span class="badge-escote">💎 A Escote</span>' : ''}
             `;
             div.onclick = (e) => {
                 if (e.target.classList.contains('btn-edit-small') || e.target.classList.contains('btn-delete-menu-small')) return;
@@ -1283,29 +1402,100 @@ const App = {
     },
 
     showParticipantSelector(product) {
-        const participants = Object.values(this.state.tableData.participants);
+        const participants = Object.values(this.state.tableData.participants || {})
+            .filter(p => p.status !== 'left');
         this.state.tempSelection = [];
-        let html = `<h3>¿Para quién es ${product.icon} ${product.name}?</h3><div class="participant-grid">`;
-        html += `<button class="participant-btn btn-shared" style="grid-column: span 2;" onclick="App.handleSharedOrder(${JSON.stringify(product).replace(/"/g, '&quot;')})">💎 A Escote (Todos)</button>`;
+        this.state.currentSelectorParticipants = participants.map(p => p.name);
+
+        let html = `<h3>¿Para quién es ${product.icon || '🍴'} ${product.name}?</h3>`;
+
+        if (product.allowEscote) {
+            html += `
+                <div style="margin-top: 0.85rem; margin-bottom: 0.5rem;">
+                    <button class="participant-btn btn-shared" style="width: 100%; padding: 0.85rem;" onclick="App.handleSharedOrder(${JSON.stringify(product).replace(/"/g, '&quot;')})">
+                        💎 A Escote (Todos)
+                    </button>
+                </div>
+            `;
+        }
+
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.85rem; margin-bottom: 0.35rem;">
+                <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">Asignar a cada uno:</span>
+                <div class="selector-switch-group">
+                    <button type="button" id="switch-select-all" class="selector-switch-btn" onclick="App.toggleAllParticipants(true)">Todos</button>
+                    <button type="button" id="switch-select-none" class="selector-switch-btn active" onclick="App.toggleAllParticipants(false)">Ninguno</button>
+                </div>
+            </div>
+        `;
+
+        html += `<div class="participant-grid" style="margin-top: 0.5rem; margin-bottom: 1.25rem;">`;
         participants.forEach(p => {
             const isMe = p.name === this.state.user;
-            html += `<button id="p-btn-${p.name.replace(/\s/g, '_')}" class="participant-btn ${isMe ? 'is-me' : ''}" onclick="App.toggleParticipantSelection('${p.name.replace(/'/g, "\\'")}')">${p.name}</button>`;
+            const idName = p.name.replace(/\s/g, '_').replace(/\./g, '_');
+            html += `<button id="p-btn-${idName}" class="participant-btn ${isMe ? 'is-me' : ''}" onclick="App.toggleParticipantSelection('${p.name.replace(/'/g, "\\'")}')">${p.name}</button>`;
         });
-        html += `</div><button id="btn-confirm-order" class="btn-primary" onclick="App.confirmMultiOrder(${JSON.stringify(product).replace(/"/g, '&quot;')})">Confirmar Pedido (0)</button>`;
+        html += `</div>`;
+        html += `<button id="btn-confirm-order" class="btn-primary" onclick="App.confirmMultiOrder(${JSON.stringify(product).replace(/"/g, '&quot;')})">Confirmar Pedido (0)</button>`;
+
         this.openModal(html);
+    },
+
+    toggleAllParticipants(selectAll) {
+        const participants = this.state.currentSelectorParticipants || [];
+        const switchAll = document.getElementById('switch-select-all');
+        const switchNone = document.getElementById('switch-select-none');
+
+        if (selectAll) {
+            this.state.tempSelection = [...participants];
+            participants.forEach(name => {
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                const btn = document.getElementById(`p-btn-${idName}`);
+                if (btn) btn.classList.add('selected');
+            });
+            if (switchAll) switchAll.classList.add('active');
+            if (switchNone) switchNone.classList.remove('active');
+        } else {
+            this.state.tempSelection = [];
+            participants.forEach(name => {
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                const btn = document.getElementById(`p-btn-${idName}`);
+                if (btn) btn.classList.remove('selected');
+            });
+            if (switchAll) switchAll.classList.remove('active');
+            if (switchNone) switchNone.classList.add('active');
+        }
+
+        const confirmBtn = document.getElementById('btn-confirm-order');
+        if (confirmBtn) {
+            confirmBtn.textContent = `Confirmar Pedido (${this.state.tempSelection.length})`;
+        }
     },
 
     toggleParticipantSelection(name) {
         const idx = this.state.tempSelection.indexOf(name);
-        const btn = document.getElementById(`p-btn-${name.replace(/\s/g, '_')}`);
+        const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+        const btn = document.getElementById(`p-btn-${idName}`);
         if (idx > -1) {
             this.state.tempSelection.splice(idx, 1);
-            btn.classList.remove('selected');
+            if (btn) btn.classList.remove('selected');
         } else {
             this.state.tempSelection.push(name);
-            btn.classList.add('selected');
+            if (btn) btn.classList.add('selected');
         }
-        document.getElementById('btn-confirm-order').textContent = `Confirmar Pedido (${this.state.tempSelection.length})`;
+
+        // Actualizar el estado visual del switch Todos / Ninguno
+        const total = (this.state.currentSelectorParticipants || []).length;
+        const count = this.state.tempSelection.length;
+        const switchAll = document.getElementById('switch-select-all');
+        const switchNone = document.getElementById('switch-select-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
+
+        const confirmBtn = document.getElementById('btn-confirm-order');
+        if (confirmBtn) {
+            confirmBtn.textContent = `Confirmar Pedido (${count})`;
+        }
     },
 
     confirmMultiOrder(product) {
@@ -2125,9 +2315,6 @@ const App = {
             }
             
             html += `</div>`;
-            
-            // Botón para selecciones múltiples o terminar
-            html += `<button id="btn-table-finish-add" class="btn-primary" onclick="App.confirmTableBatchAddFriends()" style="width: 100%; margin-top: 1rem; display: none; font-size: 1rem; padding: 0.9rem;">Pulsa cuando termines de añadir amigos</button>`;
 
             html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
@@ -2168,14 +2355,9 @@ const App = {
             if (btn) btn.classList.add('selected');
             await this.addFriendsToTable([name]);
         }
-
-        const finishBtn = document.getElementById('btn-table-finish-add');
-        if (finishBtn) {
-            finishBtn.style.display = this.state.tempSelectionFriends.length > 1 ? 'block' : 'none';
-        }
     },
 
-    setTableFriendsQuickFilter(filterType) {
+    async setTableFriendsQuickFilter(filterType) {
         const boysList = ['Antonio', 'Caba', 'David', 'Jose', 'Edu', 'Pedro', 'Karlos', 'Fernando'].map(n => n.toLowerCase());
         const available = this.state.tempAvailableTableMembers || [];
 
@@ -2189,6 +2371,10 @@ const App = {
         } else if (filterType === 'ninguno') {
             targetNames = [];
         }
+
+        const prevSelection = this.state.tempSelectionFriends || [];
+        const toAdd = targetNames.filter(name => !prevSelection.includes(name));
+        const toRemove = prevSelection.filter(name => !targetNames.includes(name));
 
         this.state.tempSelectionFriends = [...targetNames];
 
@@ -2204,21 +2390,16 @@ const App = {
             }
         });
 
-        const finishBtn = document.getElementById('btn-table-finish-add');
-        if (finishBtn) {
-            finishBtn.style.display = targetNames.length > 0 ? 'block' : 'none';
+        if (toAdd.length > 0) {
+            await this.addFriendsToTable(toAdd);
+        }
+        for (const name of toRemove) {
+            await this.removeTableFriendSilent(name);
         }
     },
 
     async confirmTableBatchAddFriends() {
-        const selected = [...(this.state.tempSelectionFriends || [])];
         this.closeModal();
-
-        try {
-            await this.addFriendsToTable(selected);
-        } catch (error) {
-            console.error('Error al añadir grupo a la mesa:', error);
-        }
     },
 
     async confirmTableCustomFriend() {
@@ -3358,9 +3539,6 @@ const App = {
             }
             
             html += `</div>`;
-            
-            // Botón para selecciones múltiples o terminar
-            html += `<button id="btn-party-finish-add" class="btn-primary" onclick="App.confirmPartyBatchAddFriends()" style="width: 100%; margin-top: 1rem; display: none; font-size: 1rem; padding: 0.9rem;">Pulsa cuando termines de añadir amigos</button>`;
 
             html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
@@ -3401,14 +3579,9 @@ const App = {
             if (btn) btn.classList.add('selected');
             await this.addPartyFriendSilent(name);
         }
-
-        const finishBtn = document.getElementById('btn-party-finish-add');
-        if (finishBtn) {
-            finishBtn.style.display = this.state.tempSelectionFriends.length > 1 ? 'block' : 'none';
-        }
     },
 
-    setPartyFriendsQuickFilter(filterType) {
+    async setPartyFriendsQuickFilter(filterType) {
         const boysList = ['Antonio', 'Caba', 'David', 'Jose', 'Edu', 'Pedro', 'Karlos', 'Fernando'].map(n => n.toLowerCase());
         const available = this.state.tempAvailablePartyMembers || [];
 
@@ -3422,6 +3595,10 @@ const App = {
         } else if (filterType === 'ninguno') {
             targetNames = [];
         }
+
+        const prevSelection = this.state.tempSelectionFriends || [];
+        const toAdd = targetNames.filter(name => !prevSelection.includes(name));
+        const toRemove = prevSelection.filter(name => !targetNames.includes(name));
 
         this.state.tempSelectionFriends = [...targetNames];
 
@@ -3438,24 +3615,16 @@ const App = {
             }
         });
 
-        // Mostrar u ocultar el botón de terminar si hay amigos seleccionados
-        const finishBtn = document.getElementById('btn-party-finish-add');
-        if (finishBtn) {
-            finishBtn.style.display = targetNames.length > 0 ? 'block' : 'none';
+        for (const name of toAdd) {
+            await this.addPartyFriendSilent(name);
+        }
+        for (const name of toRemove) {
+            await this.removePartyFriendSilent(name);
         }
     },
 
     async confirmPartyBatchAddFriends() {
-        const selected = [...(this.state.tempSelectionFriends || [])];
         this.closeModal();
-
-        try {
-            for (const name of selected) {
-                await this.addPartyFriendSilent(name);
-            }
-        } catch (error) {
-            console.error('Error al añadir grupo de amigos:', error);
-        }
     },
 
     async confirmPartyCustomFriend() {
