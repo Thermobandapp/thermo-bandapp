@@ -1504,7 +1504,8 @@ const App = {
     },
 
     handleRepeatRoundSelector() {
-        const participants = Object.values(this.state.tableData.participants || {});
+        const participants = Object.values(this.state.tableData.participants || {})
+            .filter(p => p.status !== 'left');
         if (participants.length === 0) return alert('No hay participantes en la mesa.');
 
         const orders = Object.values(this.state.tableData.orders || {});
@@ -1519,20 +1520,34 @@ const App = {
             }
         });
 
+        const eligibleParticipants = participants.filter(p => !!participantLastOrders[p.name]).map(p => p.name);
+        this.state.currentRepeatParticipants = eligibleParticipants;
         this.state.tempRepeatSelection = [];
         
         let html = `<h3>Otra ronda de lo mismo 🔁</h3>`;
-        html += `<p class="subtitle" style="margin-bottom: 1rem; text-align: center;">¿Quiénes quieren repetir su último pedido?</p>`;
-        html += `<div class="participant-grid">`;
+        html += `<p class="subtitle" style="margin-bottom: 0.85rem; text-align: center;">¿Quiénes quieren repetir su último pedido?</p>`;
+        
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">Seleccionar:</span>
+                <div class="selector-switch-group">
+                    <button type="button" id="switch-repeat-all" class="selector-switch-btn" onclick="App.toggleAllRepeatParticipants(true)">Todos</button>
+                    <button type="button" id="switch-repeat-none" class="selector-switch-btn active" onclick="App.toggleAllRepeatParticipants(false)">Ninguno</button>
+                </div>
+            </div>
+        `;
+
+        html += `<div class="participant-grid" style="margin-top: 0.5rem; margin-bottom: 1.25rem;">`;
         
         participants.forEach(p => {
             const lastOrder = participantLastOrders[p.name];
             const isMe = p.name === this.state.user;
             const disabled = !lastOrder;
             const detailText = lastOrder ? lastOrder.productName : 'Sin pedidos';
+            const idName = p.name.replace(/\s/g, '_').replace(/\./g, '_');
             
             html += `
-                <button id="rep-btn-${p.name.replace(/\s/g, '_')}" 
+                <button id="rep-btn-${idName}" 
                         class="participant-btn ${isMe && lastOrder ? 'is-me' : ''} ${disabled ? 'disabled' : ''}" 
                         ${disabled ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''} 
                         onclick="App.toggleRepeatSelection('${p.name.replace(/'/g, "\\'")}')">
@@ -1548,18 +1563,62 @@ const App = {
         this.openModal(html);
     },
 
+    toggleAllRepeatParticipants(selectAll) {
+        const eligible = this.state.currentRepeatParticipants || [];
+        const switchAll = document.getElementById('switch-repeat-all');
+        const switchNone = document.getElementById('switch-repeat-none');
+
+        if (selectAll) {
+            this.state.tempRepeatSelection = [...eligible];
+            eligible.forEach(name => {
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                const btn = document.getElementById(`rep-btn-${idName}`);
+                if (btn) btn.classList.add('selected');
+            });
+            if (switchAll) switchAll.classList.toggle('active', eligible.length > 0);
+            if (switchNone) switchNone.classList.toggle('active', eligible.length === 0);
+        } else {
+            this.state.tempRepeatSelection = [];
+            eligible.forEach(name => {
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                const btn = document.getElementById(`rep-btn-${idName}`);
+                if (btn) btn.classList.remove('selected');
+            });
+            if (switchAll) switchAll.classList.remove('active');
+            if (switchNone) switchNone.classList.add('active');
+        }
+
+        const confirmBtn = document.getElementById('btn-confirm-repeat');
+        if (confirmBtn) {
+            confirmBtn.textContent = `Repetir pedidos (${this.state.tempRepeatSelection.length})`;
+        }
+    },
+
     toggleRepeatSelection(name) {
         if (!this.state.tempRepeatSelection) this.state.tempRepeatSelection = [];
         const idx = this.state.tempRepeatSelection.indexOf(name);
-        const btn = document.getElementById(`rep-btn-${name.replace(/\s/g, '_')}`);
+        const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+        const btn = document.getElementById(`rep-btn-${idName}`);
         if (idx > -1) {
             this.state.tempRepeatSelection.splice(idx, 1);
-            btn.classList.remove('selected');
+            if (btn) btn.classList.remove('selected');
         } else {
             this.state.tempRepeatSelection.push(name);
-            btn.classList.add('selected');
+            if (btn) btn.classList.add('selected');
         }
-        document.getElementById('btn-confirm-repeat').textContent = `Repetir pedidos (${this.state.tempRepeatSelection.length})`;
+
+        // Actualizar el estado visual del switch Todos / Ninguno
+        const total = (this.state.currentRepeatParticipants || []).length;
+        const count = this.state.tempRepeatSelection.length;
+        const switchAll = document.getElementById('switch-repeat-all');
+        const switchNone = document.getElementById('switch-repeat-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
+
+        const confirmBtn = document.getElementById('btn-confirm-repeat');
+        if (confirmBtn) {
+            confirmBtn.textContent = `Repetir pedidos (${count})`;
+        }
     },
 
     async confirmRepeatRound(participantLastOrders) {
@@ -2284,21 +2343,19 @@ const App = {
             let html = `<h3>Añadir Amigos a la Mesa</h3>`;
             html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
-            // Botones de selección rápida: Chicos, Chicas, Todos, Limpiar
+            // Botones de selección rápida: Chicos, Chicas, Switch Todos/Ninguno
             html += `
-                <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.85rem;">
                     <button type="button" class="filter-pill filter-pill-boys" onclick="App.setTableFriendsQuickFilter('chicos')">
                         👦 Chicos
                     </button>
                     <button type="button" class="filter-pill filter-pill-girls" onclick="App.setTableFriendsQuickFilter('chicas')">
                         👧 Chicas
                     </button>
-                    <button type="button" class="filter-pill" onclick="App.setTableFriendsQuickFilter('todos')">
-                        Todos
-                    </button>
-                    <button type="button" class="filter-pill" onclick="App.setTableFriendsQuickFilter('ninguno')">
-                        Limpiar
-                    </button>
+                    <div class="selector-switch-group">
+                        <button type="button" id="switch-table-friend-all" class="selector-switch-btn" onclick="App.setTableFriendsQuickFilter('todos')">Todos</button>
+                        <button type="button" id="switch-table-friend-none" class="selector-switch-btn active" onclick="App.setTableFriendsQuickFilter('ninguno')">Ninguno</button>
+                    </div>
                 </div>
             `;
 
@@ -2355,6 +2412,14 @@ const App = {
             if (btn) btn.classList.add('selected');
             await this.addFriendsToTable([name]);
         }
+
+        // Actualizar el estado visual del switch Todos / Ninguno
+        const total = (this.state.tempAvailableTableMembers || []).length;
+        const count = this.state.tempSelectionFriends.length;
+        const switchAll = document.getElementById('switch-table-friend-all');
+        const switchNone = document.getElementById('switch-table-friend-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
     },
 
     async setTableFriendsQuickFilter(filterType) {
@@ -2389,6 +2454,14 @@ const App = {
                 }
             }
         });
+
+        // Actualizar el estado visual del switch Todos / Ninguno
+        const total = available.length;
+        const count = targetNames.length;
+        const switchAll = document.getElementById('switch-table-friend-all');
+        const switchNone = document.getElementById('switch-table-friend-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
 
         if (toAdd.length > 0) {
             await this.addFriendsToTable(toAdd);
@@ -3380,9 +3453,10 @@ const App = {
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿Quiénes ponen esta cantidad?</label>
-                        <button type="button" id="btn-party-money-toggle-all" class="btn-icon-small" onclick="App.toggleAllPartyMoneyFriends()" style="font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-sm);">
-                            ${isAllSelected ? 'Deseleccionar todos' : 'Marcar todos'}
-                        </button>
+                        <div class="selector-switch-group">
+                            <button type="button" id="switch-party-money-all" class="selector-switch-btn ${isAllSelected ? 'active' : ''}" onclick="App.toggleAllPartyMoneyFriends(true)">Todos</button>
+                            <button type="button" id="switch-party-money-none" class="selector-switch-btn ${this.state.tempPartyMoneyFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyMoneyFriends(false)">Ninguno</button>
+                        </div>
                     </div>
                     <div id="party-money-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateFriendButtons()}
@@ -3413,17 +3487,21 @@ const App = {
         this.updatePartyMoneyFriendsUIState();
     },
 
-    toggleAllPartyMoneyFriends() {
+    toggleAllPartyMoneyFriends(selectAll) {
         const participants = this.state.partyData?.participants
             ? Object.values(this.state.partyData.participants)
                 .filter(p => p.status !== 'left')
                 .map(p => p.name)
             : [];
 
-        if (this.state.tempPartyMoneyFriends.length === participants.length) {
-            this.state.tempPartyMoneyFriends = [];
+        if (selectAll !== undefined) {
+            this.state.tempPartyMoneyFriends = selectAll ? [...participants] : [];
         } else {
-            this.state.tempPartyMoneyFriends = [...participants];
+            if (this.state.tempPartyMoneyFriends.length === participants.length) {
+                this.state.tempPartyMoneyFriends = [];
+            } else {
+                this.state.tempPartyMoneyFriends = [...participants];
+            }
         }
 
         participants.forEach(name => {
@@ -3446,14 +3524,16 @@ const App = {
                 .filter(p => p.status !== 'left')
                 .map(p => p.name)
             : [];
-        const isAllSelected = participants.length > 0 && this.state.tempPartyMoneyFriends.length === participants.length;
-        const toggleBtn = document.getElementById('btn-party-money-toggle-all');
-        if (toggleBtn) {
-            toggleBtn.textContent = isAllSelected ? 'Deseleccionar todos' : 'Marcar todos';
-        }
+        const count = this.state.tempPartyMoneyFriends.length;
+        const total = participants.length;
+        const switchAll = document.getElementById('switch-party-money-all');
+        const switchNone = document.getElementById('switch-party-money-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
+
         const countText = document.getElementById('party-money-count-text');
         if (countText) {
-            countText.textContent = `${this.state.tempPartyMoneyFriends.length} de ${participants.length} seleccionados`;
+            countText.textContent = `${count} de ${total} seleccionados`;
         }
     },
 
@@ -3508,21 +3588,19 @@ const App = {
             let html = `<h3>Añadir Amigos al Bote</h3>`;
             html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
-            // Botones de selección rápida: Chicos, Chicas, Todos, Ninguno
+            // Botones de selección rápida: Chicos, Chicas, Switch Todos/Ninguno
             html += `
-                <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.85rem;">
                     <button type="button" class="filter-pill filter-pill-boys" onclick="App.setPartyFriendsQuickFilter('chicos')">
                         👦 Chicos
                     </button>
                     <button type="button" class="filter-pill filter-pill-girls" onclick="App.setPartyFriendsQuickFilter('chicas')">
                         👧 Chicas
                     </button>
-                    <button type="button" class="filter-pill" onclick="App.setPartyFriendsQuickFilter('todos')">
-                        Todos
-                    </button>
-                    <button type="button" class="filter-pill" onclick="App.setPartyFriendsQuickFilter('ninguno')">
-                        Limpiar
-                    </button>
+                    <div class="selector-switch-group">
+                        <button type="button" id="switch-party-friend-all" class="selector-switch-btn" onclick="App.setPartyFriendsQuickFilter('todos')">Todos</button>
+                        <button type="button" id="switch-party-friend-none" class="selector-switch-btn active" onclick="App.setPartyFriendsQuickFilter('ninguno')">Ninguno</button>
+                    </div>
                 </div>
             `;
 
@@ -3579,6 +3657,14 @@ const App = {
             if (btn) btn.classList.add('selected');
             await this.addPartyFriendSilent(name);
         }
+
+        // Actualizar el estado visual del switch Todos / Ninguno
+        const total = (this.state.tempAvailablePartyMembers || []).length;
+        const count = this.state.tempSelectionFriends.length;
+        const switchAll = document.getElementById('switch-party-friend-all');
+        const switchNone = document.getElementById('switch-party-friend-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
     },
 
     async setPartyFriendsQuickFilter(filterType) {
@@ -3614,6 +3700,14 @@ const App = {
                 }
             }
         });
+
+        // Actualizar el estado visual del switch Todos / Ninguno
+        const total = available.length;
+        const count = targetNames.length;
+        const switchAll = document.getElementById('switch-party-friend-all');
+        const switchNone = document.getElementById('switch-party-friend-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
 
         for (const name of toAdd) {
             await this.addPartyFriendSilent(name);
@@ -3692,9 +3786,10 @@ const App = {
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿A quiénes incluye esta ronda?</label>
-                        <button type="button" id="btn-party-expense-toggle-all" class="btn-icon-small" onclick="App.toggleAllPartyExpenseFriends()" style="font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-sm);">
-                            ${isAllSelected ? 'Deseleccionar todos' : 'Marcar todos'}
-                        </button>
+                        <div class="selector-switch-group">
+                            <button type="button" id="switch-party-expense-all" class="selector-switch-btn ${isAllSelected ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(true)">Todos</button>
+                            <button type="button" id="switch-party-expense-none" class="selector-switch-btn ${this.state.tempPartyExpenseFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(false)">Ninguno</button>
+                        </div>
                     </div>
                     <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateFriendButtons()}
@@ -3725,15 +3820,19 @@ const App = {
         this.updatePartyExpenseFriendsUIState();
     },
 
-    toggleAllPartyExpenseFriends() {
+    toggleAllPartyExpenseFriends(selectAll) {
         const participants = this.state.partyData?.participants
             ? Object.values(this.state.partyData.participants).map(p => p.name)
             : [];
 
-        if (this.state.tempPartyExpenseFriends.length === participants.length) {
-            this.state.tempPartyExpenseFriends = [];
+        if (selectAll !== undefined) {
+            this.state.tempPartyExpenseFriends = selectAll ? [...participants] : [];
         } else {
-            this.state.tempPartyExpenseFriends = [...participants];
+            if (this.state.tempPartyExpenseFriends.length === participants.length) {
+                this.state.tempPartyExpenseFriends = [];
+            } else {
+                this.state.tempPartyExpenseFriends = [...participants];
+            }
         }
 
         participants.forEach(name => {
@@ -3754,14 +3853,16 @@ const App = {
         const participants = this.state.partyData?.participants
             ? Object.values(this.state.partyData.participants).map(p => p.name)
             : [];
-        const isAllSelected = participants.length > 0 && this.state.tempPartyExpenseFriends.length === participants.length;
-        const toggleBtn = document.getElementById('btn-party-expense-toggle-all');
-        if (toggleBtn) {
-            toggleBtn.textContent = isAllSelected ? 'Deseleccionar todos' : 'Marcar todos';
-        }
+        const count = this.state.tempPartyExpenseFriends.length;
+        const total = participants.length;
+        const switchAll = document.getElementById('switch-party-expense-all');
+        const switchNone = document.getElementById('switch-party-expense-none');
+        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
+
         const countText = document.getElementById('party-expense-count-text');
         if (countText) {
-            countText.textContent = `${this.state.tempPartyExpenseFriends.length} de ${participants.length} seleccionados`;
+            countText.textContent = `${count} de ${total} seleccionados`;
         }
     },
 
@@ -3883,9 +3984,10 @@ const App = {
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿A quiénes incluye esta ronda?</label>
-                        <button type="button" id="btn-party-expense-toggle-all" class="btn-icon-small" onclick="App.toggleAllPartyExpenseFriends()" style="font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-sm);">
-                            ${isAllSelected ? 'Deseleccionar todos' : 'Marcar todos'}
-                        </button>
+                        <div class="selector-switch-group">
+                            <button type="button" id="switch-party-expense-all" class="selector-switch-btn ${isAllSelected ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(true)">Todos</button>
+                            <button type="button" id="switch-party-expense-none" class="selector-switch-btn ${this.state.tempPartyExpenseFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(false)">Ninguno</button>
+                        </div>
                     </div>
                     <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateFriendButtons()}
