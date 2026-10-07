@@ -2028,21 +2028,22 @@ const App = {
             
             html += `</div>`;
             
+            html += `<button id="btn-confirm-add-friends" class="btn-primary" onclick="App.confirmAddFriends()" style="width: 100%; margin-top: 1rem;">Añadir a la mesa (0)</button>`;
+
             html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
                     <p class="subtitle" style="margin-bottom: 0.5rem; color: var(--text-main);">¿No es miembro? Añádelo manualmente:</p>
                     <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 0.75rem;">
-                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);">
+                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-bottom: 0.75rem;">
                         <input type="checkbox" id="chk-permanent-member" style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;">
                         <span style="font-size: 0.88rem; line-height: 1.35;">
                             <strong>Miembro permanente</strong><br>
                             <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en esta mesa.</span>
                         </span>
                     </label>
+                    <button class="btn-secondary" onclick="App.confirmAddFriends()" style="width: 100%;">Añadir nombre escrito</button>
                 </div>
             `;
-            
-            html += `<button id="btn-confirm-add-friends" class="btn-primary" onclick="App.confirmAddFriends()">Añadir a la mesa (0)</button>`;
 
             this.openModal(html);
         } catch (error) {
