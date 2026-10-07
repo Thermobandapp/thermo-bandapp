@@ -167,6 +167,57 @@ body.light-theme .btn-theme-toggle {
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 
+/* Botones de filtro rápido de amigos (Chicos, Chicas, Todos, Limpiar) */
+.filter-pill {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-pill:hover {
+    transform: translateY(-1px);
+}
+
+.filter-pill-boys {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.45);
+    color: #93c5fd;
+}
+
+.filter-pill-girls {
+    background: rgba(236, 72, 153, 0.2);
+    border-color: rgba(236, 72, 153, 0.45);
+    color: #f472b6;
+}
+
+/* Modo claro: máxima legibilidad y fondo sólido/opaco sin transparencias sucias */
+body.light-theme .filter-pill {
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+body.light-theme .filter-pill-boys {
+    background: #eff6ff !important;
+    border-color: #3b82f6 !important;
+    color: #1d4ed8 !important;
+    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.15);
+}
+
+body.light-theme .filter-pill-girls {
+    background: #fdf2f8 !important;
+    border-color: #ec4899 !important;
+    color: #be185d !important;
+    box-shadow: 0 1px 4px rgba(236, 72, 153, 0.15);
+}
+
 /* Botón flotante/en cabecera para cambio de tema */
 .btn-theme-toggle {
     background: rgba(255, 255, 255, 0.08);

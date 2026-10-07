@@ -2065,17 +2065,17 @@ const App = {
 
             // Botones de selección rápida: Chicos, Chicas, Todos, Limpiar
             html += `
-                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
-                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('chicos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
+                <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                    <button type="button" class="filter-pill filter-pill-boys" onclick="App.setTableFriendsQuickFilter('chicos')">
                         👦 Chicos
                     </button>
-                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('chicas')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(236, 72, 153, 0.2); border-color: rgba(236, 72, 153, 0.4); color: #f472b6;">
+                    <button type="button" class="filter-pill filter-pill-girls" onclick="App.setTableFriendsQuickFilter('chicas')">
                         👧 Chicas
                     </button>
-                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('todos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                    <button type="button" class="filter-pill" onclick="App.setTableFriendsQuickFilter('todos')">
                         Todos
                     </button>
-                    <button type="button" class="btn-icon-small" onclick="App.setTableFriendsQuickFilter('ninguno')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                    <button type="button" class="filter-pill" onclick="App.setTableFriendsQuickFilter('ninguno')">
                         Limpiar
                     </button>
                 </div>
@@ -3298,17 +3298,17 @@ const App = {
 
             // Botones de selección rápida: Chicos, Chicas, Todos, Ninguno
             html += `
-                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
-                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('chicos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
+                <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                    <button type="button" class="filter-pill filter-pill-boys" onclick="App.setPartyFriendsQuickFilter('chicos')">
                         👦 Chicos
                     </button>
-                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('chicas')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(236, 72, 153, 0.2); border-color: rgba(236, 72, 153, 0.4); color: #f472b6;">
+                    <button type="button" class="filter-pill filter-pill-girls" onclick="App.setPartyFriendsQuickFilter('chicas')">
                         👧 Chicas
                     </button>
-                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('todos')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                    <button type="button" class="filter-pill" onclick="App.setPartyFriendsQuickFilter('todos')">
                         Todos
                     </button>
-                    <button type="button" class="btn-icon-small" onclick="App.setPartyFriendsQuickFilter('ninguno')" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+                    <button type="button" class="filter-pill" onclick="App.setPartyFriendsQuickFilter('ninguno')">
                         Limpiar
                     </button>
                 </div>
