@@ -7,8 +7,9 @@
     --glass-bg: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.1);
     
-    --primary: #6366f1;
-    --primary-dark: #4f46e5;
+    --primary: #818cf8;
+    --primary-dark: #6366f1;
+    --primary-light: #c7d2fe;
     --secondary: #94a3b8;
     
     --text-main: #f8fafc;
@@ -387,7 +388,7 @@ input:focus {
 .stat-value {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--primary);
+    color: var(--primary-light);
 }
 
 .stat-label {
@@ -668,7 +669,7 @@ input:focus {
 
 .p-amount {
     font-weight: 700;
-    color: var(--primary);
+    color: var(--primary-light);
     font-size: 1.1rem;
 }
 
@@ -680,7 +681,7 @@ input:focus {
     margin-top: 1rem;
     padding-top: 1rem !important;
     border-top: 2px solid var(--glass-border) !important;
-    color: var(--primary);
+    color: var(--primary-light);
 }
 
 .participant-item.is-left {
@@ -991,8 +992,8 @@ input:focus {
 .pot-display-large .value {
     font-size: 3rem;
     font-weight: 800;
-    color: var(--primary);
-    text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+    color: var(--primary-light);
+    text-shadow: 0 0 20px rgba(129, 140, 248, 0.4);
 }
 
 .party-actions {

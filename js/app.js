@@ -2778,7 +2778,7 @@ const App = {
             html += `
                 <div style="background: rgba(99,102,241,0.15); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
                     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Se lleva en efectivo del bote:</p>
-                    <span style="font-size: 1.8rem; font-weight: 700; color: #818cf8;">${refundable.toFixed(2)}€</span>
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #a5b4fc;">${refundable.toFixed(2)}€</span>
                     ${pendingBizum > 0.01 ? `<p style="color: #f472b6; font-size: 0.82rem; margin-top: 0.4rem;">+ ${pendingBizum.toFixed(2)}€ le llegarán por Bizum al cerrar la fiesta.</p>` : ''}
                 </div>
                 <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${refundable.toFixed(2)}€ en efectivo</button>
@@ -2811,7 +2811,7 @@ const App = {
         if (remainingBalance > 0.01 && participants.length > 0) {
             refundHtml = `
                 <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.2rem; border-color: rgba(99, 102, 241, 0.4);">
-                    <h3 style="text-align: center; margin-bottom: 0.5rem; color: #818cf8; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem; color: #a5b4fc; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
                         <span>💵 Reparto en Metálico del Bote (${remainingBalance.toFixed(2)}€)</span>
                     </h3>
                     <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
