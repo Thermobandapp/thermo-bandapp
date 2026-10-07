@@ -150,6 +150,12 @@ body.light-theme .mode-tab.active {
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
 }
 
+body.light-theme .code-badge {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
 body.light-theme .btn-secondary {
     background: rgba(255, 255, 255, 0.85);
     color: var(--text-main);
@@ -580,11 +586,14 @@ input:focus {
 .code-badge {
     display: inline-block;
     background: var(--primary);
-    padding: 0.25rem 1rem;
+    color: #ffffff !important;
+    padding: 0.3rem 1.1rem;
     border-radius: 2rem;
     font-size: 0.875rem;
     font-weight: 700;
+    letter-spacing: 0.03em;
     margin-top: 0.5rem;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
 }
 
 .grid-stats {
