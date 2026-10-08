@@ -148,6 +148,19 @@ const App = {
         return partnerPart ? partnerPart.name : null;
     },
 
+    // Comprueba si la pareja de alguien está registrada en la fiesta (y opcionalmente si sigue activa)
+    isPartnerInParty(name, participants = null, onlyActive = false) {
+        const partner = this.getPartner(name);
+        if (!partner) return null;
+        const parts = participants || Object.values(this.state.partyData?.participants || {});
+        const partnerPart = parts.find(p => {
+            if (this.normalizeKey(p.name) !== this.normalizeKey(partner)) return false;
+            if (onlyActive && p.status === 'left') return false;
+            return true;
+        });
+        return partnerPart ? partnerPart.name : null;
+    },
+
     // Guarda o desvincula una pareja en Firebase bidireccionalmente
     async setCouple(name1, name2) {
         if (!name1) return;
@@ -2801,37 +2814,89 @@ const App = {
         friendsContainer.innerHTML = '';
         
         const balances = this.calculatePartyBalances();
-        const participantNames = balances.participants.map(p => p.name);
 
-        participantNames.forEach(name => {
-            const isCustodian = data.custodian === name;
-            const pData = data.participants[name.replace(/\./g, '_')];
-            const hasLeft = pData?.status === 'left';
-            const aport = balances.aports[name] || 0;
-            const gastado = balances.spent[name] || 0;
-            
+        balances.units.forEach(u => {
             const div = document.createElement('div');
-            div.className = `participant-item glass ${hasLeft ? 'is-left' : ''}`;
-            div.style.cursor = 'pointer';
-            if (hasLeft) {
-                div.onclick = () => this.showPartyRefundModal(name);
+            if (u.isCouple) {
+                const isCustodian = (data.custodian === u.p1 || data.custodian === u.p2);
+                if (u.hasLeft) {
+                    // Ambos fuera
+                    div.className = 'participant-item glass is-couple is-left';
+                    div.style.cursor = 'pointer';
+                    div.onclick = () => this.showPartyRefundModal(u.p1);
+                    div.innerHTML = `
+                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <span class="p-name">${u.p1} y ${u.p2} <small>(Fuera) 💸</small> <span class="badge-couple">💑 Pareja</span></span>
+                            <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${this.formatEuro(u.spent)} (${u.p1}: ${this.formatEuro(u.p1Spent)} | ${u.p2}: ${this.formatEuro(u.p2Spent)})</small>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="p-amount">${this.formatEuro(u.aport)}</div>
+                            <small style="font-size: 0.7rem; color: var(--text-muted);">aportado</small>
+                        </div>
+                    `;
+                } else if (u.oneLeft) {
+                    // Uno activo, uno fuera
+                    const isCustActive = data.custodian === u.activeName;
+                    div.className = 'participant-item glass is-couple';
+                    div.style.cursor = 'pointer';
+                    div.onclick = () => this.showPartyCoupleOptions(u.activeName, u.leftName);
+                    div.innerHTML = `
+                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <span class="p-name">${u.activeName} ${isCustActive ? '🚩' : ''} <span class="badge-couple">💑 Pareja</span></span>
+                            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;">
+                                <div>Gastado: <b>${this.formatEuro(u.spent)}</b> (${u.activeName}: ${this.formatEuro(balances.spent[u.activeName] || 0)} | <span style="color:#f87171;">${u.leftName} fuera</span>: ${this.formatEuro(balances.spent[u.leftName] || 0)})</div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="p-amount">${this.formatEuro(u.aport)}</div>
+                            <small style="font-size: 0.7rem; color: var(--text-muted);">aportado (${u.activeName}: ${this.formatEuro(balances.aports[u.activeName] || 0)} | ${u.leftName}: ${this.formatEuro(balances.aports[u.leftName] || 0)})</small>
+                        </div>
+                    `;
+                } else {
+                    // Ambos activos
+                    div.className = 'participant-item glass is-couple';
+                    div.style.cursor = 'pointer';
+                    div.onclick = () => this.showPartyCoupleOptions(u.p1, u.p2);
+                    div.innerHTML = `
+                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <span class="p-name">${u.p1} y ${u.p2} ${isCustodian ? '🚩' : ''} <span class="badge-couple">💑 Pareja</span></span>
+                            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;">
+                                <div>Gastado: <b>${this.formatEuro(u.spent)}</b> (${u.p1}: ${this.formatEuro(u.p1Spent)} | ${u.p2}: ${this.formatEuro(u.p2Spent)})</div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="p-amount">${this.formatEuro(u.aport)}</div>
+                            <small style="font-size: 0.7rem; color: var(--text-muted);">aportado (${u.p1}: ${this.formatEuro(u.p1Aport)} | ${u.p2}: ${this.formatEuro(u.p2Aport)})</small>
+                        </div>
+                    `;
+                }
             } else {
-                div.onclick = () => this.showPartyParticipantOptions(name);
+                // Individual (sin pareja en la fiesta)
+                const name = u.p1;
+                const isCustodian = data.custodian === name;
+                const hasLeft = u.hasLeft;
+                div.className = `participant-item glass ${hasLeft ? 'is-left' : ''}`;
+                div.style.cursor = 'pointer';
+                if (hasLeft) {
+                    div.onclick = () => this.showPartyRefundModal(name);
+                } else {
+                    div.onclick = () => this.showPartyParticipantOptions(name);
+                }
+                div.innerHTML = `
+                    <div class="p-info">
+                        <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera) 💸</small>' : ''}</span>
+                        <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${this.formatEuro(u.spent)}</small>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="p-amount">${this.formatEuro(u.aport)}</div>
+                        <small style="font-size: 0.7rem; color: var(--text-muted);">aportado</small>
+                    </div>
+                `;
             }
-            div.innerHTML = `
-                <div class="p-info">
-                    <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera) 💸</small>' : ''}</span>
-                    <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${this.formatEuro(gastado)}</small>
-                </div>
-                <div style="text-align: right;">
-                    <div class="p-amount">${this.formatEuro(aport)}</div>
-                    <small style="font-size: 0.7rem; color: var(--text-muted);">aportado</small>
-                </div>
-            `;
             friendsContainer.appendChild(div);
         });
 
-        if (participantNames.length === 0) {
+        if (balances.units.length === 0) {
             friendsContainer.innerHTML = '<div class="empty-msg">Pulsa en "Añadir Amigo" para empezar la lista</div>';
         }
 
@@ -2866,7 +2931,12 @@ const App = {
             });
         }
     },
+
     showPartyParticipantOptions(name) {
+        const partnerInParty = this.isPartnerInParty(name);
+        if (partnerInParty) {
+            return this.showPartyCoupleOptions(name, partnerInParty);
+        }
         const isCustodian = this.state.partyData?.custodian === name;
         const isMe = name === this.state.user;
         let html = `<h3>👤 ${name}</h3>`;
@@ -2882,6 +2952,90 @@ const App = {
 
         html += `</div>`;
         this.openModal(html);
+    },
+
+    showPartyCoupleOptions(name1, name2) {
+        const p1 = this.state.partyData?.participants?.[name1.replace(/\./g, '_')];
+        const p2 = this.state.partyData?.participants?.[name2.replace(/\./g, '_')];
+        const isLeft1 = p1?.status === 'left';
+        const isLeft2 = p2?.status === 'left';
+
+        // Si uno está fuera y el otro dentro
+        if (isLeft1 !== isLeft2) {
+            const activeName = isLeft1 ? name2 : name1;
+            const leftName = isLeft1 ? name1 : name2;
+            const isCustodian = this.state.partyData?.custodian === activeName;
+            let html = `<h3>💑 Pareja: ${activeName}</h3>`;
+            html += `<p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+                ${leftName} ya se fue a casa. ${activeName} asume la cuenta conjunta de la pareja.
+            </p>`;
+            html += `<div style="display: flex; flex-direction: column; gap: 0.75rem;">`;
+
+            if (!isCustodian) {
+                html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${activeName}')">🚩 Pasarle la banderola a ${activeName}</button>`;
+            }
+
+            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${activeName}')">&#128682; ${activeName} también se va a casa</button>`;
+            html += `<button class="btn-secondary" onclick="App.closeModal(); App.showPartyRefundModal('${activeName}')">💸 Ver balance de la pareja</button>`;
+            html += `</div>`;
+            this.openModal(html);
+            return;
+        }
+
+        // Si ambos están fuera
+        if (isLeft1 && isLeft2) {
+            this.showPartyRefundModal(name1);
+            return;
+        }
+
+        // Ambos activos
+        const isCustodian1 = this.state.partyData?.custodian === name1;
+        const isCustodian2 = this.state.partyData?.custodian === name2;
+
+        let html = `<h3>💑 Pareja: ${name1} y ${name2}</h3>`;
+        html += `<div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">`;
+
+        if (!isCustodian1) {
+            html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${name1}')">🚩 Pasarle la banderola a ${name1}</button>`;
+        }
+        if (!isCustodian2) {
+            html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${name2}')">🚩 Pasarle la banderola a ${name2}</button>`;
+        }
+
+        html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name1}')">&#128682; Se va solo/a ${name1}</button>`;
+        html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name2}')">&#128682; Se va solo/a ${name2}</button>`;
+        html += `<button class="btn-danger" style="background: rgba(239,68,68,0.22); border-color: rgba(239,68,68,0.5); color: #f87171; font-weight: 600;" onclick="App.closeModal(); App.markCoupleAsLeft('${name1}', '${name2}')">&#128682;&#128682; Se van ambos a casa</button>`;
+        html += `<button class="btn-secondary" onclick="App.closeModal(); App.showPartyRefundModal('${name1}')">💸 Ver balance de la pareja</button>`;
+
+        html += `</div>`;
+        this.openModal(html);
+    },
+
+    async markCoupleAsLeft(name1, name2) {
+        if (!confirm(`¿Seguro que quieres marcar a ${name1} y ${name2} como que se han ido?`)) return;
+        try {
+            const key1 = name1.replace(/\./g, '_');
+            const key2 = name2.replace(/\./g, '_');
+            const currentData1 = this.state.partyData?.participants?.[key1] || {};
+            const currentData2 = this.state.partyData?.participants?.[key2] || {};
+            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${key1}`), {
+                ...currentData1, name: name1, status: 'left', leftAt: Date.now()
+            });
+            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${key2}`), {
+                ...currentData2, name: name2, status: 'left', leftAt: Date.now()
+            });
+
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'system',
+                amount: 0,
+                description: `🚶 ${name1} y ${name2} se fueron a casa`,
+                user: this.state.user,
+                timestamp: Date.now()
+            });
+
+            this.showPartyRefundModal(name1);
+        } catch (error) { console.error('Error marcando pareja como ida:', error); }
     },
 
     async markParticipantAsLeft(name) {
@@ -2949,89 +3103,153 @@ const App = {
             });
         }
 
-        // Balance neto ideal de cada participante: lo que puso menos lo que gastó
-        const netBalances = {};
-        let totalPositiveNet = 0;
-        let totalNegativeNet = 0;
+        // Agrupar en unidades financieras (parejas en fiesta e individuales)
+        const processedKeys = new Set();
+        const units = [];
 
-        participantNames.forEach(n => {
-            const net = (aports[n] || 0) - (spent[n] || 0);
-            netBalances[n] = net;
-            if (net > 0.001) {
-                totalPositiveNet += net;
-            } else if (net < -0.001) {
-                totalNegativeNet += Math.abs(net);
+        allParticipants.forEach(p => {
+            const pKey = this.normalizeKey(p.name);
+            if (processedKeys.has(pKey)) return;
+
+            const partnerName = this.getPartner(p.name);
+            const partnerObj = partnerName
+                ? allParticipants.find(x => this.normalizeKey(x.name) === this.normalizeKey(partnerName))
+                : null;
+
+            if (partnerObj) {
+                // Ambos miembros de la pareja están en la fiesta
+                processedKeys.add(pKey);
+                processedKeys.add(this.normalizeKey(partnerName));
+
+                const p1 = p.name;
+                const p2 = partnerObj.name;
+                const p1Aport = aports[p1] || 0;
+                const p2Aport = aports[p2] || 0;
+                const p1Spent = spent[p1] || 0;
+                const p2Spent = spent[p2] || 0;
+
+                const unitAport = p1Aport + p2Aport;
+                const unitSpent = p1Spent + p2Spent;
+                const unitNet = unitAport - unitSpent;
+
+                const p1Left = p.status === 'left';
+                const p2Left = partnerObj.status === 'left';
+                const bothLeft = p1Left && p2Left;
+                const oneLeft = (p1Left && !p2Left) || (!p1Left && p2Left);
+                const activeName = p1Left ? p2 : p1;
+                const leftName = p1Left ? p1 : p2;
+
+                units.push({
+                    unitId: `${p1}_${p2}`.replace(/\s/g, '_'),
+                    displayName: oneLeft ? `${activeName} y ${leftName}` : `${p1} y ${p2}`,
+                    shortName: oneLeft ? activeName : `${p1} y ${p2}`,
+                    isCouple: true,
+                    names: [p1, p2],
+                    activeNames: bothLeft ? [] : (oneLeft ? [activeName] : [p1, p2]),
+                    leftNames: bothLeft ? [p1, p2] : (oneLeft ? [leftName] : []),
+                    hasLeft: bothLeft,
+                    oneLeft: oneLeft,
+                    activeName: oneLeft ? activeName : null,
+                    leftName: oneLeft ? leftName : null,
+                    p1,
+                    p2,
+                    p1Aport,
+                    p2Aport,
+                    p1Spent,
+                    p2Spent,
+                    aport: unitAport,
+                    spent: unitSpent,
+                    net: unitNet,
+                    refunded: !!(p.refunded && partnerObj.refunded)
+                });
+            } else {
+                // Individual (sin pareja registrada, o su pareja NO está en la fiesta)
+                processedKeys.add(pKey);
+                const pAport = aports[p.name] || 0;
+                const pSpent = spent[p.name] || 0;
+                const pNet = pAport - pSpent;
+                const hasLeft = p.status === 'left';
+
+                units.push({
+                    unitId: p.name.replace(/\s/g, '_'),
+                    displayName: p.name,
+                    shortName: p.name,
+                    isCouple: false,
+                    names: [p.name],
+                    activeNames: hasLeft ? [] : [p.name],
+                    leftNames: hasLeft ? [p.name] : [],
+                    hasLeft: hasLeft,
+                    oneLeft: false,
+                    activeName: hasLeft ? null : p.name,
+                    leftName: hasLeft ? p.name : null,
+                    p1: p.name,
+                    p2: null,
+                    p1Aport: pAport,
+                    p2Aport: 0,
+                    p1Spent: pSpent,
+                    p2Spent: 0,
+                    aport: pAport,
+                    spent: pSpent,
+                    net: pNet,
+                    refunded: !!p.refunded
+                });
             }
         });
 
-        // 1. Reparto del efectivo sobrante del bote (remainingBalance)
-        // Para MINIMIZAR el número de envíos por Bizum:
-        // En lugar de repartir el bote fraccionado entre todos (lo que obligaría a todos a recibir Bizum),
-        // liquidamos al 100% en metálico a tantos amigos como sea posible (ordenados de menor a mayor saldo),
-        // de modo que el dinero restante a cobrar por Bizum quede concentrado en el MENOR número de personas posible (idealmente 1 o 2).
-        const refunds = {};
-        const pendingToReceive = {};
+        // 1. Reparto del efectivo sobrante del bote (remainingBalance) a nivel de UNIDADES
+        units.forEach(u => {
+            u.refund = 0;
+            u.pendingToReceive = 0;
+        });
 
-        participantNames.forEach(n => {
-            refunds[n] = 0;
-            pendingToReceive[n] = 0;
+        let totalPositiveNet = 0;
+        units.forEach(u => {
+            if (u.net > 0.001) totalPositiveNet += u.net;
         });
 
         if (totalPositiveNet <= remainingBalance + 0.05) {
-            // Hay suficiente metálico para pagarle el 100% a todos en mano
-            participantNames.forEach(n => {
-                const net = netBalances[n] || 0;
-                if (net > 0.001) {
-                    refunds[n] = net;
+            units.forEach(u => {
+                if (u.net > 0.001) {
+                    u.refund = u.net;
                 }
             });
         } else {
-            // Ordenar los acreedores de MENOR a MAYOR saldo a favor
-            // para liquidar a tantos por completo en mano como sea posible con el efectivo disponible
-            const creditorsList = participantNames
-                .filter(n => (netBalances[n] || 0) > 0.001)
-                .map(n => ({ name: n, net: netBalances[n] }))
+            const creditorsList = units
+                .filter(u => u.net > 0.001)
                 .sort((a, b) => a.net - b.net);
 
             let cashPool = remainingBalance;
 
-            creditorsList.forEach(c => {
-                if (cashPool >= c.net - 0.001) {
-                    // Se le paga íntegramente en metálico: 0 Bizums para esta persona
-                    refunds[c.name] = c.net;
-                    pendingToReceive[c.name] = 0;
-                    cashPool -= c.net;
+            creditorsList.forEach(u => {
+                if (cashPool >= u.net - 0.001) {
+                    u.refund = u.net;
+                    u.pendingToReceive = 0;
+                    cashPool -= u.net;
                 } else if (cashPool > 0.001) {
-                    // Se le entrega todo el resto de efectivo que queda en el bote
-                    refunds[c.name] = cashPool;
-                    pendingToReceive[c.name] = c.net - cashPool;
+                    u.refund = cashPool;
+                    u.pendingToReceive = u.net - cashPool;
                     cashPool = 0;
                 } else {
-                    // Ya no queda metálico en el bote: cobrará su saldo por Bizum
-                    refunds[c.name] = 0;
-                    pendingToReceive[c.name] = c.net;
+                    u.refund = 0;
+                    u.pendingToReceive = u.net;
                 }
             });
         }
 
-        // 2. Ajuste de Cuentas por Bizum (Minimizando transacciones)
-        // Cada deudor hace el menor número de Bizums posible
+        // 2. Ajuste de Cuentas por Bizum entre Unidades Deudoras y Acreedoras
         const debts = [];
         const debtors = [];
         const creditors = [];
 
-        participantNames.forEach(n => {
-            const net = netBalances[n] || 0;
-            if (net < -0.01) {
-                debtors.push({ name: n, amount: Math.abs(net) });
+        units.forEach(u => {
+            if (u.net < -0.01) {
+                debtors.push({ name: u.shortName || u.displayName, amount: Math.abs(u.net) });
             }
-            const pending = pendingToReceive[n] || 0;
-            if (pending > 0.01) {
-                creditors.push({ name: n, amount: pending });
+            if (u.pendingToReceive > 0.01) {
+                creditors.push({ name: u.shortName || u.displayName, amount: u.pendingToReceive });
             }
         });
 
-        // Ordenar ambos de mayor a menor para emparejar importes grandes primero y minimizar transferencias
         debtors.sort((a, b) => b.amount - a.amount);
         creditors.sort((a, b) => b.amount - a.amount);
 
@@ -3057,6 +3275,24 @@ const App = {
             if (creditor.amount <= 0.01) cIdx++;
         }
 
+        // Mapeo retrocompatible por nombre individual
+        const netBalances = {};
+        const refunds = {};
+        const pendingToReceive = {};
+
+        participantNames.forEach(n => {
+            const u = units.find(unit => unit.names.includes(n));
+            if (u) {
+                netBalances[n] = u.net;
+                refunds[n] = u.refund;
+                pendingToReceive[n] = u.pendingToReceive;
+            } else {
+                netBalances[n] = (aports[n] || 0) - (spent[n] || 0);
+                refunds[n] = 0;
+                pendingToReceive[n] = 0;
+            }
+        });
+
         return {
             totalCollected,
             totalSpent,
@@ -3067,6 +3303,7 @@ const App = {
             refunds,
             pendingToReceive,
             debts,
+            units,
             participants: allParticipants
         };
     },
@@ -3075,26 +3312,52 @@ const App = {
         const data = this.state.partyData;
         if (!data) return;
         const balances = this.calculatePartyBalances();
+        
+        // Buscar la unidad correspondiente a este nombre
+        const unit = balances.units.find(u => u.names.includes(name));
+        if (!unit) return;
+
+        const isCouple = unit.isCouple;
         const pData = data.participants?.[name.replace(/\./g, '_')];
-        const alreadyRefunded = pData?.refunded;
+        const alreadyRefunded = isCouple ? unit.refunded : pData?.refunded;
 
-        const aport = balances.aports[name] || 0;
-        const gastado = balances.spent[name] || 0;
-        const net = balances.netBalances[name] || 0;
-        const refundable = balances.refunds[name] || 0;
-        const pendingBizum = balances.pendingToReceive[name] || 0;
+        const aport = unit.aport;
+        const gastado = unit.spent;
+        const net = unit.net;
+        const refundable = unit.refund || 0;
+        const pendingBizum = unit.pendingToReceive || 0;
 
-        let html = `<h3>💸 ${name} se fue antes</h3>`;
+        let title = isCouple ? `💸 Pareja: ${unit.p1} y ${unit.p2}` : `💸 ${name} se fue antes`;
+        let html = `<h3>${title}</h3>`;
+
+        if (isCouple && unit.oneLeft) {
+            html += `
+                <div style="background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.3); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.85rem; font-size: 0.85rem; color: #fde047;">
+                    ℹ️ <b>${unit.activeName}</b> sigue en la fiesta consumiendo del fondo común. La liquidación definitiva se cerrará cuando ambos se hayan retirado o al finalizar la fiesta.
+                </div>
+            `;
+        }
+
         html += `
             <div style="background: rgba(255,255,255,0.03); border-radius: 10px; padding: 0.85rem; margin-bottom: 1rem; font-size: 0.9rem;">
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
-                    <span style="color: var(--text-muted);">Puso en el bote:</span>
+                    <span style="color: var(--text-muted);">${isCouple ? 'Pusieron en el bote:' : 'Puso en el bote:'}</span>
                     <b>${this.formatEuro(aport)}</b>
                 </div>
+                ${isCouple ? `
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.78rem; color: var(--text-muted); padding-left: 0.5rem;">
+                        <span>↳ ${unit.p1}: ${this.formatEuro(unit.p1Aport)} | ${unit.p2}: ${this.formatEuro(unit.p2Aport)}</span>
+                    </div>
+                ` : ''}
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
-                    <span style="color: var(--text-muted);">Consumió en rondas:</span>
+                    <span style="color: var(--text-muted);">${isCouple ? 'Consumieron en rondas:' : 'Consumió en rondas:'}</span>
                     <b style="color: #f87171;">${this.formatEuro(gastado)}</b>
                 </div>
+                ${isCouple ? `
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.78rem; color: var(--text-muted); padding-left: 0.5rem;">
+                        <span>↳ ${unit.p1}: ${this.formatEuro(unit.p1Spent)} | ${unit.p2}: ${this.formatEuro(unit.p2Spent)}</span>
+                    </div>
+                ` : ''}
                 <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
                     <span style="color: var(--text-muted);">Saldo a su favor:</span>
                     <b style="color: ${net > 0 ? 'var(--success)' : (net < 0 ? '#ef4444' : 'var(--text-muted)')};">${net >= 0 ? '+' : ''}${this.formatEuro(net)}</b>
@@ -3104,10 +3367,12 @@ const App = {
 
         if (alreadyRefunded) {
             html += `<p style="color: var(--success);">✅ Ya retiró su dinero.</p>`;
+        } else if (isCouple && unit.oneLeft) {
+            html += `<p style="color: var(--text-muted); text-align: center; font-size: 0.85rem;">Mientras ${unit.activeName} continúe activo/a en la fiesta, el saldo conjunto se mantiene en el bote.</p>`;
         } else if (refundable > 0.01) {
             html += `
                 <div style="background: rgba(99,102,241,0.15); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Se lleva en efectivo del bote:</p>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Se ${isCouple ? 'llevan' : 'lleva'} en efectivo del bote:</p>
                     <span style="font-size: 1.8rem; font-weight: 700; color: #a5b4fc;">${this.formatEuro(refundable)}</span>
                     ${pendingBizum > 0.01 ? `<p style="color: #f472b6; font-size: 0.82rem; margin-top: 0.4rem;">+ ${this.formatEuro(pendingBizum)} le llegarán por Bizum al cerrar la fiesta.</p>` : ''}
                 </div>
@@ -3134,11 +3399,11 @@ const App = {
         const data = this.state.partyData;
         if (!data) return;
         const balances = this.calculatePartyBalances();
-        const { totalCollected, totalSpent, remainingBalance, aports, spent, netBalances, refunds, pendingToReceive, debts, participants } = balances;
+        const { totalCollected, totalSpent, remainingBalance, aports, spent, netBalances, refunds, pendingToReceive, debts, units } = balances;
         
         // 1. Bloque de Reparto del Bote Físico
         let refundHtml = '';
-        if (remainingBalance > 0.01 && participants.length > 0) {
+        if (remainingBalance > 0.01 && units && units.length > 0) {
             refundHtml = `
                 <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.2rem; border-color: rgba(99, 102, 241, 0.4);">
                     <h3 style="text-align: center; margin-bottom: 0.5rem; color: #a5b4fc; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -3151,30 +3416,26 @@ const App = {
             `;
             
             // Ordenar por devolución en metálico de mayor a menor
-            const sortedParticipants = participants.map(p => {
-                const aport = aports[p.name] || 0;
-                const gastado = spent[p.name] || 0;
-                const net = netBalances[p.name] || 0;
-                const refund = refunds[p.name] || 0;
-                const pending = pendingToReceive[p.name] || 0;
-                return { name: p.name, aport, gastado, net, refund, pending };
-            }).sort((a, b) => b.refund - a.refund);
+            const sortedUnits = [...units].sort((a, b) => b.refund - a.refund);
             
-            sortedParticipants.forEach(p => {
-                const isDebtor = p.net < -0.01;
+            sortedUnits.forEach(u => {
+                const isDebtor = u.net < -0.01;
                 refundHtml += `
                     <div style="display: flex; justify-content: space-between; font-size: 0.88rem; padding: 0.5rem 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.03); align-items: center;">
                         <div style="display: flex; flex-direction: column;">
-                            <span style="color: var(--text-main); font-weight: 600;">${p.name}</span>
+                            <span style="color: var(--text-main); font-weight: 600;">${u.displayName} ${u.isCouple ? '<span class="badge-couple">💑 Pareja</span>' : ''}</span>
                             <span style="font-size: 0.72rem; color: var(--text-muted);">
-                                Puso: ${this.formatEuro(p.aport)} | Gastó: ${this.formatEuro(p.gastado)}
+                                ${u.isCouple
+                                    ? `Pusieron: ${this.formatEuro(u.aport)} (${u.p1}: ${this.formatEuro(u.p1Aport)} | ${u.p2}: ${this.formatEuro(u.p2Aport)}) | Gastaron: ${this.formatEuro(u.spent)} (${u.p1}: ${this.formatEuro(u.p1Spent)} | ${u.p2}: ${this.formatEuro(u.p2Spent)})`
+                                    : `Puso: ${this.formatEuro(u.aport)} | Gastó: ${this.formatEuro(u.spent)}`
+                                }
                             </span>
                         </div>
-                        <div style="text-align: right;">
-                            <span style="color: ${p.refund > 0.01 ? 'var(--success)' : (isDebtor ? '#f87171' : 'var(--text-muted)')}; font-weight: 700; font-size: 0.95rem; display: block;">
-                                ${p.refund > 0.01 ? `+${this.formatEuro(p.refund)} metálico` : (isDebtor ? `Debe ${this.formatEuro(Math.abs(p.net))}` : '0,00€')}
+                        <div style="text-align: right; flex-shrink: 0; margin-left: 0.5rem;">
+                            <span style="color: ${u.refund > 0.01 ? 'var(--success)' : (isDebtor ? '#f87171' : 'var(--text-muted)')}; font-weight: 700; font-size: 0.95rem; display: block;">
+                                ${u.refund > 0.01 ? `+${this.formatEuro(u.refund)} metálico` : (isDebtor ? `Debe ${this.formatEuro(Math.abs(u.net))}` : '0,00€')}
                             </span>
-                            ${p.pending > 0.01 ? `<small style="color: #f472b6; font-size: 0.72rem;">(+${this.formatEuro(p.pending)} por Bizum)</small>` : ''}
+                            ${u.pendingToReceive > 0.01 ? `<small style="color: #f472b6; font-size: 0.72rem;">(+${this.formatEuro(u.pendingToReceive)} por Bizum)</small>` : ''}
                         </div>
                     </div>
                 `;
@@ -3379,7 +3640,7 @@ const App = {
         } catch (error) { console.error(error); }
     },
 
-    // Claim refund for a participant who left early
+    // Reclamar devolución del bote para un participante o pareja que se fue
     async claimRefund(name) {
         const balances = this.calculatePartyBalances();
         if (balances.remainingBalance <= 0) {
@@ -3387,27 +3648,45 @@ const App = {
             return;
         }
 
-        const refund = balances.refunds[name] || 0;
+        const unit = balances.units ? balances.units.find(u => u.names.includes(name)) : null;
+        const refund = unit ? unit.refund : (balances.refunds[name] || 0);
+
         if (refund <= 0.01) {
             alert('No hay nada que reclamar para ' + name);
             return;
         }
 
+        if (unit && unit.isCouple && unit.oneLeft) {
+            alert(`Su pareja (${unit.activeName}) sigue activa en la fiesta consumiendo del fondo. La devolución se realiza cuando ambos se hayan retirado o al finalizar la fiesta.`);
+            return;
+        }
+
+        const isCouple = unit && unit.isCouple;
+        const refundLabel = isCouple ? `${unit.p1} y ${unit.p2}` : name;
+
         // Actualizar total del bote
         const newTotal = balances.totalCollected - refund;
         await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
+
         // Marcar como reembolsado
-        await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\./g, '_')}/refunded`), true);
+        if (isCouple) {
+            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${unit.p1.replace(/\./g, '_')}/refunded`), true);
+            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${unit.p2.replace(/\./g, '_')}/refunded`), true);
+        } else {
+            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\./g, '_')}/refunded`), true);
+        }
+
         // Añadir entrada al historial
         const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
         await set(historyRef, {
             type: 'refund',
             amount: -refund,
-            description: `Reclamo de ${name}`,
+            description: isCouple ? `Reclamo de pareja (${refundLabel})` : `Reclamo de ${name}`,
             user: this.state.user,
             timestamp: Date.now()
         });
-        alert(`${name} ha reclamado ${this.formatEuro(refund)} del bote.`);
+
+        alert(`${refundLabel} ha reclamado ${this.formatEuro(refund)} en efectivo del bote.`);
         // Recargar UI
         if (this.listenToParty) {
             this.listenToParty(this.state.partyId);
