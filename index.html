@@ -48,10 +48,7 @@
         <main id="main-content">
             <!-- Las vistas se cargarán aquí dinámicamente -->
             <!-- VISTA: Acceso Miembros -->
-            <section id="login-view" class="view active">
-                <div class="setup-header">
-                    <img src="imagenes/LOGO%20Thermo%20Bandapp.png" alt="Thermo Bandapp Logo" class="app-logo-large">
-                </div>
+            <section id="login-view" class="view">
                 <div class="card glass">
                     <h2>Acceso Miembros</h2>
                     <p class="subtitle" id="login-subtitle">Selecciona tu miembro de la banda para entrar</p>
@@ -369,6 +366,24 @@
                     </div>
                 </div>
             </section>
+            <!-- Activación inmediata y sincronizada de la vista adecuada según sesión (evita cualquier parpadeo de carátula o vista incorrecta) -->
+            <script>
+                (function() {
+                    try {
+                        var isAuth = localStorage.getItem('thermo_auth');
+                        var savedTable = localStorage.getItem('thermo_tableId');
+                        var savedParty = localStorage.getItem('thermo_partyId');
+                        var targetId = 'login-view';
+                        if (isAuth) {
+                            if (savedTable) targetId = 'summary-view';
+                            else if (savedParty) targetId = 'party-pot-view';
+                            else targetId = 'setup-view';
+                        }
+                        var el = document.getElementById(targetId);
+                        if (el) el.classList.add('active');
+                    } catch(e) {}
+                })();
+            </script>
         </main>
 
         <nav class="main-nav hidden">
