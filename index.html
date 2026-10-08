@@ -29,7 +29,12 @@
                 </div>
                 <span id="header-user-name" style="font-size: 0.88rem; color: var(--secondary); margin-left: 3.5rem; margin-top: -0.2rem;"></span>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="header-controls" style="display: flex; align-items: center; gap: 0.4rem;">
+                <div class="font-size-selector" role="group" aria-label="Tamaño de texto" title="Tamaño de letra">
+                    <button type="button" class="font-size-btn active" data-size="small" onclick="App.setFontSize('small')" title="Tamaño normal (actual)">A</button>
+                    <button type="button" class="font-size-btn" data-size="medium" onclick="App.setFontSize('medium')" title="Tamaño mediano">A</button>
+                    <button type="button" class="font-size-btn" data-size="large" onclick="App.setFontSize('large')" title="Tamaño grande (+10% máx)">A</button>
+                </div>
                 <button id="btn-toggle-theme" class="btn-theme-toggle" onclick="App.toggleTheme()" title="Cambiar a Modo Claro / Oscuro">
                     <span id="theme-toggle-icon">☀️</span>
                 </button>

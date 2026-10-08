@@ -31,12 +31,14 @@ const App = {
         tempLoginName: null,
         tempLoginCode: null,
         couples: {},
-        theme: 'dark'
+        theme: 'dark',
+        fontSize: 'small'
     },
 
     init() {
         console.log('Thermo Bandapp inicializada 🍻');
         this.initTheme();
+        this.initFontSize();
         this.initFirebase();
         this.cacheDOM();
         this.bindEvents();
@@ -71,6 +73,74 @@ const App = {
             if (iconEl) iconEl.textContent = '☀️';
             if (toggleBtn) toggleBtn.title = 'Cambiar a Modo Claro';
         }
+    },
+
+    // Inicializa el sistema de tamaño de fuente
+    initFontSize() {
+        const savedSize = localStorage.getItem('thermo_font_size') || 'small';
+        this.applyFontSize(savedSize);
+
+        // Re-calibrar según orientación o tamaño de pantalla
+        window.addEventListener('resize', () => {
+            if (this.state.fontSize) {
+                this.applyFontSize(this.state.fontSize, false);
+            }
+        });
+    },
+
+    setFontSize(size) {
+        if (!['small', 'medium', 'large'].includes(size)) size = 'small';
+        this.applyFontSize(size);
+    },
+
+    // Evalúa el dispositivo y calcula factores de crecimiento proporcionados (máximo +10%)
+    getDeviceFontCalibration(size) {
+        const width = window.innerWidth || document.documentElement.clientWidth || 390;
+        
+        if (size === 'small') {
+            return { rootScale: 1.0 };
+        }
+
+        // Calibración adaptativa según pantalla
+        let maxBoost = 1.10; // Aumento máximo del 10%
+        let midBoost = 1.05; // Aumento medio del 5%
+
+        if (width <= 360) {
+            // Dispositivos compactos: factor calibrado para evitar desbordes
+            maxBoost = 1.08;
+            midBoost = 1.04;
+        } else if (width <= 400) {
+            maxBoost = 1.095;
+            midBoost = 1.048;
+        }
+
+        if (size === 'medium') {
+            return {
+                rootScale: 1 + (midBoost - 1) * 0.65
+            };
+        }
+
+        // size === 'large': Escala base que junto al boost de pequeños alcanza hasta el 10% máximo
+        return {
+            rootScale: 1 + (maxBoost - 1) * 0.68
+        };
+    },
+
+    applyFontSize(size, save = true) {
+        this.state.fontSize = size;
+        if (save) {
+            localStorage.setItem('thermo_font_size', size);
+        }
+
+        const cal = this.getDeviceFontCalibration(size);
+        document.documentElement.style.setProperty('--root-font-scale', cal.rootScale);
+        document.documentElement.setAttribute('data-font-size', size);
+
+        // Actualizar visualmente los botones del selector
+        const buttons = document.querySelectorAll('.font-size-btn');
+        buttons.forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-size') === size);
+        });
     },
 
     // Convierte comas en puntos en todos los inputs numéricos de la app

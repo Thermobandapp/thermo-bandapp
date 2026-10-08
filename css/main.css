@@ -1,6 +1,7 @@
 .hidden { display: none !important; }
 
 :root {
+    --root-font-scale: 1;
     /* Paleta de Colores - Premium Dark (Default) */
     --bg-color: #0f172a;
     --card-bg: rgba(30, 41, 59, 0.7);
@@ -301,6 +302,147 @@ body.light-theme .selector-switch-btn.active {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
+html {
+    font-size: calc(16px * var(--root-font-scale, 1));
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Selector de tamaño de letra en cabecera */
+.font-size-selector {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+    user-select: none;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+}
+
+body.light-theme .font-size-selector {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
+.font-size-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    padding: 0.2rem 0.45rem;
+    border-radius: calc(var(--radius-sm) - 2px);
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 25px;
+    transition: all 0.15s ease;
+}
+
+.font-size-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.light-theme .font-size-btn:hover {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.font-size-btn.active {
+    background: var(--primary);
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Indicadores visuales de tamaño en cada opción */
+.font-size-btn[data-size="small"] {
+    font-size: 0.72rem;
+}
+.font-size-btn[data-size="medium"] {
+    font-size: 0.85rem;
+}
+.font-size-btn[data-size="large"] {
+    font-size: 1rem;
+}
+
+/* Amortiguación de textos grandes: no necesitan crecer para no deformar tarjetas ni desbordar la pantalla */
+html[data-font-size="medium"] h1,
+html[data-font-size="medium"] h2,
+html[data-font-size="medium"] .hero-title,
+html[data-font-size="medium"] .stat-value,
+html[data-font-size="medium"] #party-balance,
+html[data-font-size="medium"] .total-value {
+    font-size: calc(var(--current-font-size, 1em) * 0.965);
+}
+
+html[data-font-size="large"] h1,
+html[data-font-size="large"] h2,
+html[data-font-size="large"] .hero-title,
+html[data-font-size="large"] .stat-value,
+html[data-font-size="large"] #party-balance,
+html[data-font-size="large"] .total-value {
+    font-size: calc(var(--current-font-size, 1em) * 0.925);
+}
+
+/* Impulso selectivo a textos pequeños (+5% en medium y +10% máx en large) para máxima legibilidad */
+html[data-font-size="medium"] small,
+html[data-font-size="medium"] .text-muted,
+html[data-font-size="medium"] .badge,
+html[data-font-size="medium"] .badge-couple,
+html[data-font-size="medium"] .p-info small,
+html[data-font-size="medium"] .p-amount small,
+html[data-font-size="medium"] .history-item small,
+html[data-font-size="medium"] label,
+html[data-font-size="medium"] .subtitle {
+    font-size: 1.02em;
+}
+
+html[data-font-size="large"] small,
+html[data-font-size="large"] .text-muted,
+html[data-font-size="large"] .badge,
+html[data-font-size="large"] .badge-couple,
+html[data-font-size="large"] .p-info small,
+html[data-font-size="large"] .p-amount small,
+html[data-font-size="large"] .history-item small,
+html[data-font-size="large"] label,
+html[data-font-size="large"] .subtitle {
+    font-size: 1.045em;
+}
+
+/* Autoconfiguración y flexibilidad de contenedores ante variaciones de tamaño de texto */
+.p-info {
+    min-width: 0;
+    flex: 1;
+    word-break: break-word;
+}
+
+.participant-item {
+    min-height: 3.5rem;
+    gap: 0.5rem;
+}
+
+.participant-btn {
+    min-height: 2.8rem;
+    word-break: break-word;
+    line-height: 1.25;
+}
+
+.history-item {
+    min-height: 3.2rem;
+}
+
+.history-item .info {
+    min-width: 0;
+    flex: 1;
+    word-break: break-word;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -336,10 +478,35 @@ body {
 
 /* Header */
 .main-header {
-    padding: 1.5rem;
+    padding: 1.25rem 1.25rem 1rem 1.25rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+    .main-header {
+        padding: 0.9rem 0.9rem 0.65rem 0.9rem;
+    }
+    .header-logo h1 {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .main-header {
+        padding: 0.75rem 0.65rem 0.55rem 0.65rem;
+    }
+    .header-logo h1 {
+        font-size: 1.12rem;
+    }
+    .btn-leave span:first-child {
+        display: none;
+    }
+    .btn-leave {
+        padding: 0.45rem 0.55rem;
+    }
 }
 
 .btn-leave {
