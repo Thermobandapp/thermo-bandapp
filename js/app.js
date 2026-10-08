@@ -1066,13 +1066,12 @@ const App = {
                     processedKeys.add(pKey);
                     const amount = totals[p.name] || 0;
                     const isLeft = p.status === 'left';
-                    const partnerRegistered = this.getPartner(p.name);
                     const div = document.createElement('div');
                     div.className = `participant-item glass ${isLeft ? 'is-left' : ''}`;
                     div.style.cursor = 'pointer';
                     div.innerHTML = `
                         <div class="p-info">
-                            <span class="p-name">${p.name} ${isLeft ? '<small>(Fuera)</small>' : ''} ${partnerRegistered && !isLeft ? `<span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.25rem;">(💑 ${partnerRegistered})</span>` : ''}</span>
+                            <span class="p-name">${p.name} ${isLeft ? '<small>(Fuera)</small>' : ''}</span>
                             <span class="p-role">${p.role === 'admin' ? '🚩' : (isLeft ? '🏁' : '👤')}</span>
                         </div>
                         <span class="p-amount">${this.formatEuro(amount)}</span>
