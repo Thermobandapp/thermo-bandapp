@@ -1,6 +1,6 @@
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, push, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, set, onValue, push, get, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 /**
  * Thermo Bandapp - App Principal
@@ -1028,14 +1028,319 @@ const App = {
         }
     },
 
-    async handleDeleteOrder(orderId) {
-        if (!confirm('¿Seguro que quieres borrar este pedido?')) return;
+    // Obtiene los participantes actuales que comparten un pedido a escote
+    getOrderBeneficiaries(o) {
+        if (!o || o.user !== 'SHARED') return [];
+        if (Array.isArray(o.beneficiaries) && o.beneficiaries.length > 0) {
+            return [...o.beneficiaries];
+        }
+        const data = this.state.tableData || {};
+        const participants = Object.values(data.participants || {});
+        const tableStart = Number(data.createdAt || 0);
+        const orderTime = Number(o.timestamp || tableStart);
+        const present = participants.filter(p => Number(p.joinedAt || tableStart) <= orderTime);
+        const list = (present.length > 0 ? present : participants).map(p => p.name);
+        return list.length > 0 ? list : participants.map(p => p.name);
+    },
+
+    // Obtiene todos los candidatos posibles en la mesa para compartir un escote
+    getAllSharedOrderCandidates(o) {
+        const participants = Object.values(this.state.tableData?.participants || {});
+        const tableStart = Number(this.state.tableData?.createdAt || 0);
+        const orderTime = Number(o?.timestamp || tableStart);
+        const presentNames = participants
+            .filter(p => Number(p.joinedAt || tableStart) <= orderTime)
+            .map(p => p.name);
+        const existingBeneficiaries = Array.isArray(o?.beneficiaries) ? o.beneficiaries : [];
+        const allCandidatesSet = new Set([...presentNames, ...existingBeneficiaries]);
+        if (allCandidatesSet.size === 0) {
+            participants.forEach(p => allCandidatesSet.add(p.name));
+        }
+        return Array.from(allCandidatesSet);
+    },
+
+    async handleDeleteOrder(orderId, currentContextUser = null) {
+        const order = this.state.tableData?.orders?.[orderId];
+        if (!order) return;
+
+        // Si es pedido individual
+        if (order.user !== 'SHARED') {
+            if (!confirm(`¿Seguro que quieres borrar ${order.productName} (${this.formatEuro(order.price)}) de ${order.user}?`)) return;
+            try {
+                const orderRef = ref(this.db, `tables/${this.state.tableId}/orders/${orderId}`);
+                await set(orderRef, null);
+                this.closeModal();
+            } catch (error) {
+                console.error('Error al borrar pedido:', error);
+            }
+            return;
+        }
+
+        // Si es pedido a escote: preguntar si borrar para todos o para algunos en concreto
+        const beneficiaries = this.getOrderBeneficiaries(order);
+        this.showDeleteSharedOrderModal(orderId, order, beneficiaries, currentContextUser);
+    },
+
+    showDeleteSharedOrderModal(orderId, order, beneficiaries, currentContextUser = null) {
+        const price = Number(order.price || 0);
+        const count = beneficiaries.length;
+        const perPerson = count > 0 ? price / count : price;
+
+        let html = `
+            <div style="text-align: left;">
+                <h3 style="margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>🗑️ Borrar pedido a escote</span>
+                </h3>
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.75rem 0.9rem; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <b style="font-size: 1.05rem; color: var(--text-main);">${order.productName}</b>
+                        <b style="font-size: 1.05rem; color: var(--primary);">${this.formatEuro(price)}</b>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                        Actualmente entre <b>${count} persona${count !== 1 ? 's' : ''}</b> (${this.formatEuro(perPerson)} cada una)
+                    </div>
+                </div>
+
+                <p style="font-size: 0.92rem; color: var(--text-main); margin-bottom: 1.15rem;">
+                    ¿Quieres borrar este artículo para <b>todos</b> o solo para <b>algunos en concreto</b>?
+                </p>
+
+                <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+        `;
+
+        // Opción rápida si se abrió desde el detalle de un participante
+        if (currentContextUser && beneficiaries.includes(currentContextUser)) {
+            const safeUser = currentContextUser.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const newCount = count - 1;
+            const newPerPerson = newCount > 0 ? price / newCount : price;
+            html += `
+                <button class="btn-primary" onclick="App.removeSingleUserFromSharedOrder('${orderId}', '${safeUser}')" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; text-align: left; display: flex; justify-content: space-between; align-items: center; background: rgba(99, 102, 241, 0.2); border: 1px solid var(--primary); color: #ffffff;">
+                    <span>👤 Borrar solo para <b>${currentContextUser}</b></span>
+                    <small style="font-size: 0.78rem; opacity: 0.9;">${newCount > 0 ? `resto: ${this.formatEuro(newPerPerson)}/p` : 'elimina'}</small>
+                </button>
+            `;
+        }
+
+        html += `
+                    <button class="btn-secondary" onclick="App.showSharedOrderCustomSplitModal('${orderId}')" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; text-align: left; display: flex; align-items: center; justify-content: space-between;">
+                        <span>👥 Borrar para algunos en concreto...</span>
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">Elegir quiénes ➔</span>
+                    </button>
+
+                    <button class="btn-danger" onclick="App.confirmDeleteSharedOrderForEveryone('${orderId}')" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; text-align: left; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
+                        ❌ Borrar para todos (eliminar pedido por completo)
+                    </button>
+
+                    <button class="btn-secondary" onclick="App.closeModal()" style="width: 100%; padding: 0.6rem; font-size: 0.88rem; margin-top: 0.25rem;">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        this.openModal(html);
+    },
+
+    async confirmDeleteSharedOrderForEveryone(orderId) {
+        const order = this.state.tableData?.orders?.[orderId];
+        const name = order?.productName || 'este pedido';
+        if (!confirm(`¿Seguro que quieres borrar ${name} para todos? El pedido desaparecerá de la mesa.`)) return;
+
         try {
             const orderRef = ref(this.db, `tables/${this.state.tableId}/orders/${orderId}`);
             await set(orderRef, null);
             this.closeModal();
         } catch (error) {
-            console.error('Error al borrar pedido:', error);
+            console.error('Error al borrar pedido para todos:', error);
+        }
+    },
+
+    async removeSingleUserFromSharedOrder(orderId, userName) {
+        const order = this.state.tableData?.orders?.[orderId];
+        if (!order) return;
+        const currentBeneficiaries = this.getOrderBeneficiaries(order);
+        const remaining = currentBeneficiaries.filter(n => n !== userName);
+        const orderRef = ref(this.db, `tables/${this.state.tableId}/orders/${orderId}`);
+
+        try {
+            if (remaining.length === 0) {
+                if (!confirm(`Al borrar a ${userName}, no queda nadie en el escote. Se eliminará el pedido por completo. ¿Continuar?`)) return;
+                await set(orderRef, null);
+            } else {
+                await update(orderRef, { beneficiaries: remaining });
+            }
+            this.closeModal();
+        } catch (error) {
+            console.error('Error al quitar usuario del escote:', error);
+        }
+    },
+
+    showSharedOrderCustomSplitModal(orderId) {
+        const order = this.state.tableData?.orders?.[orderId];
+        if (!order) return;
+
+        const candidates = this.getAllSharedOrderCandidates(order);
+        const currentBeneficiaries = this.getOrderBeneficiaries(order);
+        this.state.tempSharedOrderBeneficiaries = [...currentBeneficiaries];
+
+        const price = Number(order.price || 0);
+        const isAllSelected = candidates.length > 0 && candidates.every(c => this.state.tempSharedOrderBeneficiaries.includes(c));
+
+        const generateButtons = () => {
+            return candidates.map(name => {
+                const isSelected = this.state.tempSharedOrderBeneficiaries.includes(name);
+                const safeName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                return `
+                    <button type="button" id="split-btn-${idName}" 
+                        class="participant-btn ${isSelected ? 'selected' : ''}" 
+                        onclick="App.toggleSharedOrderBeneficiary('${safeName}', '${orderId}')" 
+                        style="padding: 0.65rem 0.5rem; font-size: 0.92rem; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none !important;">
+                        ${name}
+                    </button>
+                `;
+            }).join('');
+        };
+
+        const html = `
+            <div style="text-align: left; display: flex; flex-direction: column; gap: 0.85rem;">
+                <h3 style="margin-bottom: 0;">👥 Repartir escote: ${order.productName}</h3>
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: var(--text-muted); font-size: 0.88rem;">Importe total del artículo:</span>
+                    <b style="font-size: 1.15rem; color: var(--primary);">${this.formatEuro(price)}</b>
+                </div>
+
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">¿Quiénes pagan este artículo?</label>
+                        <div class="selector-switch-group">
+                            <button type="button" id="switch-shared-all" class="selector-switch-btn ${isAllSelected ? 'active' : ''}" onclick="App.toggleAllSharedOrderBeneficiaries(true, '${orderId}')">Todos</button>
+                            <button type="button" id="switch-shared-none" class="selector-switch-btn ${this.state.tempSharedOrderBeneficiaries.length === 0 ? 'active' : ''}" onclick="App.toggleAllSharedOrderBeneficiaries(false, '${orderId}')">Ninguno</button>
+                        </div>
+                    </div>
+                    <div id="shared-split-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 35vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                        ${generateButtons()}
+                    </div>
+                </div>
+
+                <div id="shared-split-summary-box" style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-sm); padding: 0.75rem; text-align: center;">
+                    <span id="shared-split-count" style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Calculando...</span>
+                    <div id="shared-split-amount" style="font-size: 1.35rem; font-weight: 700; color: var(--primary);">0,00€</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem;">
+                    <button id="btn-save-shared-split" class="btn-primary" onclick="App.confirmSaveSharedOrderSplit('${orderId}')" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700;">
+                        Guardar reparto
+                    </button>
+                    <button class="btn-secondary" onclick="App.closeModal()" style="width: 100%; padding: 0.65rem; font-size: 0.9rem;">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        this.openModal(html);
+        this.updateSharedOrderCustomSplitUIState(orderId);
+    },
+
+    toggleSharedOrderBeneficiary(name, orderId) {
+        if (!this.state.tempSharedOrderBeneficiaries) return;
+        const idx = this.state.tempSharedOrderBeneficiaries.indexOf(name);
+        if (idx > -1) {
+            this.state.tempSharedOrderBeneficiaries.splice(idx, 1);
+        } else {
+            this.state.tempSharedOrderBeneficiaries.push(name);
+        }
+        this.updateSharedOrderCustomSplitUIState(orderId);
+    },
+
+    toggleAllSharedOrderBeneficiaries(selectAll, orderId) {
+        const order = this.state.tableData?.orders?.[orderId];
+        if (!order) return;
+        const allCandidates = this.getAllSharedOrderCandidates(order);
+        this.state.tempSharedOrderBeneficiaries = selectAll ? [...allCandidates] : [];
+        this.updateSharedOrderCustomSplitUIState(orderId);
+    },
+
+    updateSharedOrderCustomSplitUIState(orderId) {
+        const order = this.state.tableData?.orders?.[orderId];
+        if (!order) return;
+        const candidates = this.getAllSharedOrderCandidates(order);
+        const selected = this.state.tempSharedOrderBeneficiaries || [];
+        const count = selected.length;
+        const price = Number(order.price || 0);
+
+        candidates.forEach(name => {
+            const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+            const btn = document.getElementById(`split-btn-${idName}`);
+            if (btn) {
+                btn.classList.toggle('selected', selected.includes(name));
+            }
+        });
+
+        const switchAll = document.getElementById('switch-shared-all');
+        const switchNone = document.getElementById('switch-shared-none');
+        if (switchAll) switchAll.classList.toggle('active', count === candidates.length && candidates.length > 0);
+        if (switchNone) switchNone.classList.toggle('active', count === 0);
+
+        const countEl = document.getElementById('shared-split-count');
+        const amountEl = document.getElementById('shared-split-amount');
+        const saveBtn = document.getElementById('btn-save-shared-split');
+
+        if (count === 0) {
+            if (countEl) countEl.textContent = 'Nadie seleccionado';
+            if (amountEl) {
+                amountEl.textContent = 'Se borrará el pedido';
+                amountEl.style.color = 'var(--danger)';
+            }
+            if (saveBtn) {
+                saveBtn.textContent = '❌ Borrar pedido completo';
+                saveBtn.style.background = 'var(--danger)';
+            }
+        } else if (count === 1) {
+            if (countEl) countEl.textContent = `Lo pagará solo 1 persona (${selected[0]})`;
+            if (amountEl) {
+                amountEl.textContent = this.formatEuro(price);
+                amountEl.style.color = 'var(--primary)';
+            }
+            if (saveBtn) {
+                saveBtn.textContent = `💾 Guardar (paga ${selected[0]} íntegro)`;
+                saveBtn.style.background = '';
+            }
+        } else {
+            const perPerson = price / count;
+            if (countEl) countEl.textContent = `Repartido entre ${count} personas`;
+            if (amountEl) {
+                amountEl.textContent = `${this.formatEuro(perPerson)} cada una`;
+                amountEl.style.color = 'var(--primary)';
+            }
+            if (saveBtn) {
+                saveBtn.textContent = `💾 Guardar reparto (${this.formatEuro(perPerson)}/p)`;
+                saveBtn.style.background = '';
+            }
+        }
+    },
+
+    async confirmSaveSharedOrderSplit(orderId) {
+        const selected = this.state.tempSharedOrderBeneficiaries || [];
+        const orderRef = ref(this.db, `tables/${this.state.tableId}/orders/${orderId}`);
+
+        if (selected.length === 0) {
+            if (!confirm('Al no seleccionar a nadie, el pedido se eliminará de la mesa. ¿Continuar?')) return;
+            try {
+                await set(orderRef, null);
+                this.closeModal();
+            } catch (error) {
+                console.error('Error al borrar pedido:', error);
+            }
+            return;
+        }
+
+        try {
+            await update(orderRef, { beneficiaries: selected });
+            this.closeModal();
+        } catch (error) {
+            console.error('Error al guardar reparto de escote:', error);
         }
     },
 
@@ -1185,9 +1490,9 @@ const App = {
                 const orderTime = Number(o.timestamp || tableStart);
 
                 if (o.user === 'SHARED') {
-                    if (myJoinTime <= orderTime) {
-                        const presentCount = participants.filter(p => Number(p.joinedAt || tableStart) <= orderTime).length || 1;
-                        price = Number(o.price) / presentCount;
+                    const targets = this.getOrderBeneficiaries(o);
+                    if (targets.includes(name)) {
+                        price = Number(o.price) / (targets.length || 1);
                         label = `(Escote) ${o.productName}`;
                     }
                 } else if (o.user === name) {
@@ -1209,7 +1514,7 @@ const App = {
                                 <span>${label}</span>
                                 <div class="order-actions" style="display: flex; align-items: center; gap: 0.5rem;">
                                     <span style="font-weight: 600;">${this.formatEuro(price)}</span>
-                                    <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')" title="Borrar pedido">🗑️</button>
+                                    <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}', '${name.replace(/'/g, "\\'")}')" title="Borrar pedido">🗑️</button>
                                 </div>
                             </div>
                             ${metaInfo}
@@ -1326,10 +1631,20 @@ const App = {
 
         const sortedOrders = Object.entries(orders).sort((a, b) => b[1].timestamp - a[1].timestamp).slice(0, 8);
         sortedOrders.forEach(([id, o]) => {
+            let userLabel = o.user;
+            if (o.user === 'SHARED') {
+                const targets = this.getOrderBeneficiaries(o);
+                const candidates = this.getAllSharedOrderCandidates(o);
+                if (targets.length === candidates.length && candidates.length > 0) {
+                    userLabel = '💎 Todos';
+                } else {
+                    userLabel = `💎 Escote (${targets.length} pers.)`;
+                }
+            }
             const div = document.createElement('div');
             div.className = 'order-row';
             div.innerHTML = `
-                <span><b>${o.user === 'SHARED' ? '💎 Todos' : o.user}</b>: ${o.productName}</span>
+                <span><b>${userLabel}</b>: ${o.productName}</span>
                 <div class="order-actions">
                     <span>${this.formatEuro(o.price)}</span>
                     <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button>
@@ -1372,7 +1687,6 @@ const App = {
         
         const totals = {};
         const participants = Object.values(data.participants || {});
-        const tableStart = Number(data.createdAt || 0);
         
         participants.forEach(p => {
             totals[p.name] = 0;
@@ -1380,14 +1694,17 @@ const App = {
         
         if (data.orders) {
             Object.values(data.orders).forEach(o => {
-                const orderTime = Number(o.timestamp || tableStart);
                 const price = Number(o.price || 0);
 
                 if (o.user === 'SHARED') {
-                    const present = participants.filter(p => Number(p.joinedAt || tableStart) <= orderTime);
-                    const count = present.length || 1;
+                    const targets = this.getOrderBeneficiaries(o);
+                    const count = targets.length || 1;
                     const share = price / count;
-                    present.forEach(p => totals[p.name] = (totals[p.name] || 0) + share);
+                    targets.forEach(targetName => {
+                        if (totals.hasOwnProperty(targetName)) {
+                            totals[targetName] = (totals[targetName] || 0) + share;
+                        }
+                    });
                 } else if (totals.hasOwnProperty(o.user)) {
                     totals[o.user] = (totals[o.user] || 0) + price;
                 }
@@ -1414,9 +1731,9 @@ const App = {
             const orderTime = Number(o.timestamp || tableStart);
 
             if (o.user === 'SHARED') {
-                if (myJoinTime <= orderTime) {
-                    const presentCount = participants.filter(p => Number(p.joinedAt || tableStart) <= orderTime).length || 1;
-                    price = Number(o.price) / presentCount;
+                const targets = this.getOrderBeneficiaries(o);
+                if (targets.includes(name)) {
+                    price = Number(o.price) / (targets.length || 1);
                     label = `(Escote) ${o.productName}`;
                 }
             } else if (o.user === name) {
@@ -1438,7 +1755,7 @@ const App = {
                             <span>${label}</span>
                             <div class="order-actions">
                                 <span>${this.formatEuro(price)}</span>
-                                <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}')">🗑️</button>
+                                <button class="btn-delete-small" onclick="App.handleDeleteOrder('${id}', '${name.replace(/'/g, "\\'")}')">🗑️</button>
                             </div>
                         </div>
                         ${metaInfo}
