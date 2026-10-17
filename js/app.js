@@ -945,6 +945,10 @@ const App = {
                     </span>
                 </label>
 
+                <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35; padding: 0.5rem 0.65rem; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: var(--radius-sm); margin-top: 0.25rem;">
+                    💡 Si modificas el precio o el nombre, las consumiciones ya pedidas en las mesas abiertas se recalcularán automáticamente con el nuevo precio.
+                </div>
+
                 <button class="btn-primary" onclick="App.confirmSaveEditProduct('${id}')" style="width: 100%; padding: 0.85rem; font-size: 1rem; font-weight: 700; margin-top: 0.5rem;">Guardar Cambios</button>
             </div>
         `;
@@ -966,6 +970,10 @@ const App = {
         const iconInput = document.getElementById('edit-product-icon-input')?.value.trim() || '🍴';
         const allowEscote = document.getElementById('edit-product-escote-chk')?.checked ?? false;
 
+        const oldProduct = this.state.tableData?.menu?.[id] || {};
+        const oldName = oldProduct.name || '';
+        const oldPrice = Number(oldProduct.price || 0);
+
         this.closeModal();
 
         try {
@@ -975,12 +983,86 @@ const App = {
                 icon: iconInput,
                 allowEscote: Boolean(allowEscote)
             };
-            await set(ref(this.db, `tables/${this.state.tableId}/menu/${id}`), productData);
 
             const barName = this.getBarName();
+            const updates = {};
+
+            // 1. Menú de la mesa actual
+            updates[`tables/${this.state.tableId}/menu/${id}`] = productData;
+
+            // 2. Menú de plantilla del bar
             if (barName) {
-                await set(ref(this.db, `bar_menus/${barName.replace(/\s/g, '_')}/${id}`), productData);
+                updates[`bar_menus/${barName.replace(/\s/g, '_')}/${id}`] = productData;
             }
+
+            // 3. Recalcular consumiciones en la mesa actual
+            const priceChanged = oldPrice !== price;
+            const nameChanged = Boolean(oldName && oldName !== nameInput);
+
+            if (this.state.tableData?.orders) {
+                for (const [orderId, order] of Object.entries(this.state.tableData.orders)) {
+                    const matchById = order.productId && order.productId === id;
+                    const matchByName = (order.productName === oldName) || (order.productName === nameInput);
+
+                    if (matchById || matchByName) {
+                        if (order.price !== price) {
+                            updates[`tables/${this.state.tableId}/orders/${orderId}/price`] = price;
+                        }
+                        if (nameChanged && order.productName !== nameInput) {
+                            updates[`tables/${this.state.tableId}/orders/${orderId}/productName`] = nameInput;
+                        }
+                        if (!order.productId) {
+                            updates[`tables/${this.state.tableId}/orders/${orderId}/productId`] = id;
+                        }
+                    }
+                }
+            }
+
+            // 4. Buscar y actualizar otras mesas abiertas si pertenecen al mismo bar o tienen este producto
+            try {
+                const tablesSnap = await get(ref(this.db, 'tables'));
+                if (tablesSnap.exists()) {
+                    const allTables = tablesSnap.val();
+                    const currentBarKey = barName ? barName.toLowerCase() : '';
+
+                    for (const [tId, tData] of Object.entries(allTables)) {
+                        if (tId === this.state.tableId) continue;
+                        if (tData.status !== 'active') continue;
+
+                        const tBarName = tData.name ? tData.name.split(' (')[0].trim().toLowerCase() : '';
+                        const isSameBar = currentBarKey && tBarName === currentBarKey;
+                        const hasProductInMenu = Boolean(tData.menu && tData.menu[id]);
+
+                        if (isSameBar || hasProductInMenu) {
+                            updates[`tables/${tId}/menu/${id}`] = productData;
+
+                            if (tData.orders) {
+                                for (const [orderId, order] of Object.entries(tData.orders)) {
+                                    const matchById = order.productId && order.productId === id;
+                                    const matchByName = (order.productName === oldName) || (order.productName === nameInput);
+
+                                    if (matchById || matchByName) {
+                                        if (order.price !== price) {
+                                            updates[`tables/${tId}/orders/${orderId}/price`] = price;
+                                        }
+                                        if (nameChanged && order.productName !== nameInput) {
+                                            updates[`tables/${tId}/orders/${orderId}/productName`] = nameInput;
+                                        }
+                                        if (!order.productId) {
+                                            updates[`tables/${tId}/orders/${orderId}/productId`] = id;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (snapErr) {
+                console.warn('Error comprobando otras mesas abiertas:', snapErr);
+            }
+
+            await update(ref(this.db), updates);
+
         } catch (error) {
             console.error('Error al modificar el producto:', error);
             alert('Error al modificar el producto.');
@@ -1006,13 +1088,17 @@ const App = {
         const users = Array.isArray(targetUsers) ? targetUsers : [targetUsers];
         for (const targetUser of users) {
             const orderRef = push(ref(this.db, `tables/${this.state.tableId}/orders`));
-            await set(orderRef, {
+            const orderData = {
                 user: targetUser,
                 orderedBy: this.state.user,
                 productName: product.name,
                 price: product.price,
                 timestamp: Date.now()
-            });
+            };
+            if (product.id) {
+                orderData.productId = product.id;
+            }
+            await set(orderRef, orderData);
         }
         this.closeModal();
     },
@@ -1610,7 +1696,7 @@ const App = {
             `;
             div.onclick = (e) => {
                 if (e.target.classList.contains('btn-edit-small') || e.target.classList.contains('btn-delete-menu-small')) return;
-                this.showParticipantSelector(item);
+                this.showParticipantSelector({ ...item, id });
             };
             div.querySelector('.btn-edit-small').onclick = (e) => {
                 e.stopPropagation();
@@ -2026,12 +2112,17 @@ const App = {
         }
 
         try {
+            const menuEntries = Object.entries(this.state.tableData?.menu || {});
             for (const name of this.state.tempRepeatSelection) {
                 const lastOrder = participantLastOrders[name];
                 if (lastOrder) {
+                    const match = menuEntries.find(([mId, mItem]) => 
+                        (lastOrder.productId && mId === lastOrder.productId) || mItem.name === lastOrder.productName
+                    );
                     const productMock = {
-                        name: lastOrder.productName,
-                        price: lastOrder.price
+                        id: match ? match[0] : (lastOrder.productId || null),
+                        name: match ? match[1].name : lastOrder.productName,
+                        price: match ? match[1].price : lastOrder.price
                     };
                     await this.addOrder(productMock, name);
                 }
