@@ -5456,7 +5456,14 @@ Reglas obligatorias:
         };
 
         // 1. Descubrir los modelos habilitados para esta API Key mediante ListModels
-        let targetModel = 'models/gemini-1.5-flash';
+        let candidateModels = [
+            'models/gemini-3.8-flash',
+            'models/gemini-3.0-flash',
+            'models/gemini-2.5-flash',
+            'models/gemini-2.0-flash',
+            'models/gemini-1.5-flash'
+        ];
+
         try {
             const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`;
             const listRes = await fetch(listUrl, { headers });
@@ -5466,19 +5473,15 @@ Reglas obligatorias:
                     .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
                     .map(m => m.name);
 
-                const preferred = [
-                    'models/gemini-1.5-flash',
-                    'models/gemini-2.0-flash',
-                    'models/gemini-1.5-flash-8b',
-                    'models/gemini-1.5-pro'
-                ];
+                // Separar los modelos flash y ordenarlos de más reciente a más antiguo (ej. 3.8 > 2.5 > 1.5)
+                const flashModels = available.filter(m => m.toLowerCase().includes('flash'));
+                flashModels.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
 
-                const found = preferred.find(p => available.includes(p)) 
-                    || available.find(m => m.toLowerCase().includes('flash'))
-                    || available[0];
+                const otherModels = available.filter(m => !m.toLowerCase().includes('flash'));
+                otherModels.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
 
-                if (found) {
-                    targetModel = found;
+                if (flashModels.length > 0 || otherModels.length > 0) {
+                    candidateModels = [...flashModels, ...otherModels];
                 }
             } else {
                 const errData = await listRes.json().catch(() => ({}));
@@ -5494,51 +5497,76 @@ Reglas obligatorias:
             }
         }
 
-        // 2. Invocar el modelo detectado
-        const modelPath = targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`;
-        const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+        // 2. Intentar llamar a los modelos candidatos en orden de prioridad
+        let lastError = null;
+        for (let i = 0; i < candidateModels.length; i++) {
+            const targetModel = candidateModels[i];
+            const modelPath = targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(cleanKey)}`;
 
-        const res = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: promptText },
-                        {
-                            inlineData: {
-                                mimeType: 'image/jpeg',
-                                data: base64Data
-                            }
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: promptText },
+                                {
+                                    inlineData: {
+                                        mimeType: 'image/jpeg',
+                                        data: base64Data
+                                    }
+                                }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            responseMimeType: 'application/json'
                         }
-                    ]
-                }],
-                generationConfig: {
-                    temperature: 0.1,
-                    responseMimeType: 'application/json'
-                }
-            })
-        });
+                    })
+                });
 
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const errMsg = errData.error?.message || `HTTP ${res.status}`;
-            const lower = errMsg.toLowerCase();
-            if (res.status === 400 || lower.includes('api key') || lower.includes('api_key') || lower.includes('invalid')) {
-                throw new Error('La API Key de Gemini no es válida o ha caducado. Pulsa en "Revisar Clave API" para comprobarla.');
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const errMsg = errData.error?.message || `HTTP ${res.status}`;
+                    const lower = errMsg.toLowerCase();
+
+                    if (res.status === 400 && (lower.includes('api key') || lower.includes('api_key') || lower.includes('invalid'))) {
+                        throw new Error('La API Key de Gemini no es válida o ha caducado. Pulsa en "Revisar Clave API" para comprobarla.');
+                    }
+
+                    // Si Google recomienda un modelo específico (ej. "Please update your code to use models/gemini-3.8-flash")
+                    const matchRec = errMsg.match(/models\/([a-zA-Z0-9.-]+)/);
+                    if (matchRec && matchRec[1]) {
+                        const recommendedModel = `models/${matchRec[1]}`;
+                        if (!candidateModels.includes(recommendedModel)) {
+                            candidateModels.splice(i + 1, 0, recommendedModel);
+                        }
+                    }
+
+                    // Si el modelo ya no está disponible para nuevos usuarios o 404, seguir con el siguiente modelo
+                    lastError = new Error(`Error de Gemini (${modelPath}): ${errMsg}`);
+                    continue;
+                }
+
+                const data = await res.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('Gemini no devolvió texto de respuesta.');
+
+                let cleaned = text.trim();
+                if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
+                else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/i, '');
+
+                return JSON.parse(cleaned);
+
+            } catch (err) {
+                lastError = err;
+                if (err.message && err.message.includes('API Key de Gemini')) throw err;
             }
-            throw new Error(`Error de Gemini (${modelPath}): ${errMsg}`);
         }
 
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error('Gemini no devolvió texto de respuesta.');
-
-        let cleaned = text.trim();
-        if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
-        else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/i, '');
-
-        return JSON.parse(cleaned);
+        throw lastError || new Error('No se pudo procesar el ticket con los modelos disponibles de Gemini.');
     },
 
     matchTicketWithApp(ticketItems = [], appOrders = {}) {
