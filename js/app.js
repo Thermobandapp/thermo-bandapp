@@ -1122,6 +1122,9 @@ const App = {
         const qty = parseInt(qtyStr);
         if (isNaN(qty) || qty <= 0) return;
 
+        this.state.currentOrderProduct = null;
+        this.state.tempSelection = [];
+
         for (let i = 0; i < qty; i++) {
             await this.addOrder(product, 'SHARED');
         }
@@ -1290,11 +1293,12 @@ const App = {
                 const isSelected = this.state.tempSharedOrderBeneficiaries.includes(name);
                 const safeName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                const sizeClass = this.getNameLengthClass(name);
                 return `
                     <button type="button" id="split-btn-${idName}" 
-                        class="participant-btn ${isSelected ? 'selected' : ''}" 
+                        class="participant-btn ${sizeClass} ${isSelected ? 'selected' : ''}" 
                         onclick="App.toggleSharedOrderBeneficiary('${safeName}', '${orderId}')" 
-                        style="padding: 0.65rem 0.5rem; font-size: 0.92rem; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none !important;">
+                        style="padding: 0.65rem 0.35rem; border-radius: var(--radius-sm); transform: none !important;">
                         ${name}
                     </button>
                 `;
@@ -1317,7 +1321,7 @@ const App = {
                             <button type="button" id="switch-shared-none" class="selector-switch-btn ${this.state.tempSharedOrderBeneficiaries.length === 0 ? 'active' : ''}" onclick="App.toggleAllSharedOrderBeneficiaries(false, '${orderId}')">Ninguno</button>
                         </div>
                     </div>
-                    <div id="shared-split-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 35vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                    <div id="shared-split-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateButtons()}
                     </div>
                 </div>
@@ -1902,10 +1906,24 @@ const App = {
         this.openModal(html);
     },
 
+    getNameLengthClass(name) {
+        if (!name || typeof name !== 'string') return 'name-medium';
+        const trimmed = name.trim();
+        const words = trimmed.split(/\s+/);
+        const maxWordLength = Math.max(...words.map(w => w.length));
+        const totalLength = trimmed.length;
+
+        if (maxWordLength > 11 || totalLength > 15) return 'name-xlong';
+        if (maxWordLength > 8 || totalLength > 11) return 'name-long';
+        if (maxWordLength > 6 || totalLength > 8) return 'name-medium';
+        return 'name-short';
+    },
+
     showParticipantSelector(product) {
         const participants = Object.values(this.state.tableData.participants || {})
             .filter(p => p.status !== 'left');
         this.state.tempSelection = [];
+        this.state.currentOrderProduct = product;
         this.state.currentSelectorParticipants = participants.map(p => p.name);
 
         let html = `<h3>¿Para quién es ${product.icon || '🍴'} ${product.name}?</h3>`;
@@ -1930,16 +1948,31 @@ const App = {
             </div>
         `;
 
-        html += `<div class="participant-grid" style="margin-top: 0.5rem; margin-bottom: 1.25rem;">`;
+        html += `<div class="participant-grid" style="margin-top: 0.5rem; margin-bottom: 0.85rem;">`;
         participants.forEach(p => {
             const isMe = p.name === this.state.user;
             const idName = p.name.replace(/\s/g, '_').replace(/\./g, '_');
-            html += `<button id="p-btn-${idName}" class="participant-btn ${isMe ? 'is-me' : ''}" onclick="App.toggleParticipantSelection('${p.name.replace(/'/g, "\\'")}')">${p.name}</button>`;
+            const sizeClass = this.getNameLengthClass(p.name);
+            html += `<button id="p-btn-${idName}" class="participant-btn ${sizeClass} ${isMe ? 'is-me' : ''}" onclick="App.toggleParticipantSelection('${p.name.replace(/'/g, "\\'")}')">${p.name}</button>`;
         });
         html += `</div>`;
-        html += `<button id="btn-confirm-order" class="btn-primary" onclick="App.confirmMultiOrder(${JSON.stringify(product).replace(/"/g, '&quot;')})">Confirmar Pedido (0)</button>`;
+        html += `<p style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem;">Marca los nombres y pulsa <b>Volver</b></p>`;
 
         this.openModal(html);
+        this.updateParticipantSelectorReturnBtn();
+    },
+
+    updateParticipantSelectorReturnBtn() {
+        const closeBtn = document.getElementById('btn-close-modal');
+        if (!closeBtn) return;
+        const count = (this.state.tempSelection || []).length;
+        if (count > 0) {
+            closeBtn.textContent = `Volver (${count} ${count === 1 ? 'pedido' : 'pedidos'})`;
+            closeBtn.className = 'btn-primary';
+        } else {
+            closeBtn.textContent = 'Volver';
+            closeBtn.className = 'btn-secondary';
+        }
     },
 
     toggleAllParticipants(selectAll) {
@@ -1967,10 +2000,7 @@ const App = {
             if (switchNone) switchNone.classList.add('active');
         }
 
-        const confirmBtn = document.getElementById('btn-confirm-order');
-        if (confirmBtn) {
-            confirmBtn.textContent = `Confirmar Pedido (${this.state.tempSelection.length})`;
-        }
+        this.updateParticipantSelectorReturnBtn();
     },
 
     toggleParticipantSelection(name) {
@@ -1993,14 +2023,11 @@ const App = {
         if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
         if (switchNone) switchNone.classList.toggle('active', count === 0);
 
-        const confirmBtn = document.getElementById('btn-confirm-order');
-        if (confirmBtn) {
-            confirmBtn.textContent = `Confirmar Pedido (${count})`;
-        }
+        this.updateParticipantSelectorReturnBtn();
     },
 
     confirmMultiOrder(product) {
-        if (this.state.tempSelection.length === 0) return alert('Selecciona al menos a una persona.');
+        if (!this.state.tempSelection || this.state.tempSelection.length === 0) return alert('Selecciona al menos a una persona.');
         this.addOrder(product, this.state.tempSelection);
     },
 
@@ -2046,13 +2073,14 @@ const App = {
             const disabled = !lastOrder;
             const detailText = lastOrder ? lastOrder.productName : 'Sin pedidos';
             const idName = p.name.replace(/\s/g, '_').replace(/\./g, '_');
+            const sizeClass = this.getNameLengthClass(p.name);
             
             html += `
                 <button id="rep-btn-${idName}" 
-                        class="participant-btn ${isMe && lastOrder ? 'is-me' : ''} ${disabled ? 'disabled' : ''}" 
+                        class="participant-btn ${sizeClass} ${isMe && lastOrder ? 'is-me' : ''} ${disabled ? 'disabled' : ''}" 
                         ${disabled ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''} 
                         onclick="App.toggleRepeatSelection('${p.name.replace(/'/g, "\\'")}')">
-                    <div style="font-weight: bold;">${p.name}</div>
+                    <div style="font-weight: bold; font-size: inherit;">${p.name}</div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">${detailText}</div>
                 </button>
             `;
@@ -2871,7 +2899,8 @@ const App = {
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = m.name.replace(/\s/g, '_').replace(/\./g, '_');
-                html += `<button id="tf-btn-${idName}" class="participant-btn" onclick="App.toggleTableFriendDirect('${safeName}')">${m.name}</button>`;
+                const sizeClass = this.getNameLengthClass(m.name);
+                html += `<button id="tf-btn-${idName}" class="participant-btn ${sizeClass}" onclick="App.toggleTableFriendDirect('${safeName}')">${m.name}</button>`;
             });
             
             if (availableMembers.length === 0) {
@@ -3080,10 +3109,11 @@ const App = {
 
                 availableCandidates.forEach(m => {
                     const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const sizeClass = this.getNameLengthClass(m.name);
                     html += `
-                        <button class="participant-btn" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '${safeName}', ${safeOtherSelected}, ${isParty})" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.6rem 0.4rem; height: auto;">
-                            <span style="font-weight: 600;">${m.name}</span>
-                            <small style="font-size: 0.68rem; color: #22c55e;">(Sin pareja)</small>
+                        <button class="participant-btn ${sizeClass}" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '${safeName}', ${safeOtherSelected}, ${isParty})" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.6rem 0.35rem; height: auto;">
+                            <span style="font-weight: 700;">${m.name}</span>
+                            <small style="font-size: 0.72rem; color: #22c55e;">(Sin pareja)</small>
                         </button>
                     `;
                 });
@@ -4210,7 +4240,8 @@ const App = {
                 const isSelected = this.state.tempPartyMoneyFriends.includes(name);
                 const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
-                return `<button type="button" id="pm-btn-${idName}" class="participant-btn ${isSelected ? 'selected' : ''}" onclick="App.togglePartyMoneyFriend('${safeName}')" style="padding: 0.65rem 0.5rem; font-size: 0.92rem; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none !important;">${name}</button>`;
+                const sizeClass = this.getNameLengthClass(name);
+                return `<button type="button" id="pm-btn-${idName}" class="participant-btn ${sizeClass} ${isSelected ? 'selected' : ''}" onclick="App.togglePartyMoneyFriend('${safeName}')" style="padding: 0.65rem 0.35rem; border-radius: var(--radius-sm); transform: none !important;">${name}</button>`;
             }).join('');
         };
 
@@ -4231,7 +4262,7 @@ const App = {
                             <button type="button" id="switch-party-money-none" class="selector-switch-btn ${this.state.tempPartyMoneyFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyMoneyFriends(false)">Ninguno</button>
                         </div>
                     </div>
-                    <div id="party-money-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                    <div id="party-money-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateFriendButtons()}
                     </div>
                     <small id="party-money-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
@@ -4382,7 +4413,8 @@ const App = {
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = m.name.replace(/\s/g, '_').replace(/\./g, '_');
-                html += `<button id="f-btn-${idName}" class="participant-btn" onclick="App.togglePartyFriendDirect('${safeName}')">${m.name}</button>`;
+                const sizeClass = this.getNameLengthClass(m.name);
+                html += `<button id="f-btn-${idName}" class="participant-btn ${sizeClass}" onclick="App.togglePartyFriendDirect('${safeName}')">${m.name}</button>`;
             });
             
             if (availableMembers.length === 0) {
@@ -4539,7 +4571,8 @@ const App = {
                 const isSelected = this.state.tempPartyExpenseFriends.includes(name);
                 const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
-                return `<button type="button" id="pe-btn-${idName}" class="participant-btn ${isSelected ? 'selected' : ''}" onclick="App.togglePartyExpenseFriend('${safeName}')" style="padding: 0.65rem 0.5rem; font-size: 0.92rem; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none !important;">${name}</button>`;
+                const sizeClass = this.getNameLengthClass(name);
+                return `<button type="button" id="pe-btn-${idName}" class="participant-btn ${sizeClass} ${isSelected ? 'selected' : ''}" onclick="App.togglePartyExpenseFriend('${safeName}')" style="padding: 0.65rem 0.35rem; border-radius: var(--radius-sm); transform: none !important;">${name}</button>`;
             }).join('');
         };
 
@@ -4564,7 +4597,7 @@ const App = {
                             <button type="button" id="switch-party-expense-none" class="selector-switch-btn ${this.state.tempPartyExpenseFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(false)">Ninguno</button>
                         </div>
                     </div>
-                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateFriendButtons()}
                     </div>
                     <small id="party-expense-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
@@ -4737,7 +4770,8 @@ const App = {
                 const isSelected = this.state.tempPartyExpenseFriends.includes(name);
                 const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
-                return `<button type="button" id="pe-btn-${idName}" class="participant-btn ${isSelected ? 'selected' : ''}" onclick="App.togglePartyExpenseFriend('${safeName}')" style="padding: 0.65rem 0.5rem; font-size: 0.92rem; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: none !important;">${name}</button>`;
+                const sizeClass = this.getNameLengthClass(name);
+                return `<button type="button" id="pe-btn-${idName}" class="participant-btn ${sizeClass} ${isSelected ? 'selected' : ''}" onclick="App.togglePartyExpenseFriend('${safeName}')" style="padding: 0.65rem 0.35rem; border-radius: var(--radius-sm); transform: none !important;">${name}</button>`;
             }).join('');
         };
 
@@ -4762,7 +4796,7 @@ const App = {
                             <button type="button" id="switch-party-expense-none" class="selector-switch-btn ${this.state.tempPartyExpenseFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(false)">Ninguno</button>
                         </div>
                     </div>
-                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.5rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateFriendButtons()}
                     </div>
                     <small id="party-expense-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
@@ -4938,12 +4972,37 @@ const App = {
         this.display.modalContent.innerHTML = html;
         this.display.modalOverlay.classList.remove('hidden');
         const closeBtn = document.getElementById('btn-close-modal');
-        if (closeBtn) closeBtn.style.display = hideCloseBtn ? 'none' : '';
+        if (closeBtn) {
+            closeBtn.style.display = hideCloseBtn ? 'none' : '';
+            if (!this.state.currentOrderProduct) {
+                closeBtn.textContent = 'Volver';
+                closeBtn.className = 'btn-secondary';
+            }
+        }
     },
 
     closeModal() {
         this.state.isAuditModalOpen = false;
+        const orderProduct = this.state.currentOrderProduct;
+        const selectedParticipants = (this.state.tempSelection && this.state.tempSelection.length > 0)
+            ? [...this.state.tempSelection]
+            : null;
+
+        // Reset state
+        this.state.currentOrderProduct = null;
+        this.state.tempSelection = [];
+
+        const closeBtn = document.getElementById('btn-close-modal');
+        if (closeBtn) {
+            closeBtn.textContent = 'Volver';
+            closeBtn.className = 'btn-secondary';
+        }
+
         this.display.modalOverlay.classList.add('hidden');
+
+        if (orderProduct && selectedParticipants && selectedParticipants.length > 0) {
+            this.addOrder(orderProduct, selectedParticipants);
+        }
     },
 
     // --- MÉTODOS DEL COMBOBOX DE BARES ---
@@ -5128,7 +5187,8 @@ const App = {
             sortedMembers.forEach(([key, data]) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'participant-btn';
+                const sizeClass = this.getNameLengthClass(data.name);
+                btn.className = `participant-btn ${sizeClass}`;
                 if (data.name.toLowerCase() === 'fernando') {
                     btn.classList.add('is-me'); // estilo destacado
                 }
@@ -6001,8 +6061,9 @@ Reglas obligatorias:
 
         participants.forEach(p => {
             const safeUser = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const sizeClass = this.getNameLengthClass(p.name);
             buttonsHtml += `
-                <button class="participant-btn" onclick="App.addAuditOrder('${safeName}', ${price}, '${safeUser}'); App.renderTicketAuditModal();">
+                <button class="participant-btn ${sizeClass}" onclick="App.addAuditOrder('${safeName}', ${price}, '${safeUser}'); App.renderTicketAuditModal();">
                     ${p.name}
                 </button>
             `;

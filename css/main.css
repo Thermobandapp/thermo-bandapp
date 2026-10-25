@@ -428,9 +428,10 @@ html[data-font-size="large"] .subtitle {
 }
 
 .participant-btn {
-    min-height: 2.8rem;
-    word-break: break-word;
-    line-height: 1.25;
+    min-height: 3.4rem;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.18;
 }
 
 .history-item {
@@ -1058,12 +1059,35 @@ body.light-theme .badge-escote {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     color: white;
-    padding: 1rem;
+    padding: 0.7rem 0.35rem;
     border-radius: var(--radius-md);
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
     text-align: center;
     transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    font-size: clamp(1.15rem, 4.2vw, 1.35rem);
+    letter-spacing: -0.01em;
+}
+
+.participant-btn.name-short {
+    font-size: clamp(1.35rem, 5vw, 1.6rem);
+}
+
+.participant-btn.name-medium {
+    font-size: clamp(1.18rem, 4.2vw, 1.35rem);
+}
+
+.participant-btn.name-long {
+    font-size: clamp(1.05rem, 3.6vw, 1.18rem);
+}
+
+.participant-btn.name-xlong {
+    font-size: clamp(0.92rem, 3.1vw, 1.02rem);
 }
 
 .participant-btn:active {
