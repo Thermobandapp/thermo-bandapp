@@ -5459,7 +5459,6 @@ Reglas obligatorias:
         let candidateModels = [
             'models/gemini-3.8-flash',
             'models/gemini-3.0-flash',
-            'models/gemini-2.5-flash',
             'models/gemini-2.0-flash',
             'models/gemini-1.5-flash'
         ];
@@ -5473,16 +5472,21 @@ Reglas obligatorias:
                     .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
                     .map(m => m.name);
 
-                // Separar los modelos flash y ordenarlos de más reciente a más antiguo (ej. 3.8 > 2.5 > 1.5)
-                const flashModels = available.filter(m => m.toLowerCase().includes('flash'));
+                // Excluir modelos obsoletos para nuevos usuarios como gemini-2.5-flash
+                const activeAvailable = available.filter(m => !m.includes('gemini-2.5') && !m.includes('gemini-1.0'));
+
+                // Separar los modelos flash y ordenarlos de más reciente a más antiguo (ej. 3.8 > 2.0 > 1.5)
+                const flashModels = activeAvailable.filter(m => m.toLowerCase().includes('flash'));
                 flashModels.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
 
-                const otherModels = available.filter(m => !m.toLowerCase().includes('flash'));
+                const otherModels = activeAvailable.filter(m => !m.toLowerCase().includes('flash'));
                 otherModels.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
 
-                if (flashModels.length > 0 || otherModels.length > 0) {
-                    candidateModels = [...flashModels, ...otherModels];
-                }
+                candidateModels = [
+                    'models/gemini-3.8-flash',
+                    ...flashModels.filter(m => m !== 'models/gemini-3.8-flash'),
+                    ...otherModels
+                ];
             } else {
                 const errData = await listRes.json().catch(() => ({}));
                 const errMsg = errData.error?.message || `HTTP ${listRes.status}`;
@@ -5537,9 +5541,9 @@ Reglas obligatorias:
                     }
 
                     // Si Google recomienda un modelo específico (ej. "Please update your code to use models/gemini-3.8-flash")
-                    const matchRec = errMsg.match(/models\/([a-zA-Z0-9.-]+)/);
-                    if (matchRec && matchRec[1]) {
-                        const recommendedModel = `models/${matchRec[1]}`;
+                    const matches = [...errMsg.matchAll(/models\/([a-zA-Z0-9.-]+)/g)];
+                    if (matches.length > 1 && matches[1][1]) {
+                        const recommendedModel = `models/${matches[1][1]}`;
                         if (!candidateModels.includes(recommendedModel)) {
                             candidateModels.splice(i + 1, 0, recommendedModel);
                         }
