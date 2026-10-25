@@ -5217,13 +5217,13 @@ const App = {
                 <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 0.75rem 0.85rem; margin-bottom: 1rem; font-size: 0.8rem; line-height: 1.45; color: var(--text-main);">
                     💡 <b>¿Cómo conseguirla 100% gratis en 1 minuto?</b><br>
                     1. Entra en <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 700; text-decoration: underline;">Google AI Studio</a> con tu cuenta de Google.<br>
-                    2. Pulsa en <b>"Create API key"</b> y copia el texto.<br>
-                    3. Pégalo aquí. Solo necesitas configurarlo una vez.
+                    2. Pulsa en <b>"Create API key"</b> y copia el texto (suele empezar por <code>AQ...</code> o <code>AIza...</code>).<br>
+                    3. Pégalo aquí abajo. Solo necesitas configurarlo una vez.
                 </div>
 
                 <div style="margin-bottom: 0.9rem;">
                     <label style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem; font-weight: 600;">Google Gemini API Key:</label>
-                    <input type="password" id="input-gemini-key" value="${safeKey}" placeholder="AIzaSy..." style="width: 100%; padding: 0.75rem 0.85rem; font-size: 0.95rem; box-sizing: border-box; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main);">
+                    <input type="text" id="input-gemini-key" value="${safeKey}" placeholder="Pega aquí tu clave (AQ... o AIza...)" autocomplete="off" spellcheck="false" style="width: 100%; padding: 0.75rem 0.85rem; font-size: 0.92rem; box-sizing: border-box; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main); font-family: monospace;">
                 </div>
 
                 <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.25rem; cursor: pointer; user-select: none;">
@@ -5450,10 +5450,16 @@ Reglas obligatorias:
             throw new Error('API Key no encontrada. Por favor, pulsa en "Revisar Clave API" para configurarla.');
         }
 
+        const headers = {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': cleanKey
+        };
+
         // 1. Descubrir los modelos habilitados para esta API Key mediante ListModels
         let targetModel = 'models/gemini-1.5-flash';
         try {
-            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`);
+            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`;
+            const listRes = await fetch(listUrl, { headers });
             if (listRes.ok) {
                 const listData = await listRes.json();
                 const available = (listData.models || [])
@@ -5490,11 +5496,11 @@ Reglas obligatorias:
 
         // 2. Invocar el modelo detectado
         const modelPath = targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`;
-        const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${cleanKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(cleanKey)}`;
 
         const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
                 contents: [{
                     parts: [
