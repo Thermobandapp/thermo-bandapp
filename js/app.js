@@ -5197,7 +5197,8 @@ const App = {
     // ==========================================
 
     getGeminiApiKey() {
-        return localStorage.getItem('thermobanda_gemini_key') || this.state.tableData?.geminiApiKey || null;
+        const raw = localStorage.getItem('thermobanda_gemini_key') || this.state.tableData?.geminiApiKey || null;
+        return raw ? String(raw).trim() : null;
     },
 
     showGeminiApiKeyModal() {
@@ -5386,7 +5387,12 @@ Reglas obligatorias:
 
         } catch (error) {
             console.error('Error procesando ticket:', error);
-            const isKeyError = error.message && error.message.toLowerCase().includes('api');
+            const isKeyError = error.message && (
+                error.message.toLowerCase().includes('api') || 
+                error.message.toLowerCase().includes('clave') ||
+                error.message.toLowerCase().includes('key') ||
+                error.message.toLowerCase().includes('google')
+            );
             let errorHtml = `
                 <div style="text-align: left;">
                     <h3 style="color: var(--danger); margin-bottom: 0.5rem;">⚠️ No se pudo leer el ticket</h3>
@@ -5395,7 +5401,7 @@ Reglas obligatorias:
                     </p>
                     <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                         <button class="btn-primary" onclick="App.triggerCameraScan()">📷 Intentar Otra Foto</button>
-                        ${isKeyError ? `<button class="btn-secondary" onclick="App.showGeminiApiKeyModal()">⚙️ Revisar Clave API</button>` : ''}
+                        <button class="btn-secondary" onclick="App.showGeminiApiKeyModal()">⚙️ Revisar / Cambiar Clave API</button>
                         <button class="btn-secondary" onclick="App.closeModal()">Cerrar</button>
                     </div>
                 </div>
@@ -5439,59 +5445,94 @@ Reglas obligatorias:
     },
 
     async callGeminiVision(apiKey, base64Data, promptText) {
-        const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
-        let lastError = null;
+        const cleanKey = String(apiKey || '').trim();
+        if (!cleanKey) {
+            throw new Error('API Key no encontrada. Por favor, pulsa en "Revisar Clave API" para configurarla.');
+        }
 
-        for (const model of models) {
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: promptText },
-                                {
-                                    inlineData: {
-                                        mimeType: 'image/jpeg',
-                                        data: base64Data
-                                    }
-                                }
-                            ]
-                        }],
-                        generationConfig: {
-                            temperature: 0.1,
-                            responseMimeType: 'application/json'
-                        }
-                    })
-                });
+        // 1. Descubrir los modelos habilitados para esta API Key mediante ListModels
+        let targetModel = 'models/gemini-1.5-flash';
+        try {
+            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`);
+            if (listRes.ok) {
+                const listData = await listRes.json();
+                const available = (listData.models || [])
+                    .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+                    .map(m => m.name);
 
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    const errMsg = errData.error?.message || `HTTP ${res.status}`;
-                    if (res.status === 400 && errMsg.toLowerCase().includes('api_key')) {
-                        throw new Error(`API Key de Gemini no válida o caducada. Verifícala en Google AI Studio.`);
-                    }
-                    lastError = new Error(`Error en modelo ${model}: ${errMsg}`);
-                    continue;
+                const preferred = [
+                    'models/gemini-1.5-flash',
+                    'models/gemini-2.0-flash',
+                    'models/gemini-1.5-flash-8b',
+                    'models/gemini-1.5-pro'
+                ];
+
+                const found = preferred.find(p => available.includes(p)) 
+                    || available.find(m => m.toLowerCase().includes('flash'))
+                    || available[0];
+
+                if (found) {
+                    targetModel = found;
                 }
-
-                const data = await res.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!text) throw new Error('Gemini no devolvió texto de respuesta.');
-
-                let cleaned = text.trim();
-                if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
-                else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/i, '');
-
-                return JSON.parse(cleaned);
-            } catch (err) {
-                lastError = err;
-                if (err.message && err.message.includes('API Key de Gemini')) throw err;
+            } else {
+                const errData = await listRes.json().catch(() => ({}));
+                const errMsg = errData.error?.message || `HTTP ${listRes.status}`;
+                const lower = errMsg.toLowerCase();
+                if (listRes.status === 400 || lower.includes('api key') || lower.includes('api_key') || lower.includes('invalid')) {
+                    throw new Error('La API Key de Gemini no es válida o está incompleta. Pulsa en "Revisar Clave API" y asegúrate de copiar la clave entera de Google AI Studio.');
+                }
+            }
+        } catch (e) {
+            if (e.message && (e.message.includes('API Key') || e.message.includes('Google AI Studio'))) {
+                throw e;
             }
         }
-        throw lastError || new Error('No se pudo conectar con el servicio de IA de Gemini.');
+
+        // 2. Invocar el modelo detectado
+        const modelPath = targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${cleanKey}`;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [
+                        { text: promptText },
+                        {
+                            inlineData: {
+                                mimeType: 'image/jpeg',
+                                data: base64Data
+                            }
+                        }
+                    ]
+                }],
+                generationConfig: {
+                    temperature: 0.1,
+                    responseMimeType: 'application/json'
+                }
+            })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const errMsg = errData.error?.message || `HTTP ${res.status}`;
+            const lower = errMsg.toLowerCase();
+            if (res.status === 400 || lower.includes('api key') || lower.includes('api_key') || lower.includes('invalid')) {
+                throw new Error('La API Key de Gemini no es válida o ha caducado. Pulsa en "Revisar Clave API" para comprobarla.');
+            }
+            throw new Error(`Error de Gemini (${modelPath}): ${errMsg}`);
+        }
+
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error('Gemini no devolvió texto de respuesta.');
+
+        let cleaned = text.trim();
+        if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
+        else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/i, '');
+
+        return JSON.parse(cleaned);
     },
 
     matchTicketWithApp(ticketItems = [], appOrders = {}) {
