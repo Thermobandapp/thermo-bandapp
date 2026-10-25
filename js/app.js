@@ -356,7 +356,8 @@ const App = {
             partyGoHome: document.getElementById('btn-party-go-home'),
             loginSubmit: document.getElementById('btn-login-submit'),
             adminSaveMember: document.getElementById('btn-admin-save-member'),
-            showTicket: document.getElementById('btn-show-ticket')
+            showTicket: document.getElementById('btn-show-ticket'),
+            auditTicket: document.getElementById('btn-audit-ticket')
         };
         this.display = {
             adminPanelBtn: document.getElementById('admin-panel-btn'),
@@ -391,6 +392,18 @@ const App = {
         this.display.addFriendManual.addEventListener('click', () => this.handleAddFriendManual());
         if (this.buttons.showTicket) {
             this.buttons.showTicket.addEventListener('click', () => this.handleShowTicket());
+        }
+        if (this.buttons.auditTicket) {
+            this.buttons.auditTicket.addEventListener('click', () => this.startTicketAudit());
+        }
+        const ticketCamInput = document.getElementById('ticket-camera-input');
+        if (ticketCamInput) {
+            ticketCamInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    this.handleTicketPhotoSelected(e.target.files[0]);
+                    e.target.value = '';
+                }
+            });
         }
         
         this.buttons.createParty.addEventListener('click', () => this.handleCreatePartyFromSetup());
@@ -1456,6 +1469,9 @@ const App = {
                 this.updateOrdersUI();
                 if (this.state.currentView === 'settle') {
                     this.updateChangeAssistantUI();
+                }
+                if (this.state.isAuditModalOpen) {
+                    this.renderTicketAuditModal();
                 }
             }
         });
@@ -2738,7 +2754,8 @@ const App = {
                     </div>
                 </div>
             </div>
-            <div class="actions" style="margin-top: 1.5rem;">
+            <div class="actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.6rem;">
+                <button onclick="App.startTicketAudit()" class="btn-secondary" style="border-color: var(--primary); background: rgba(99, 102, 241, 0.15); font-weight: 600;">📸 Cuadrar con Ticket del Bar</button>
                 <button onclick="App.closeModal()" class="btn-primary">Cerrar Ticket</button>
             </div>
         `;
@@ -4925,6 +4942,7 @@ const App = {
     },
 
     closeModal() {
+        this.state.isAuditModalOpen = false;
         this.display.modalOverlay.classList.add('hidden');
     },
 
@@ -5172,6 +5190,758 @@ const App = {
         } catch (e) {
             console.error(e);
         }
+    },
+
+    // ==========================================
+    // CUADRE DE CUENTA Y ESCANEO DE TICKETS CON IA (GEMINI)
+    // ==========================================
+
+    getGeminiApiKey() {
+        return localStorage.getItem('thermobanda_gemini_key') || this.state.tableData?.geminiApiKey || null;
+    },
+
+    showGeminiApiKeyModal() {
+        const currentKey = this.getGeminiApiKey() || '';
+        const safeKey = currentKey ? currentKey.replace(/"/g, '&quot;') : '';
+
+        const html = `
+            <div style="text-align: left;">
+                <h3 style="margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>📸 Escaneo de Tickets con IA</span>
+                </h3>
+                <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.85rem;">
+                    Para leer y desglosar automáticamente los tickets del bar con <b>Google Gemini</b>, introduce tu API Key gratuita de Google.
+                </p>
+
+                <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 0.75rem 0.85rem; margin-bottom: 1rem; font-size: 0.8rem; line-height: 1.45; color: var(--text-main);">
+                    💡 <b>¿Cómo conseguirla 100% gratis en 1 minuto?</b><br>
+                    1. Entra en <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 700; text-decoration: underline;">Google AI Studio</a> con tu cuenta de Google.<br>
+                    2. Pulsa en <b>"Create API key"</b> y copia el texto.<br>
+                    3. Pégalo aquí. Solo necesitas configurarlo una vez.
+                </div>
+
+                <div style="margin-bottom: 0.9rem;">
+                    <label style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem; font-weight: 600;">Google Gemini API Key:</label>
+                    <input type="password" id="input-gemini-key" value="${safeKey}" placeholder="AIzaSy..." style="width: 100%; padding: 0.75rem 0.85rem; font-size: 0.95rem; box-sizing: border-box; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main);">
+                </div>
+
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.25rem; cursor: pointer; user-select: none;">
+                    <input type="checkbox" id="chk-share-gemini-key" checked style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary);">
+                    <span>Compartir esta clave con los miembros de esta mesa</span>
+                </label>
+
+                <div style="display: flex; gap: 0.6rem;">
+                    <button class="btn-primary" onclick="App.saveGeminiApiKey()" style="flex: 1; padding: 0.8rem; font-weight: 700;">💾 Guardar y Escanear</button>
+                    <button class="btn-secondary" onclick="App.closeModal()" style="padding: 0.8rem 1rem;">Cancelar</button>
+                </div>
+            </div>
+        `;
+        this.openModal(html);
+        setTimeout(() => document.getElementById('input-gemini-key')?.focus(), 80);
+    },
+
+    saveGeminiApiKey() {
+        const input = document.getElementById('input-gemini-key');
+        const key = input ? input.value.trim() : '';
+        if (!key) return alert('Por favor, introduce una API Key válida.');
+
+        localStorage.setItem('thermobanda_gemini_key', key);
+
+        const shareChk = document.getElementById('chk-share-gemini-key');
+        if (shareChk && shareChk.checked && this.state.tableId) {
+            set(ref(this.db, `tables/${this.state.tableId}/geminiApiKey`), key).catch(console.error);
+        }
+
+        this.closeModal();
+        setTimeout(() => this.triggerCameraScan(), 120);
+    },
+
+    startTicketAudit() {
+        if (!this.state.tableId) return alert('No hay ninguna mesa activa.');
+
+        const hasKey = Boolean(this.getGeminiApiKey());
+        const hasExistingScan = Boolean(this.state.scannedTicketData?.items?.length);
+
+        if (hasExistingScan) {
+            const html = `
+                <div style="text-align: left;">
+                    <h3 style="margin-bottom: 0.4rem;">📸 Cuadre con Ticket del Bar</h3>
+                    <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.15rem;">
+                        Ya tienes un ticket escaneado en esta sesión (${this.state.scannedTicketData.items.length} artículos leídos). ¿Qué prefieres hacer?
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                        <button class="btn-primary" onclick="App.renderTicketAuditModal()" style="padding: 0.85rem; font-weight: 700; text-align: center;">
+                            👁️ Ver Cuadre Actual
+                        </button>
+                        <button class="btn-secondary" onclick="App.triggerCameraScan()" style="padding: 0.85rem; text-align: center;">
+                            📷 Hacer Nueva Foto al Ticket
+                        </button>
+                        <button class="btn-secondary" onclick="App.showGeminiApiKeyModal()" style="font-size: 0.82rem; opacity: 0.85; padding: 0.65rem;">
+                            ⚙️ Configurar Clave API Gemini
+                        </button>
+                    </div>
+                </div>
+            `;
+            this.openModal(html);
+            return;
+        }
+
+        if (!hasKey) {
+            this.showGeminiApiKeyModal();
+            return;
+        }
+
+        this.triggerCameraScan();
+    },
+
+    triggerCameraScan() {
+        const input = document.getElementById('ticket-camera-input');
+        if (input) {
+            input.click();
+        } else {
+            alert('No se encontró el selector de cámara en la página.');
+        }
+    },
+
+    async handleTicketPhotoSelected(file) {
+        if (!file || !file.type.startsWith('image/')) {
+            return alert('Por favor, selecciona una fotografía válida del ticket.');
+        }
+
+        const apiKey = this.getGeminiApiKey();
+        if (!apiKey) {
+            this.showGeminiApiKeyModal();
+            return;
+        }
+
+        this.openModal(`
+            <div style="text-align: center; padding: 1.5rem 0.5rem;">
+                <div class="loader" style="margin: 0 auto 1.25rem;"></div>
+                <h3 style="margin-bottom: 0.4rem;">📸 Analizando ticket con IA...</h3>
+                <p id="audit-loading-status" style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.45;">
+                    Optimizando fotografía del ticket...
+                </p>
+            </div>
+        `, true);
+
+        try {
+            const statusEl = document.getElementById('audit-loading-status');
+
+            const base64Data = await this.resizeImageToBase64(file, 1280, 0.85);
+            this.state.scannedTicketImageUrl = `data:image/jpeg;base64,${base64Data}`;
+
+            if (statusEl) statusEl.textContent = 'Leyendo consumiciones y precios con Google Gemini...';
+
+            const prompt = `Eres un asistente experto en contabilidad de hostelería y auditoría de tickets de bar y restaurante.
+Analiza con total precisión esta imagen del ticket / cuenta física.
+Extrae todos los artículos, consumiciones o conceptos cobrados.
+
+Devuelve estrictamente un objeto JSON con esta estructura exacta:
+{
+  "establishment": "Nombre del bar o restaurante si es visible, o vacío",
+  "items": [
+    {
+      "name": "Nombre claro y reconocible del producto (ej: Caña, Doble, Café con leche, Bravas)",
+      "qty": 3,
+      "unitPrice": 2.50,
+      "totalPrice": 7.50
+    }
+  ],
+  "total": 24.50
+}
+
+Reglas obligatorias:
+- "qty" debe ser un número entero o decimal (si no se indica cantidad, pon 1).
+- "unitPrice" y "totalPrice" deben ser números (sin símbolo €). Si solo aparece el total del renglón, divide entre la cantidad.
+- Si hay conceptos globales como "Terraza", "Pan/Servicio", "Suplemento", inclúyelos como un artículo más.
+- NO incluyas subtotales parciales, base imponible ni desglose de IVA como artículos.
+- "total" debe ser el importe final a pagar del ticket.`;
+
+            const parsed = await this.callGeminiVision(apiKey, base64Data, prompt);
+
+            if (!parsed || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+                throw new Error('No se detectaron artículos en el ticket. Asegúrate de que la foto esté bien enfocada e iluminada.');
+            }
+
+            parsed.items = parsed.items.map(item => {
+                const qty = Math.max(1, Number(item.qty || 1));
+                const totalPrice = Number(item.totalPrice || (qty * Number(item.unitPrice || 0)));
+                const unitPrice = Number(item.unitPrice || (qty > 0 ? totalPrice / qty : totalPrice));
+                return {
+                    name: String(item.name || 'Artículo').trim(),
+                    qty,
+                    unitPrice: Math.round(unitPrice * 100) / 100,
+                    totalPrice: Math.round(totalPrice * 100) / 100
+                };
+            });
+
+            if (!parsed.total) {
+                parsed.total = parsed.items.reduce((acc, it) => acc + it.totalPrice, 0);
+            }
+            parsed.total = Math.round(Number(parsed.total) * 100) / 100;
+
+            this.state.scannedTicketData = parsed;
+            this.state.isAuditModalOpen = true;
+            this.renderTicketAuditModal();
+
+        } catch (error) {
+            console.error('Error procesando ticket:', error);
+            const isKeyError = error.message && error.message.toLowerCase().includes('api');
+            let errorHtml = `
+                <div style="text-align: left;">
+                    <h3 style="color: var(--danger); margin-bottom: 0.5rem;">⚠️ No se pudo leer el ticket</h3>
+                    <p style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 1rem; line-height: 1.45;">
+                        ${error.message || 'Ocurrió un error inesperado al procesar la fotografía.'}
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                        <button class="btn-primary" onclick="App.triggerCameraScan()">📷 Intentar Otra Foto</button>
+                        ${isKeyError ? `<button class="btn-secondary" onclick="App.showGeminiApiKeyModal()">⚙️ Revisar Clave API</button>` : ''}
+                        <button class="btn-secondary" onclick="App.closeModal()">Cerrar</button>
+                    </div>
+                </div>
+            `;
+            this.openModal(errorHtml);
+        }
+    },
+
+    resizeImageToBase64(file, maxDimension = 1280, quality = 0.85) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > maxDimension || h > maxDimension) {
+                        if (w > h) {
+                            h = Math.round((h * maxDimension) / w);
+                            w = maxDimension;
+                        } else {
+                            w = Math.round((w * maxDimension) / h);
+                            h = maxDimension;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    const base64 = dataUrl.split(',')[1];
+                    resolve(base64);
+                };
+                img.onerror = () => reject(new Error('No se pudo cargar la imagen para optimizarla.'));
+                img.src = e.target.result;
+            };
+            reader.onerror = () => reject(new Error('Error al leer el archivo de fotografía.'));
+            reader.readAsDataURL(file);
+        });
+    },
+
+    async callGeminiVision(apiKey, base64Data, promptText) {
+        const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+        let lastError = null;
+
+        for (const model of models) {
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: promptText },
+                                {
+                                    inlineData: {
+                                        mimeType: 'image/jpeg',
+                                        data: base64Data
+                                    }
+                                }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            responseMimeType: 'application/json'
+                        }
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const errMsg = errData.error?.message || `HTTP ${res.status}`;
+                    if (res.status === 400 && errMsg.toLowerCase().includes('api_key')) {
+                        throw new Error(`API Key de Gemini no válida o caducada. Verifícala en Google AI Studio.`);
+                    }
+                    lastError = new Error(`Error en modelo ${model}: ${errMsg}`);
+                    continue;
+                }
+
+                const data = await res.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('Gemini no devolvió texto de respuesta.');
+
+                let cleaned = text.trim();
+                if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
+                else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/i, '');
+
+                return JSON.parse(cleaned);
+            } catch (err) {
+                lastError = err;
+                if (err.message && err.message.includes('API Key de Gemini')) throw err;
+            }
+        }
+        throw lastError || new Error('No se pudo conectar con el servicio de IA de Gemini.');
+    },
+
+    matchTicketWithApp(ticketItems = [], appOrders = {}) {
+        const appMap = new Map();
+
+        Object.entries(appOrders).forEach(([orderId, o]) => {
+            const rawName = o.productName || 'Varios';
+            const norm = this.normalizeKey(rawName);
+            if (!appMap.has(norm)) {
+                appMap.set(norm, {
+                    name: rawName,
+                    norm,
+                    qty: 0,
+                    unitPrice: Number(o.price || 0),
+                    totalPrice: 0,
+                    consumers: {},
+                    orderIds: []
+                });
+            }
+            const entry = appMap.get(norm);
+            entry.qty += 1;
+            entry.totalPrice += Number(o.price || 0);
+            entry.orderIds.push(orderId);
+
+            const consumerName = o.user === 'SHARED' ? '💎 A escote' : o.user;
+            entry.consumers[consumerName] = (entry.consumers[consumerName] || 0) + 1;
+        });
+
+        const matches = [];
+        const matchedAppKeys = new Set();
+
+        ticketItems.forEach((tItem, tIndex) => {
+            const tNorm = this.normalizeKey(tItem.name);
+            let bestKey = null;
+
+            if (appMap.has(tNorm) && !matchedAppKeys.has(tNorm)) {
+                bestKey = tNorm;
+            } else {
+                for (const [aNorm] of appMap.entries()) {
+                    if (matchedAppKeys.has(aNorm)) continue;
+                    if (aNorm.includes(tNorm) || tNorm.includes(aNorm)) {
+                        bestKey = aNorm;
+                        break;
+                    }
+                }
+            }
+
+            const tQty = Number(tItem.qty || 1);
+            const tUnitPrice = Number(tItem.unitPrice || (tItem.totalPrice ? tItem.totalPrice / tQty : 0));
+            const tTotalPrice = Number(tItem.totalPrice || (tQty * tUnitPrice));
+
+            if (bestKey) {
+                matchedAppKeys.add(bestKey);
+                const aData = appMap.get(bestKey);
+                const qtyDiff = tQty - aData.qty;
+                const priceDiff = tTotalPrice - aData.totalPrice;
+
+                matches.push({
+                    ticketIndex: tIndex,
+                    ticketItem: { ...tItem, qty: tQty, unitPrice: tUnitPrice, totalPrice: tTotalPrice },
+                    appItem: aData,
+                    displayName: aData.name || tItem.name,
+                    tQty,
+                    aQty: aData.qty,
+                    qtyDiff,
+                    priceDiff,
+                    unitPrice: tUnitPrice || aData.unitPrice,
+                    consumers: aData.consumers,
+                    status: qtyDiff === 0 ? 'BALANCED' : (qtyDiff > 0 ? 'MISSING_IN_APP' : 'EXTRA_IN_APP')
+                });
+            } else {
+                matches.push({
+                    ticketIndex: tIndex,
+                    ticketItem: { ...tItem, qty: tQty, unitPrice: tUnitPrice, totalPrice: tTotalPrice },
+                    appItem: null,
+                    displayName: tItem.name,
+                    tQty,
+                    aQty: 0,
+                    qtyDiff: tQty,
+                    priceDiff: tTotalPrice,
+                    unitPrice: tUnitPrice,
+                    consumers: {},
+                    status: 'MISSING_IN_APP'
+                });
+            }
+        });
+
+        for (const [aNorm, aData] of appMap.entries()) {
+            if (!matchedAppKeys.has(aNorm)) {
+                matches.push({
+                    ticketIndex: null,
+                    ticketItem: null,
+                    appItem: aData,
+                    displayName: aData.name,
+                    tQty: 0,
+                    aQty: aData.qty,
+                    qtyDiff: -aData.qty,
+                    priceDiff: -aData.totalPrice,
+                    unitPrice: aData.unitPrice,
+                    consumers: aData.consumers,
+                    status: 'EXTRA_IN_APP'
+                });
+            }
+        }
+
+        return matches;
+    },
+
+    renderTicketAuditModal() {
+        if (!this.state.scannedTicketData) return;
+        this.state.isAuditModalOpen = true;
+
+        const ticketData = this.state.scannedTicketData;
+        const appOrders = this.state.tableData?.orders || {};
+        const matches = this.matchTicketWithApp(ticketData.items, appOrders);
+
+        let ticketSum = 0;
+        ticketData.items.forEach(it => ticketSum += Number(it.totalPrice || 0));
+        let appSum = 0;
+        Object.values(appOrders).forEach(o => appSum += Number(o.price || 0));
+
+        const grandDiff = Math.round((ticketSum - appSum) * 100) / 100;
+        const isPerfect = Math.abs(grandDiff) < 0.05 && matches.every(m => m.qtyDiff === 0);
+
+        const mismatched = matches.filter(m => m.status !== 'BALANCED');
+        const balanced = matches.filter(m => m.status === 'BALANCED');
+
+        let bannerHtml = '';
+        if (isPerfect) {
+            bannerHtml = `
+                <div class="audit-banner success">
+                    🎉 <b>¡Enhorabuena! La cuenta está 100% cuadrada con el ticket del bar.</b><br>
+                    Todos los artículos y cantidades coinciden exactamente.
+                </div>
+            `;
+        } else if (grandDiff > 0) {
+            bannerHtml = `
+                <div class="audit-banner danger">
+                    🔴 <b>Descuadre: El ticket del bar suma ${this.formatEuro(grandDiff)} MÁS que la app.</b><br>
+                    Faltan consumiciones por apuntar. Revisa abajo los botones de asignación rápida.
+                </div>
+            `;
+        } else {
+            bannerHtml = `
+                <div class="audit-banner warning">
+                    🟠 <b>Descuadre: La app suma ${this.formatEuro(Math.abs(grandDiff))} MÁS que el ticket.</b><br>
+                    Se apuntó algo de más en la mesa o el bar no lo ha cobrado.
+                </div>
+            `;
+        }
+
+        const renderItemCard = (m) => {
+            const isMissing = m.status === 'MISSING_IN_APP';
+            const isExtra = m.status === 'EXTRA_IN_APP';
+            const isBalanced = m.status === 'BALANCED';
+
+            let badgeClass = isBalanced ? 'balanced' : (isMissing ? 'missing' : 'extra');
+            let badgeText = isBalanced
+                ? '✓ Cuadrado'
+                : (isMissing ? `Faltan ${m.qtyDiff} en app (+${this.formatEuro(m.priceDiff)})` : `Sobran ${Math.abs(m.qtyDiff)} en app (-${this.formatEuro(Math.abs(m.priceDiff))})`);
+
+            const consumerEntries = Object.entries(m.consumers);
+            let consumersLine = '';
+            if (consumerEntries.length > 0) {
+                const listStr = consumerEntries.map(([name, count]) => `<b>${name}</b> (${count})`).join(', ');
+                consumersLine = `<div class="audit-consumers-line">👥 Pedido en la app por: ${listStr}</div>`;
+            } else if (isMissing) {
+                consumersLine = `<div class="audit-consumers-line" style="color:#f87171;">⚠️ Nadie en la mesa ha apuntado este artículo.</div>`;
+            }
+
+            let actionsHtml = '';
+            const safeName = m.displayName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const safePrice = Number(m.unitPrice || 0);
+
+            if (isMissing) {
+                let quickPills = '';
+                consumerEntries.forEach(([cName]) => {
+                    const cleanUser = cName === '💎 A escote' ? 'SHARED' : cName;
+                    const safeUser = cleanUser.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    quickPills += `
+                        <button class="audit-pill-btn" onclick="App.addAuditOrder('${safeName}', ${safePrice}, '${safeUser}')">
+                            + ${cName}
+                        </button>
+                    `;
+                });
+
+                if (!m.consumers['💎 A escote']) {
+                    quickPills += `
+                        <button class="audit-pill-btn pill-shared" onclick="App.addAuditOrder('${safeName}', ${safePrice}, 'SHARED')">
+                            + 💎 A escote
+                        </button>
+                    `;
+                }
+
+                quickPills += `
+                    <button class="audit-pill-btn" onclick="App.showAuditAssignPicker('${safeName}', ${safePrice})" style="background: rgba(255,255,255,0.06); border-color: var(--glass-border);">
+                        👤 Asignar a...
+                    </button>
+                `;
+
+                actionsHtml = `
+                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.4rem; font-weight: 600;">¿Quién se tomó lo que falta?</div>
+                    <div class="audit-action-pills">${quickPills}</div>
+                `;
+            } else if (isExtra) {
+                let removePills = '';
+                consumerEntries.forEach(([cName]) => {
+                    const cleanUser = cName === '💎 A escote' ? 'SHARED' : cName;
+                    const safeUser = cleanUser.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    removePills += `
+                        <button class="audit-pill-btn pill-remove" onclick="App.removeAuditOrder('${safeName}', '${safeUser}')">
+                            - Quitar a ${cName}
+                        </button>
+                    `;
+                });
+
+                actionsHtml = `
+                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.4rem; font-weight: 600;">Quitar de la app (sobrante):</div>
+                    <div class="audit-action-pills">${removePills}</div>
+                `;
+            }
+
+            let ticketQtyControls = '';
+            if (m.ticketIndex !== null && m.ticketIndex !== undefined) {
+                ticketQtyControls = `
+                    <span style="font-size: 0.76rem; color: var(--text-muted); margin-left: 0.4rem;">
+                        Ticket: 
+                        <button class="audit-qty-btn" onclick="App.adjustAuditTicketItemQty(${m.ticketIndex}, -1)" title="Restar 1 en ticket">-</button>
+                        <b>${m.tQty}</b>
+                        <button class="audit-qty-btn" onclick="App.adjustAuditTicketItemQty(${m.ticketIndex}, 1)" title="Sumar 1 en ticket">+</button>
+                    </span>
+                `;
+            }
+
+            return `
+                <div class="audit-item-card ${isBalanced ? 'is-balanced' : (isMissing ? 'is-missing' : 'is-extra')}">
+                    <div class="audit-item-header">
+                        <div>
+                            <b style="font-size: 0.95rem; color: var(--text-main);">${m.displayName}</b>
+                            <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.35rem;">(${this.formatEuro(m.unitPrice)})</span>
+                        </div>
+                        <span class="audit-badge ${badgeClass}">${badgeText}</span>
+                    </div>
+                    <div style="font-size: 0.82rem; margin-bottom: 0.35rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            ${ticketQtyControls || `<span style="color:var(--text-muted); font-size: 0.76rem;">Ticket: <b>0</b></span>`}
+                            <span style="margin: 0 0.4rem; color: var(--text-muted);">|</span>
+                            <span style="font-size: 0.76rem; color: var(--text-muted);">App: <b>${m.aQty}</b> (${this.formatEuro(m.aQty * m.unitPrice)})</span>
+                        </div>
+                    </div>
+                    ${consumersLine}
+                    ${actionsHtml}
+                </div>
+            `;
+        };
+
+        const establishmentName = ticketData.establishment ? ` (${ticketData.establishment})` : '';
+
+        const html = `
+            <div class="audit-container">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">⚖️ Cuadre de Cuenta${establishmentName}</h3>
+                </div>
+
+                <div class="audit-summary-grid">
+                    <div class="audit-summary-card">
+                        <div class="audit-summary-label">Ticket Bar</div>
+                        <div class="audit-summary-value" style="color: var(--primary);">${this.formatEuro(ticketSum)}</div>
+                    </div>
+                    <div class="audit-summary-card">
+                        <div class="audit-summary-label">Total App</div>
+                        <div class="audit-summary-value">${this.formatEuro(appSum)}</div>
+                    </div>
+                    <div class="audit-summary-card" style="border-color: ${isPerfect ? 'rgba(34,197,94,0.5)' : (grandDiff > 0 ? 'rgba(239,68,68,0.5)' : 'rgba(245,158,11,0.5)')};">
+                        <div class="audit-summary-label">Diferencia</div>
+                        <div class="audit-summary-value" style="color: ${isPerfect ? '#4ade80' : (grandDiff > 0 ? '#f87171' : '#fbbf24')};">
+                            ${grandDiff > 0 ? '+' : ''}${this.formatEuro(grandDiff)}
+                        </div>
+                    </div>
+                </div>
+
+                ${bannerHtml}
+
+                ${this.state.scannedTicketImageUrl ? `
+                    <div style="margin-bottom: 0.25rem;">
+                        <button onclick="App.toggleAuditPhotoPreview()" class="btn-secondary" style="width: 100%; padding: 0.45rem 0.75rem; font-size: 0.78rem; display: flex; justify-content: space-between; align-items: center;">
+                            <span>📷 Ver foto del ticket escaneado</span>
+                            <span id="audit-photo-toggle-icon">▼</span>
+                        </button>
+                        <div id="audit-photo-container" style="display: none; margin-top: 0.5rem; text-align: center; background: #000; border-radius: var(--radius-sm); overflow: hidden; max-height: 240px;">
+                            <img src="${this.state.scannedTicketImageUrl}" alt="Ticket Bar" style="max-width: 100%; height: auto; max-height: 240px; object-fit: contain;">
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.25rem;">
+                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-main);">
+                        ${mismatched.length > 0 ? `⚠️ Artículos con descuadre (${mismatched.length}):` : '✅ Todos los artículos cuadran'}
+                    </span>
+                    <button onclick="App.promptAddManualTicketItem()" style="background: none; border: none; color: var(--primary); font-size: 0.78rem; font-weight: 600; cursor: pointer; text-decoration: underline;">
+                        + Añadir renglón al ticket
+                    </button>
+                </div>
+
+                <div style="max-height: 48vh; overflow-y: auto; padding-right: 2px;">
+                    ${mismatched.map(m => renderItemCard(m)).join('')}
+
+                    ${balanced.length > 0 ? `
+                        <div style="margin-top: 0.85rem; margin-bottom: 0.45rem; font-size: 0.82rem; font-weight: 700; color: #4ade80;">
+                            ✓ Artículos perfectamente cuadrados (${balanced.length}):
+                        </div>
+                        ${balanced.map(m => renderItemCard(m)).join('')}
+                    ` : ''}
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; border-top: 1px solid var(--glass-border); padding-top: 0.75rem;">
+                    <button class="btn-secondary" onclick="App.triggerCameraScan()" style="flex: 1; padding: 0.75rem; font-size: 0.85rem;">
+                        🔄 Nueva foto
+                    </button>
+                    <button class="btn-secondary" onclick="App.showGeminiApiKeyModal()" style="padding: 0.75rem 0.85rem; font-size: 0.85rem;" title="Configurar clave Gemini">
+                        ⚙️
+                    </button>
+                    <button class="btn-primary" onclick="App.closeModal()" style="flex: 1.2; padding: 0.75rem; font-weight: 700; font-size: 0.85rem;">
+                        ${isPerfect ? '🎉 Listo' : 'Cerrar'}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        this.openModal(html);
+    },
+
+    toggleAuditPhotoPreview() {
+        const container = document.getElementById('audit-photo-container');
+        const icon = document.getElementById('audit-photo-toggle-icon');
+        if (!container) return;
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            if (icon) icon.textContent = '▲';
+        } else {
+            container.style.display = 'none';
+            if (icon) icon.textContent = '▼';
+        }
+    },
+
+    async addAuditOrder(productName, price, targetUser) {
+        if (!this.state.tableId) return;
+        try {
+            const orderRef = push(ref(this.db, `tables/${this.state.tableId}/orders`));
+            await set(orderRef, {
+                user: targetUser,
+                orderedBy: this.state.user || 'Admin',
+                productName: productName,
+                price: Number(price || 0),
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            console.error('Error añadiendo pedido desde auditoría:', error);
+            alert('Error al añadir la consumición.');
+        }
+    },
+
+    async removeAuditOrder(productName, targetUser) {
+        if (!this.state.tableId) return;
+        try {
+            const orders = Object.entries(this.state.tableData?.orders || {});
+            const normTarget = this.normalizeKey(productName);
+            const matches = orders
+                .filter(([id, o]) => (o.user === targetUser || (targetUser === 'SHARED' && o.user === 'SHARED')) && this.normalizeKey(o.productName) === normTarget)
+                .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+            if (matches.length > 0) {
+                const [orderId] = matches[0];
+                const orderRef = ref(this.db, `tables/${this.state.tableId}/orders/${orderId}`);
+                await set(orderRef, null);
+            } else {
+                alert(`No se encontró ningún pedido reciente de ${productName} para ${targetUser}.`);
+            }
+        } catch (error) {
+            console.error('Error eliminando pedido desde auditoría:', error);
+            alert('Error al retirar la consumición.');
+        }
+    },
+
+    adjustAuditTicketItemQty(index, delta) {
+        if (!this.state.scannedTicketData?.items?.[index]) return;
+        const item = this.state.scannedTicketData.items[index];
+        const newQty = Math.max(0, (item.qty || 1) + delta);
+        item.qty = newQty;
+        const unitPrice = item.unitPrice || 0;
+        item.totalPrice = Math.round(newQty * unitPrice * 100) / 100;
+        this.renderTicketAuditModal();
+    },
+
+    promptAddManualTicketItem() {
+        const name = prompt('Nombre del artículo del ticket:');
+        if (!name || !name.trim()) return;
+        const qtyStr = prompt('Cantidad en el ticket:', '1');
+        const qty = parseInt(qtyStr) || 1;
+        const priceStr = prompt('Precio total (€):', '0');
+        const price = this.parseAmount(priceStr) || 0;
+
+        if (!this.state.scannedTicketData) {
+            this.state.scannedTicketData = { items: [], total: 0 };
+        }
+
+        this.state.scannedTicketData.items.push({
+            name: name.trim(),
+            qty,
+            unitPrice: Math.round((price / (qty || 1)) * 100) / 100,
+            totalPrice: price
+        });
+        this.renderTicketAuditModal();
+    },
+
+    showAuditAssignPicker(productName, price) {
+        const participants = Object.values(this.state.tableData?.participants || {})
+            .filter(p => p.status !== 'left');
+
+        const safeName = productName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+        let buttonsHtml = `
+            <button class="participant-btn btn-shared" style="width: 100%; padding: 0.85rem; margin-bottom: 0.75rem;" onclick="App.addAuditOrder('${safeName}', ${price}, 'SHARED'); App.renderTicketAuditModal();">
+                💎 A Escote (Todos)
+            </button>
+            <div class="participant-grid" style="margin-bottom: 1rem;">
+        `;
+
+        participants.forEach(p => {
+            const safeUser = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            buttonsHtml += `
+                <button class="participant-btn" onclick="App.addAuditOrder('${safeName}', ${price}, '${safeUser}'); App.renderTicketAuditModal();">
+                    ${p.name}
+                </button>
+            `;
+        });
+        buttonsHtml += `</div>`;
+
+        const html = `
+            <div style="text-align: left;">
+                <h3 style="margin-bottom: 0.4rem;">➕ Asignar ${productName} (${this.formatEuro(price)})</h3>
+                <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Selecciona a quién se le suma esta consumición en la cuenta:
+                </p>
+                ${buttonsHtml}
+                <button class="btn-secondary" onclick="App.renderTicketAuditModal()" style="width: 100%;">Volver al Cuadre</button>
+            </div>
+        `;
+
+        this.openModal(html);
     }
 };
 

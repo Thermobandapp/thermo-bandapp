@@ -1687,3 +1687,282 @@ body.light-theme .badge-escote {
     font-size: 1.1rem;
     margin-top: 0.5rem;
 }
+
+/* --- Estilos para Cuadre de Cuenta y Escaneo de Tickets --- */
+.audit-container {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.audit-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.audit-summary-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.35rem;
+    text-align: center;
+}
+
+body.light-theme .audit-summary-card {
+    background: rgba(241, 245, 249, 0.8);
+    border-color: rgba(203, 213, 225, 0.8);
+}
+
+.audit-summary-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+    font-weight: 600;
+}
+
+.audit-summary-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.audit-banner {
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    line-height: 1.35;
+    font-weight: 500;
+}
+
+.audit-banner.success {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #4ade80;
+}
+
+body.light-theme .audit-banner.success {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #15803d;
+}
+
+.audit-banner.danger {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+}
+
+body.light-theme .audit-banner.danger {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #b91c1c;
+}
+
+.audit-banner.warning {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fbbf24;
+}
+
+body.light-theme .audit-banner.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: #b45309;
+}
+
+.audit-item-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 0.55rem;
+    transition: all 0.2s ease;
+}
+
+body.light-theme .audit-item-card {
+    background: #ffffff;
+    border-color: rgba(203, 213, 225, 0.8);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.audit-item-card.is-balanced {
+    border-color: rgba(34, 197, 94, 0.3);
+    background: rgba(34, 197, 94, 0.04);
+}
+
+body.light-theme .audit-item-card.is-balanced {
+    background: rgba(240, 253, 244, 0.7);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.audit-item-card.is-missing {
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.06);
+}
+
+body.light-theme .audit-item-card.is-missing {
+    background: rgba(254, 242, 242, 0.7);
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+.audit-item-card.is-extra {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.06);
+}
+
+body.light-theme .audit-item-card.is-extra {
+    background: rgba(254, 243, 199, 0.5);
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.audit-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.35rem;
+}
+
+.audit-badge {
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.audit-badge.missing {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+body.light-theme .audit-badge.missing {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.audit-badge.extra {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+body.light-theme .audit-badge.extra {
+    background: #fef3c7;
+    color: #d97706;
+    border-color: #fcd34d;
+}
+
+.audit-badge.balanced {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+body.light-theme .audit-badge.balanced {
+    background: #dcfce7;
+    color: #16a34a;
+    border-color: #86efac;
+}
+
+.audit-consumers-line {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.45rem;
+    line-height: 1.35;
+}
+
+.audit-action-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+
+.audit-pill-btn {
+    border: 1px solid var(--primary);
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--text-main);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: all 0.15s ease;
+}
+
+.audit-pill-btn:hover {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.audit-pill-btn.pill-remove {
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+}
+
+body.light-theme .audit-pill-btn.pill-remove {
+    color: #dc2626;
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.audit-pill-btn.pill-remove:hover {
+    background: var(--danger);
+    color: #ffffff;
+}
+
+.audit-pill-btn.pill-shared {
+    border-color: rgba(56, 189, 248, 0.5);
+    background: rgba(56, 189, 248, 0.12);
+    color: #7dd3fc;
+}
+
+body.light-theme .audit-pill-btn.pill-shared {
+    color: #0369a1;
+    background: #e0f2fe;
+    border-color: #bae6fd;
+}
+
+.audit-pill-btn.pill-shared:hover {
+    background: #0284c7;
+    color: #ffffff;
+}
+
+.audit-qty-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+body.light-theme .audit-qty-btn {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
+.audit-qty-btn:hover {
+    background: var(--primary);
+    color: #fff;
+}
