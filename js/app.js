@@ -1264,9 +1264,14 @@ const App = {
         const remaining = currentBeneficiaries.filter(n => n !== userName);
         const orderRef = ref(this.db, `tables/${this.state.tableId}/orders/${orderId}`);
 
+        if (remaining.length === 0) {
+            if (!confirm(`Al borrar a ${userName}, no queda nadie en el escote. Se eliminará el pedido (${order.productName}) por completo de la mesa. ¿Continuar?`)) return;
+        } else {
+            if (!confirm(`¿Seguro que quieres borrar a ${userName} de este pedido a escote (${order.productName})?`)) return;
+        }
+
         try {
             if (remaining.length === 0) {
-                if (!confirm(`Al borrar a ${userName}, no queda nadie en el escote. Se eliminará el pedido por completo. ¿Continuar?`)) return;
                 await set(orderRef, null);
             } else {
                 await update(orderRef, { beneficiaries: remaining });
@@ -1437,6 +1442,14 @@ const App = {
                 console.error('Error al borrar pedido:', error);
             }
             return;
+        }
+
+        const order = this.state.tableData?.orders?.[orderId];
+        const currentBeneficiaries = order ? this.getOrderBeneficiaries(order) : [];
+        const removedUsers = currentBeneficiaries.filter(u => !selected.includes(u));
+        if (removedUsers.length > 0) {
+            const removedText = removedUsers.length === 1 ? `a "${removedUsers[0]}"` : `a ${removedUsers.join(', ')}`;
+            if (!confirm(`¿Seguro que quieres quitar ${removedText} de este reparto a escote?`)) return;
         }
 
         try {
@@ -2937,6 +2950,7 @@ const App = {
         const isSelected = this.state.tempSelectionFriends.includes(name);
 
         if (isSelected) {
+            if (!confirm(`¿Seguro que quieres quitar a "${name}" de la mesa?`)) return;
             // Apagar y quitar de la mesa
             const idx = this.state.tempSelectionFriends.indexOf(name);
             this.state.tempSelectionFriends.splice(idx, 1);
@@ -2976,6 +2990,20 @@ const App = {
         const prevSelection = this.state.tempSelectionFriends || [];
         const toAdd = targetNames.filter(name => !prevSelection.includes(name));
         const toRemove = prevSelection.filter(name => !targetNames.includes(name));
+
+        if (toRemove.length > 0) {
+            const namesText = toRemove.length === 1 ? `a "${toRemove[0]}"` : `a ${toRemove.length} amigos (${toRemove.join(', ')})`;
+            if (!confirm(`¿Seguro que quieres quitar de la mesa ${namesText}?`)) {
+                // Restaurar switch visual según la selección actual
+                const total = available.length;
+                const count = (this.state.tempSelectionFriends || []).length;
+                const switchAll = document.getElementById('switch-table-friend-all');
+                const switchNone = document.getElementById('switch-table-friend-none');
+                if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+                if (switchNone) switchNone.classList.toggle('active', count === 0);
+                return;
+            }
+        }
 
         this.state.tempSelectionFriends = [...targetNames];
 
@@ -4451,6 +4479,7 @@ const App = {
         const isSelected = this.state.tempSelectionFriends.includes(name);
 
         if (isSelected) {
+            if (!confirm(`¿Seguro que quieres quitar a "${name}" del bote de la fiesta?`)) return;
             // Apagar y quitar del bote
             const idx = this.state.tempSelectionFriends.indexOf(name);
             this.state.tempSelectionFriends.splice(idx, 1);
@@ -4490,6 +4519,20 @@ const App = {
         const prevSelection = this.state.tempSelectionFriends || [];
         const toAdd = targetNames.filter(name => !prevSelection.includes(name));
         const toRemove = prevSelection.filter(name => !targetNames.includes(name));
+
+        if (toRemove.length > 0) {
+            const namesText = toRemove.length === 1 ? `a "${toRemove[0]}"` : `a ${toRemove.length} amigos (${toRemove.join(', ')})`;
+            if (!confirm(`¿Seguro que quieres quitar del bote ${namesText}?`)) {
+                // Restaurar switch visual
+                const total = available.length;
+                const count = (this.state.tempSelectionFriends || []).length;
+                const switchAll = document.getElementById('switch-party-friend-all');
+                const switchNone = document.getElementById('switch-party-friend-none');
+                if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
+                if (switchNone) switchNone.classList.toggle('active', count === 0);
+                return;
+            }
+        }
 
         this.state.tempSelectionFriends = [...targetNames];
 
@@ -5995,6 +6038,8 @@ Reglas obligatorias:
 
     async removeAuditOrder(productName, targetUser) {
         if (!this.state.tableId) return;
+        const targetLabel = targetUser === 'SHARED' ? 'a escote' : targetUser;
+        if (!confirm(`¿Seguro que quieres borrar una consumición de "${productName}" de ${targetLabel}?`)) return;
         try {
             const orders = Object.entries(this.state.tableData?.orders || {});
             const normTarget = this.normalizeKey(productName);
@@ -6018,10 +6063,17 @@ Reglas obligatorias:
     adjustAuditTicketItemQty(index, delta) {
         if (!this.state.scannedTicketData?.items?.[index]) return;
         const item = this.state.scannedTicketData.items[index];
+        if (delta < 0 && (item.qty || 1) <= 1) {
+            if (!confirm(`¿Seguro que quieres borrar "${item.name}" del ticket escaneado?`)) return;
+        }
         const newQty = Math.max(0, (item.qty || 1) + delta);
-        item.qty = newQty;
-        const unitPrice = item.unitPrice || 0;
-        item.totalPrice = Math.round(newQty * unitPrice * 100) / 100;
+        if (newQty === 0) {
+            this.state.scannedTicketData.items.splice(index, 1);
+        } else {
+            item.qty = newQty;
+            const unitPrice = item.unitPrice || 0;
+            item.totalPrice = Math.round(newQty * unitPrice * 100) / 100;
+        }
         this.renderTicketAuditModal();
     },
 
