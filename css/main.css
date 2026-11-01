@@ -960,6 +960,16 @@ input:focus {
     transform: scale(0.95);
 }
 
+.menu-item.dragging, .reorder-item-row.dragging {
+    opacity: 0.5;
+    transform: scale(0.97);
+}
+
+.menu-item.drag-over, .reorder-item-row.drag-over {
+    border: 2px dashed var(--primary) !important;
+    background: rgba(99, 102, 241, 0.18) !important;
+}
+
 .item-icon {
     font-size: 2rem;
     margin-bottom: 0.5rem;

@@ -348,6 +348,7 @@ const App = {
             joinTable: document.getElementById('btn-join-table'),
             addProduct: document.getElementById('btn-add-product-menu'),
             repeatRound: document.getElementById('btn-repeat-round'),
+            reorderMenu: document.getElementById('btn-reorder-menu'),
             leaveTable: document.getElementById('btn-leave-table'),
             createParty: document.getElementById('btn-create-party-main'),
             partySettlements: document.getElementById('btn-party-settlements'),
@@ -385,6 +386,9 @@ const App = {
         this.buttons.addProduct.addEventListener('click', () => this.handleAddProductMenu());
         if (this.buttons.repeatRound) {
             this.buttons.repeatRound.addEventListener('click', () => this.handleRepeatRoundSelector());
+        }
+        if (this.buttons.reorderMenu) {
+            this.buttons.reorderMenu.addEventListener('click', () => this.handleOpenReorderMenuModal());
         }
         this.buttons.leaveTable.addEventListener('click', () => this.handleLeaveTable());
         document.getElementById('btn-close-modal').addEventListener('click', () => this.closeModal());
@@ -932,6 +936,7 @@ const App = {
         this.closeModal();
 
         try {
+            const currentCount = Object.keys(this.state.tableData?.menu || {}).length;
             const productRef = push(ref(this.db, `tables/${this.state.tableId}/menu`));
             const productData = {
                 name: nameInput,
@@ -939,9 +944,15 @@ const App = {
                 icon: iconInput,
                 allowEscote: Boolean(allowEscote),
                 alcohol,
-                cl
+                cl,
+                order: currentCount
             };
             await set(productRef, productData);
+
+            if (Array.isArray(this.state.tableData?.menuOrder)) {
+                const newMenuOrder = [...this.state.tableData.menuOrder, productRef.key];
+                await set(ref(this.db, `tables/${this.state.tableId}/menuOrder`), newMenuOrder);
+            }
 
             // Sincronizar con la biblioteca del bar
             const barName = this.getBarName();
@@ -1070,13 +1081,15 @@ const App = {
         this.closeModal();
 
         try {
+            const existingOrder = oldProduct.order !== undefined ? oldProduct.order : 0;
             const productData = {
                 name: nameInput,
                 price,
                 icon: iconInput,
                 allowEscote: Boolean(allowEscote),
                 alcohol,
-                cl
+                cl,
+                order: existingOrder
             };
 
             const barName = this.getBarName();
@@ -1796,20 +1809,53 @@ const App = {
         this.openModal(html);
     },
 
+    getOrderedMenuItems() {
+        const menu = this.state.tableData?.menu;
+        if (!menu) return [];
+
+        const entries = Object.entries(menu);
+        const menuOrder = this.state.tableData?.menuOrder;
+
+        if (Array.isArray(menuOrder) && menuOrder.length > 0) {
+            return entries.sort((a, b) => {
+                const idxA = menuOrder.indexOf(a[0]);
+                const idxB = menuOrder.indexOf(b[0]);
+                const valA = idxA !== -1 ? idxA : (a[1].order !== undefined ? a[1].order : 9999);
+                const valB = idxB !== -1 ? idxB : (b[1].order !== undefined ? b[1].order : 9999);
+                if (valA !== valB) return valA - valB;
+                return (a[1].name || '').localeCompare(b[1].name || '');
+            });
+        }
+
+        const hasOrderProp = entries.some(([, item]) => item.order !== undefined);
+        if (hasOrderProp) {
+            return entries.sort((a, b) => {
+                const valA = a[1].order !== undefined ? a[1].order : 9999;
+                const valB = b[1].order !== undefined ? b[1].order : 9999;
+                if (valA !== valB) return valA - valB;
+                return (a[1].name || '').localeCompare(b[1].name || '');
+            });
+        }
+
+        return entries;
+    },
+
     updateMenuUI() {
-        const menu = this.state.tableData.menu;
+        const orderedEntries = this.getOrderedMenuItems();
         this.display.menu.innerHTML = '';
-        if (!menu) {
+        if (orderedEntries.length === 0) {
             this.display.menu.innerHTML = '<p class="empty-msg">Pulsa "Nuevo" para añadir productos.</p>';
             return;
         }
 
-        Object.entries(menu).forEach(([id, item]) => {
+        orderedEntries.forEach(([id, item]) => {
             const alcoholBadge = (item.alcohol > 0 || item.cl > 0)
                 ? `<span class="badge-escote" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.72rem; padding: 0.15rem 0.4rem; border-radius: 4px; margin-top: 0.15rem;">🍺 ${item.alcohol > 0 ? item.alcohol + '%' : ''}${item.alcohol > 0 && item.cl > 0 ? ' · ' : ''}${item.cl > 0 ? item.cl + 'cl' : ''}</span>`
                 : '';
             const div = document.createElement('div');
             div.className = 'menu-item glass';
+            div.setAttribute('data-id', id);
+            div.setAttribute('draggable', 'true');
             div.innerHTML = `
                 <button class="btn-edit-small" data-id="${id}">✏️</button>
                 <button class="btn-delete-menu-small" data-id="${id}">🗑️</button>
@@ -1831,8 +1877,189 @@ const App = {
                 e.stopPropagation();
                 this.handleDeleteProduct(id, item);
             };
+
+            // Drag and drop en escritorio
+            div.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', id);
+                div.classList.add('dragging');
+            });
+            div.addEventListener('dragend', () => {
+                div.classList.remove('dragging');
+            });
+            div.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                div.classList.add('drag-over');
+            });
+            div.addEventListener('dragleave', () => {
+                div.classList.remove('drag-over');
+            });
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                div.classList.remove('drag-over');
+                const draggedId = e.dataTransfer.getData('text/plain');
+                if (draggedId && draggedId !== id) {
+                    this.reorderMenuCardDrop(draggedId, id);
+                }
+            });
+
             this.display.menu.appendChild(div);
         });
+    },
+
+    async reorderMenuCardDrop(draggedId, targetId) {
+        const orderedEntries = this.getOrderedMenuItems();
+        const currentIds = orderedEntries.map(([id]) => id);
+        const fromIndex = currentIds.indexOf(draggedId);
+        const toIndex = currentIds.indexOf(targetId);
+        if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+        currentIds.splice(fromIndex, 1);
+        currentIds.splice(toIndex, 0, draggedId);
+
+        await this.saveMenuOrder(currentIds);
+    },
+
+    handleOpenReorderMenuModal() {
+        if (!this.state.tableId) return;
+        const orderedEntries = this.getOrderedMenuItems();
+        if (orderedEntries.length <= 1) {
+            return alert('Necesitas al menos 2 productos para reordenar.');
+        }
+
+        this.state.tempMenuOrder = orderedEntries.map(([id, item]) => ({ id, ...item }));
+        this.renderReorderMenuModal();
+    },
+
+    renderReorderMenuModal() {
+        const items = this.state.tempMenuOrder || [];
+
+        let listHtml = '';
+        items.forEach((item, index) => {
+            const isFirst = index === 0;
+            const isLast = index === items.length - 1;
+
+            listHtml += `
+                <div class="reorder-item-row" data-index="${index}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.65rem 0.8rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-bottom: 0.45rem; user-select: none;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; flex: 1; overflow: hidden;">
+                        <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted); width: 1.3rem; text-align: center;">${index + 1}</span>
+                        <span style="font-size: 1.4rem;">${item.icon || '🍴'}</span>
+                        <div style="display: flex; flex-direction: column; overflow: hidden; text-align: left;">
+                            <span style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main, #ffffff);">${item.name}</span>
+                            <span style="font-size: 0.78rem; color: var(--text-muted);">${this.formatEuro(item.price)}</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; align-items: center;">
+                        <button type="button" class="btn-icon-small" onclick="App.moveReorderItem(${index}, -1)" ${isFirst ? 'disabled style="opacity: 0.25; cursor: default; padding: 0.4rem 0.6rem;"' : 'style="padding: 0.4rem 0.6rem; font-size: 0.95rem; font-weight: bold;"'} title="Subir">▲</button>
+                        <button type="button" class="btn-icon-small" onclick="App.moveReorderItem(${index}, 1)" ${isLast ? 'disabled style="opacity: 0.25; cursor: default; padding: 0.4rem 0.6rem;"' : 'style="padding: 0.4rem 0.6rem; font-size: 0.95rem; font-weight: bold;"'} title="Bajar">▼</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        const html = `
+            <div style="text-align: left;">
+                <h3 style="margin-bottom: 0.2rem;">⇅ Ordenar Tarjetas</h3>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                    Usa las flechas ▲ ▼ para mover los artículos al orden que desees.
+                </p>
+
+                <div style="display: flex; gap: 0.35rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center; margin-right: 0.2rem;">Atajos:</span>
+                    <button type="button" class="btn-icon-small" onclick="App.sortReorderTemp('az')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">🔤 A - Z</button>
+                    <button type="button" class="btn-icon-small" onclick="App.sortReorderTemp('price-asc')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">💶 Precio: Menor a Mayor</button>
+                    <button type="button" class="btn-icon-small" onclick="App.sortReorderTemp('price-desc')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">💶 Precio: Mayor a Menor</button>
+                </div>
+
+                <div id="reorder-list-container" style="max-height: 50vh; overflow-y: auto; padding-right: 0.2rem;">
+                    ${listHtml}
+                </div>
+
+                <div style="display: flex; gap: 0.6rem; margin-top: 1rem;">
+                    <button type="button" class="btn-primary" onclick="App.confirmSaveMenuOrder()" style="flex: 1; padding: 0.8rem; font-weight: 700; font-size: 0.95rem;">
+                        Guardar Orden
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.8rem 1rem;">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        this.openModal(html);
+    },
+
+    moveReorderItem(index, direction) {
+        const items = this.state.tempMenuOrder;
+        if (!items) return;
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= items.length) return;
+
+        const temp = items[index];
+        items[index] = items[targetIndex];
+        items[targetIndex] = temp;
+
+        this.renderReorderMenuModal();
+    },
+
+    sortReorderTemp(type) {
+        const items = this.state.tempMenuOrder;
+        if (!items) return;
+
+        if (type === 'az') {
+            items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        } else if (type === 'price-asc') {
+            items.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+        } else if (type === 'price-desc') {
+            items.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+        }
+
+        this.renderReorderMenuModal();
+    },
+
+    async confirmSaveMenuOrder() {
+        if (!this.state.tableId || !this.state.tempMenuOrder) return;
+        const newOrderIds = this.state.tempMenuOrder.map(item => item.id);
+        this.closeModal();
+        await this.saveMenuOrder(newOrderIds);
+    },
+
+    async saveMenuOrder(newOrderIds) {
+        if (!this.state.tableId || !newOrderIds || newOrderIds.length === 0) return;
+
+        try {
+            const barName = this.getBarName();
+            const updates = {};
+
+            updates[`tables/${this.state.tableId}/menuOrder`] = newOrderIds;
+            newOrderIds.forEach((id, idx) => {
+                updates[`tables/${this.state.tableId}/menu/${id}/order`] = idx;
+            });
+
+            if (barName) {
+                const barKey = barName.replace(/\s/g, '_');
+                updates[`bar_menus/${barKey}_order`] = newOrderIds;
+                newOrderIds.forEach((id, idx) => {
+                    updates[`bar_menus/${barKey}/${id}/order`] = idx;
+                });
+            }
+
+            if (this.state.tableData) {
+                this.state.tableData.menuOrder = newOrderIds;
+                if (this.state.tableData.menu) {
+                    newOrderIds.forEach((id, idx) => {
+                        if (this.state.tableData.menu[id]) {
+                            this.state.tableData.menu[id].order = idx;
+                        }
+                    });
+                }
+            }
+
+            await update(ref(this.db), updates);
+            this.updateMenuUI();
+        } catch (error) {
+            console.error('Error al guardar el nuevo orden del menú:', error);
+            alert('Error al guardar el nuevo orden del menú.');
+        }
     },
 
     updateOrdersUI() {
