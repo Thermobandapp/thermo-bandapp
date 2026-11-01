@@ -377,6 +377,7 @@ html[data-font-size="medium"] h2,
 html[data-font-size="medium"] .hero-title,
 html[data-font-size="medium"] .stat-value,
 html[data-font-size="medium"] #party-balance,
+html[data-font-size="medium"] #party-total-spent,
 html[data-font-size="medium"] .total-value {
     font-size: calc(var(--current-font-size, 1em) * 0.965);
 }
@@ -386,6 +387,7 @@ html[data-font-size="large"] h2,
 html[data-font-size="large"] .hero-title,
 html[data-font-size="large"] .stat-value,
 html[data-font-size="large"] #party-balance,
+html[data-font-size="large"] #party-total-spent,
 html[data-font-size="large"] .total-value {
     font-size: calc(var(--current-font-size, 1em) * 0.925);
 }

@@ -125,8 +125,8 @@
 
                     <!-- Formulario FIESTA -->
                     <div id="setup-form-party" class="setup-form hidden">
-                        <h2>Bote de Fiesta</h2>
-                        <p class="subtitle">Recauda dinero y gestiona los gastos</p>
+                        <h2>Modo Fiesta</h2>
+                        <p class="subtitle">Anota gastos compartidos y calcula reembolsos al final</p>
                         
                         <div class="form-group hidden" id="form-group-user-name-party">
                             <label for="user-name-party">Tu nombre</label>
@@ -134,14 +134,14 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="party-name-input">Nombre del Bote</label>
+                            <label for="party-name-input">Nombre de la Fiesta</label>
                             <input type="text" id="party-name-input" placeholder="Ej: Cumpleaños Juan">
                         </div>
 
                         <div class="actions">
-                            <button id="btn-create-party-main" class="btn-primary">Crear Nuevo Bote</button>
+                            <button id="btn-create-party-main" class="btn-primary">Crear Nueva Fiesta</button>
                             <div class="divider"><span>o</span></div>
-                            <button id="btn-join-party-main" class="btn-secondary">Unirse a Bote Abierto</button>
+                            <button id="btn-join-party-main" class="btn-secondary">Unirse a Fiesta Abierta</button>
                         </div>
                     </div>
                 </div>
@@ -319,39 +319,39 @@
                 </div>
                 <input type="file" id="ticket-camera-input" accept="image/*" capture="environment" style="display: none;">
             </section>
-            <!-- VISTA: Bote de Fiesta -->
+            <!-- VISTA: Modo Fiesta -->
             <section id="party-pot-view" class="view">
                 <div class="card glass">
                     <div class="summary-header">
-                        <h2>Bote de Fiesta 🥳</h2>
+                        <h2>Modo Fiesta 🥳</h2>
                         <div id="party-code-badge" class="code-badge">CÓDIGO: ---</div>
                     </div>
 
                     <div id="party-pot-active">
                         <div class="pot-display-large">
-                            <span class="label">Dinero Disponible</span>
-                            <span id="party-balance" class="value">0,00€</span>
+                            <span class="label">Total Gastado en la Fiesta</span>
+                            <span id="party-total-spent" class="value">0,00€</span>
                         </div>
 
                         <div class="grid-stats">
                             <div class="stat-card glass">
-                                <span id="party-total-collected" class="stat-value">0,00€</span>
-                                <span class="stat-label">Recaudado</span>
+                                <span id="party-my-balance" class="stat-value">0,00€</span>
+                                <span id="party-my-balance-label" class="stat-label">Mi Balance</span>
                             </div>
                             <div class="stat-card glass">
-                                <span id="party-total-spent" class="stat-value">0,00€</span>
-                                <span class="stat-label">Gastado</span>
+                                <span id="party-total-rounds-count" class="stat-value">0</span>
+                                <span class="stat-label">Gastos / Rondas</span>
                             </div>
                         </div>
 
-                        <div class="party-actions">
-                            <button id="btn-party-add-money" class="btn-secondary">➕ Añadir Fondos</button>
+                        <div class="party-actions" style="margin-bottom: 2rem;">
+                            <button id="btn-party-settlements" class="btn-secondary">⚖️ Reembolsos</button>
                             <button id="btn-party-add-expense" class="btn-primary">💸 Anotar Gasto</button>
                         </div>
 
                         <div class="friends-section" style="margin-bottom: 2rem; min-height: 100px;">
                             <div class="menu-controls">
-                                <h3 style="color: var(--primary); font-size: 1.1rem;">Participantes</h3>
+                                <h3 style="color: var(--primary); font-size: 1.1rem;">Participantes y Balances</h3>
                                 <button id="btn-party-add-friend" class="btn-icon-small">➕ Añadir Amigo</button>
                             </div>
                             <div id="party-participants-list" class="list-container" style="margin-top: 1rem;">
@@ -360,9 +360,9 @@
                         </div>
 
                         <div class="history-section" style="margin-top: 2rem;">
-                            <h3>Historial de la Noche</h3>
+                            <h3>Historial de Gastos y Rondas</h3>
                             <div id="party-history" class="list-container" style="margin-top: 1rem;">
-                                <!-- Gastos y aportes -->
+                                <!-- Gastos -->
                             </div>
                         </div>
                     </div>
@@ -405,8 +405,8 @@
 
             <!-- Botones exclusivos de FIESTA -->
             <button class="nav-item nav-party-only hidden" id="btn-party-go-home" data-view="party-pot">
-                <span class="nav-icon">🏠</span>
-                <span class="nav-label">Irse a casa</span>
+                <span class="nav-icon">⚖️</span>
+                <span class="nav-label">Reembolsos</span>
             </button>
         </nav>
 

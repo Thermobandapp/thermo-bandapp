@@ -350,7 +350,7 @@ const App = {
             repeatRound: document.getElementById('btn-repeat-round'),
             leaveTable: document.getElementById('btn-leave-table'),
             createParty: document.getElementById('btn-create-party-main'),
-            addPartyMoney: document.getElementById('btn-party-add-money'),
+            partySettlements: document.getElementById('btn-party-settlements'),
             addPartyExpense: document.getElementById('btn-party-add-expense'),
             addPartyFriend: document.getElementById('btn-party-add-friend'),
             partyGoHome: document.getElementById('btn-party-go-home'),
@@ -406,12 +406,22 @@ const App = {
             });
         }
         
-        this.buttons.createParty.addEventListener('click', () => this.handleCreatePartyFromSetup());
-        document.getElementById('btn-join-party-main').addEventListener('click', () => this.handleJoinPartyFromSetup());
-        this.buttons.addPartyMoney.addEventListener('click', () => this.handlePartyAddMoney());
-        this.buttons.addPartyExpense.addEventListener('click', () => this.handlePartyAddExpense());
-        this.buttons.addPartyFriend.addEventListener('click', () => this.handlePartyAddFriend());
-        this.buttons.partyGoHome.addEventListener('click', () => this.handlePartyGoHome());
+        if (this.buttons.createParty) {
+            this.buttons.createParty.addEventListener('click', () => this.handleCreatePartyFromSetup());
+        }
+        document.getElementById('btn-join-party-main')?.addEventListener('click', () => this.handleJoinPartyFromSetup());
+        if (this.buttons.partySettlements) {
+            this.buttons.partySettlements.addEventListener('click', () => this.handlePartyGoHome());
+        }
+        if (this.buttons.addPartyExpense) {
+            this.buttons.addPartyExpense.addEventListener('click', () => this.handlePartyAddExpense());
+        }
+        if (this.buttons.addPartyFriend) {
+            this.buttons.addPartyFriend.addEventListener('click', () => this.handlePartyAddFriend());
+        }
+        if (this.buttons.partyGoHome) {
+            this.buttons.partyGoHome.addEventListener('click', () => this.handlePartyGoHome());
+        }
         this.buttons.loginSubmit.addEventListener('click', () => this.handleLogin());
         if (this.buttons.adminSaveMember) {
             this.buttons.adminSaveMember.addEventListener('click', () => this.handleSaveMember());
@@ -3354,134 +3364,155 @@ const App = {
     },
 
     updatePartyUI() {
-        const data = this.state.partyData;
-        const balance = (data.totalCollected || 0) - (data.totalSpent || 0);
-        
-        document.getElementById('party-code-badge').textContent = `CÓDIGO: ${this.state.partyId}`;
-        document.getElementById('party-balance').textContent = this.formatEuro(balance);
-        document.getElementById('party-total-collected').textContent = this.formatEuro(data.totalCollected || 0);
-        document.getElementById('party-total-spent').textContent = this.formatEuro(data.totalSpent || 0);
-
-        // 1. Lista de Participantes
-        const friendsContainer = document.getElementById('party-participants-list');
-        friendsContainer.innerHTML = '';
-        
+        const data = this.state.partyData || {};
         const balances = this.calculatePartyBalances();
+        
+        const codeBadge = document.getElementById('party-code-badge');
+        if (codeBadge) codeBadge.textContent = `CÓDIGO: ${this.state.partyId}`;
+        
+        const totalSpentEl = document.getElementById('party-total-spent');
+        if (totalSpentEl) totalSpentEl.textContent = this.formatEuro(balances.totalSpent || 0);
 
-        balances.units.forEach(u => {
-            const div = document.createElement('div');
-            if (u.isCouple) {
-                const isCustodian = (data.custodian === u.p1 || data.custodian === u.p2);
-                if (u.hasLeft) {
-                    // Ambos fuera
-                    div.className = 'participant-item glass is-couple is-left';
-                    div.style.cursor = 'pointer';
-                    div.onclick = () => this.showPartyRefundModal(u.p1);
-                    div.innerHTML = `
-                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                            <span class="p-name">${u.p1} y ${u.p2} <small>(Fuera) 💸</small> <span class="badge-couple">💑 Pareja</span></span>
-                            <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${this.formatEuro(u.spent)} (${u.p1}: ${this.formatEuro(u.p1Spent)} | ${u.p2}: ${this.formatEuro(u.p2Spent)})</small>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="p-amount">${this.formatEuro(u.aport)}</div>
-                            <small style="font-size: 0.7rem; color: var(--text-muted);">aportado</small>
-                        </div>
-                    `;
-                } else if (u.oneLeft) {
-                    // Uno activo, uno fuera
-                    const isCustActive = data.custodian === u.activeName;
-                    div.className = 'participant-item glass is-couple';
-                    div.style.cursor = 'pointer';
-                    div.onclick = () => this.showPartyCoupleOptions(u.activeName, u.leftName);
-                    div.innerHTML = `
-                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                            <span class="p-name">${u.activeName} ${isCustActive ? '🚩' : ''} <span class="badge-couple">💑 Pareja</span></span>
-                            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;">
-                                <div>Gastado: <b>${this.formatEuro(u.spent)}</b> (${u.activeName}: ${this.formatEuro(balances.spent[u.activeName] || 0)} | <span style="color:#f87171;">${u.leftName} fuera</span>: ${this.formatEuro(balances.spent[u.leftName] || 0)})</div>
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="p-amount">${this.formatEuro(u.aport)}</div>
-                            <small style="font-size: 0.7rem; color: var(--text-muted);">aportado (${u.activeName}: ${this.formatEuro(balances.aports[u.activeName] || 0)} | ${u.leftName}: ${this.formatEuro(balances.aports[u.leftName] || 0)})</small>
-                        </div>
-                    `;
+        const totalRoundsEl = document.getElementById('party-total-rounds-count');
+        if (totalRoundsEl) totalRoundsEl.textContent = balances.roundCount || 0;
+
+        // Balance del usuario actual o de su pareja
+        const myBalanceEl = document.getElementById('party-my-balance');
+        const myBalanceLabelEl = document.getElementById('party-my-balance-label');
+        if (myBalanceEl && myBalanceLabelEl) {
+            const myUnit = balances.units.find(u => u.names.includes(this.state.user));
+            if (myUnit) {
+                const net = myUnit.net;
+                if (net > 0.01) {
+                    myBalanceEl.textContent = `+${this.formatEuro(net)}`;
+                    myBalanceEl.style.color = '#4ade80';
+                    myBalanceLabelEl.textContent = 'Te deben';
+                } else if (net < -0.01) {
+                    myBalanceEl.textContent = `-${this.formatEuro(Math.abs(net))}`;
+                    myBalanceEl.style.color = '#f87171';
+                    myBalanceLabelEl.textContent = 'Debes pagar';
                 } else {
-                    // Ambos activos
-                    div.className = 'participant-item glass is-couple';
-                    div.style.cursor = 'pointer';
-                    div.onclick = () => this.showPartyCoupleOptions(u.p1, u.p2);
-                    div.innerHTML = `
-                        <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                            <span class="p-name">${u.p1} y ${u.p2} ${isCustodian ? '🚩' : ''} <span class="badge-couple">💑 Pareja</span></span>
-                            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;">
-                                <div>Gastado: <b>${this.formatEuro(u.spent)}</b> (${u.p1}: ${this.formatEuro(u.p1Spent)} | ${u.p2}: ${this.formatEuro(u.p2Spent)})</div>
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="p-amount">${this.formatEuro(u.aport)}</div>
-                            <small style="font-size: 0.7rem; color: var(--text-muted);">aportado (${u.p1}: ${this.formatEuro(u.p1Aport)} | ${u.p2}: ${this.formatEuro(u.p2Aport)})</small>
-                        </div>
-                    `;
+                    myBalanceEl.textContent = '0,00€';
+                    myBalanceEl.style.color = 'var(--text-muted)';
+                    myBalanceLabelEl.textContent = 'En paz';
                 }
             } else {
-                // Individual (sin pareja en la fiesta)
-                const name = u.p1;
-                const isCustodian = data.custodian === name;
-                const hasLeft = u.hasLeft;
-                div.className = `participant-item glass ${hasLeft ? 'is-left' : ''}`;
-                div.style.cursor = 'pointer';
-                if (hasLeft) {
-                    div.onclick = () => this.showPartyRefundModal(name);
-                } else {
-                    div.onclick = () => this.showPartyParticipantOptions(name);
-                }
-                div.innerHTML = `
-                    <div class="p-info">
-                        <span class="p-name">${name} ${isCustodian ? '🚩' : ''} ${hasLeft ? '<small>(Fuera) 💸</small>' : ''}</span>
-                        <small style="font-size: 0.72rem; color: var(--text-muted); display: block;">Gastado: ${this.formatEuro(u.spent)}</small>
-                    </div>
-                    <div style="text-align: right;">
-                        <div class="p-amount">${this.formatEuro(u.aport)}</div>
-                        <small style="font-size: 0.7rem; color: var(--text-muted);">aportado</small>
-                    </div>
-                `;
+                myBalanceEl.textContent = '0,00€';
+                myBalanceEl.style.color = 'var(--text-muted)';
+                myBalanceLabelEl.textContent = 'Mi Balance';
             }
-            friendsContainer.appendChild(div);
-        });
-
-        if (balances.units.length === 0) {
-            friendsContainer.innerHTML = '<div class="empty-msg">Pulsa en "Añadir Amigo" para empezar la lista</div>';
         }
 
-        // 2. Historial
-        const historyContainer = document.getElementById('party-history');
-        historyContainer.innerHTML = '';
-        
-        if (data.history) {
-            Object.entries(data.history).sort((a,b) => b[1].timestamp - a[1].timestamp).forEach(([id, item]) => {
+        // 1. Lista de Participantes y Balances
+        const friendsContainer = document.getElementById('party-participants-list');
+        if (friendsContainer) {
+            friendsContainer.innerHTML = '';
+            
+            balances.units.forEach(u => {
                 const div = document.createElement('div');
-                div.className = `history-item ${item.type}`;
-                const isExpense = item.type === 'expense';
-                const isIncome = item.type === 'income';
+                const hasLeft = u.hasLeft;
+                div.className = `participant-item glass ${u.isCouple ? 'is-couple' : ''} ${hasLeft ? 'is-left' : ''}`;
+                div.style.cursor = 'pointer';
+                div.onclick = () => {
+                    if (u.isCouple) {
+                        this.showPartyCoupleOptions(u.p1, u.p2);
+                    } else {
+                        this.showPartyParticipantOptions(u.p1);
+                    }
+                };
+
+                let netBadge = '';
+                if (u.net > 0.01) {
+                    netBadge = `<div class="p-amount" style="color: #4ade80; font-weight: 700; font-size: 1.05rem;">+${this.formatEuro(u.net)}</div><small style="font-size: 0.7rem; color: #4ade80; display: block;">le deben</small>`;
+                } else if (u.net < -0.01) {
+                    netBadge = `<div class="p-amount" style="color: #f87171; font-weight: 700; font-size: 1.05rem;">-${this.formatEuro(Math.abs(u.net))}</div><small style="font-size: 0.7rem; color: #f87171; display: block;">debe pagar</small>`;
+                } else {
+                    netBadge = `<div class="p-amount" style="color: var(--text-muted); font-weight: 700; font-size: 1.05rem;">0,00€</div><small style="font-size: 0.7rem; color: var(--text-muted); display: block;">en paz</small>`;
+                }
+
+                let subtitle = '';
+                if (u.isCouple) {
+                    subtitle = `Pagaron: <b>${this.formatEuro(u.paid)}</b> | Consumieron: <b>${this.formatEuro(u.spent)}</b>`;
+                    if (u.oneLeft) {
+                        subtitle += `<br><span style="color:#f87171; font-size: 0.7rem;">(${u.leftName} fuera)</span>`;
+                    }
+                } else {
+                    subtitle = `Pagó: <b>${this.formatEuro(u.paid)}</b> | Consumió: <b>${this.formatEuro(u.spent)}</b>`;
+                }
+
                 div.innerHTML = `
-                    <div class="info" style="flex: 1; min-width: 0; padding-right: 0.5rem;">
-                        <b>${item.description}</b><br>
-                        <small>${new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} por ${item.user}</small>
+                    <div class="p-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; min-width: 0; flex: 1;">
+                        <span class="p-name" style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            ${u.displayName}
+                            ${u.isCouple ? '<span class="badge-couple">💑 Pareja</span>' : ''}
+                            ${hasLeft ? '<small style="color: #f87171;">(Fuera) 🚶</small>' : ''}
+                        </span>
+                        <small style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.3;">
+                            ${subtitle}
+                        </small>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
-                        <span class="amount">${item.type === 'income' ? '+' : '-'}${this.formatEuro(item.amount)}</span>
-                        ${isExpense ? `
-                            <button class="btn-icon-small" title="Editar gasto" onclick="App.handlePartyEditExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">✏️</button>
-                            <button class="btn-icon-small" title="Borrar gasto" onclick="App.handlePartyDeleteExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
-                        ` : ''}
-                        ${isIncome ? `
-                            <button class="btn-icon-small" title="Editar aporte" onclick="App.handlePartyEditIncome('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">✏️</button>
-                            <button class="btn-icon-small" title="Borrar aporte" onclick="App.handlePartyDeleteIncome('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
-                        ` : ''}
+                    <div style="text-align: right; flex-shrink: 0; margin-left: 0.5rem;">
+                        ${netBadge}
                     </div>
                 `;
-                historyContainer.appendChild(div);
+                friendsContainer.appendChild(div);
             });
+
+            if (balances.units.length === 0) {
+                friendsContainer.innerHTML = '<div class="empty-msg">Pulsa en "➕ Añadir Amigo" para empezar la lista</div>';
+            }
+        }
+
+        // 2. Historial de Gastos y Rondas
+        const historyContainer = document.getElementById('party-history');
+        if (historyContainer) {
+            historyContainer.innerHTML = '';
+            
+            if (data.history) {
+                Object.entries(data.history).sort((a,b) => b[1].timestamp - a[1].timestamp).forEach(([id, item]) => {
+                    const div = document.createElement('div');
+                    div.className = `history-item ${item.type}`;
+                    const isExpense = item.type === 'expense';
+                    const isIncome = item.type === 'income';
+                    const isSystem = item.type === 'system';
+
+                    if (isSystem) {
+                        div.innerHTML = `
+                            <div class="info" style="text-align: center; width: 100%;">
+                                <span>${item.description}</span>
+                                <small style="display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem;">${new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
+                            </div>
+                        `;
+                    } else {
+                        const payer = item.payer || item.user || 'Desconocido';
+                        const splitCount = Array.isArray(item.beneficiaries) && item.beneficiaries.length > 0 ? item.beneficiaries.length : null;
+                        const splitText = splitCount ? ` · Dividido entre ${splitCount} pers.` : '';
+                        const timeStr = new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                        div.innerHTML = `
+                            <div class="info" style="flex: 1; min-width: 0; padding-right: 0.5rem;">
+                                <b style="font-size: 0.95rem;">${item.description}</b><br>
+                                <small style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; display: block; margin-top: 0.15rem;">
+                                    Pagó: <b style="color: var(--primary-light);">${payer}</b>${splitText} (${timeStr})
+                                </small>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+                                <span class="amount" style="color: ${isExpense ? 'var(--danger)' : 'var(--success)'}; font-size: 1rem;">
+                                    ${isExpense ? '-' : '+'}${this.formatEuro(item.amount)}
+                                </span>
+                                ${isExpense ? `
+                                    <button class="btn-icon-small" title="Editar gasto" onclick="App.handlePartyEditExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">✏️</button>
+                                    <button class="btn-icon-small" title="Borrar gasto" onclick="App.handlePartyDeleteExpense('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
+                                ` : ''}
+                                ${isIncome ? `
+                                    <button class="btn-icon-small" title="Borrar aporte" onclick="App.handlePartyDeleteIncome('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
+                                ` : ''}
+                            </div>
+                        `;
+                    }
+                    historyContainer.appendChild(div);
+                });
+            }
         }
     },
 
@@ -3490,76 +3521,120 @@ const App = {
         if (partnerInParty) {
             return this.showPartyCoupleOptions(name, partnerInParty);
         }
-        const isCustodian = this.state.partyData?.custodian === name;
-        const isMe = name === this.state.user;
-        let html = `<h3>👤 ${name}</h3>`;
-        html += `<div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">`;
+        const balances = this.calculatePartyBalances();
+        const paid = balances.paid[name] || 0;
+        const spent = balances.spent[name] || 0;
+        const net = paid - spent;
+        const pData = this.state.partyData?.participants?.[name.replace(/\./g, '_')];
+        const hasLeft = pData?.status === 'left';
 
-        if (!isCustodian) {
-            html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${name}')">🚩 Pasarle la banderola (y el dinero)</button>`;
+        let netText = '';
+        if (net > 0.01) {
+            netText = `<span style="color: #4ade80; font-weight: 700;">+${this.formatEuro(net)} (Le deben)</span>`;
+        } else if (net < -0.01) {
+            netText = `<span style="color: #f87171; font-weight: 700;">-${this.formatEuro(Math.abs(net))} (Debe pagar)</span>`;
+        } else {
+            netText = `<span style="color: var(--text-muted); font-weight: 700;">0,00€ (En paz)</span>`;
         }
 
-        if (!isMe) {
+        let html = `<h3>👤 ${name} ${hasLeft ? '<small style="color:#f87171;">(Fuera)</small>' : ''}</h3>`;
+        html += `
+            <div style="background: rgba(255,255,255,0.04); border-radius: 10px; padding: 0.85rem; margin: 1rem 0; font-size: 0.9rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
+                    <span style="color: var(--text-muted);">Total pagado:</span>
+                    <b>${this.formatEuro(paid)}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
+                    <span style="color: var(--text-muted);">Total consumido:</span>
+                    <b>${this.formatEuro(spent)}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
+                    <span style="color: var(--text-muted);">Balance neto:</span>
+                    ${netText}
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        `;
+
+        if (!hasLeft) {
             html += `<button class="btn-danger" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name}')">&#128682; Marcar que se ha ido a casa</button>`;
+        } else {
+            html += `<button class="btn-secondary" onclick="App.closeModal(); App.markParticipantAsActive('${name}')">🔄 Volver a marcar como presente</button>`;
         }
-
+        html += `<button class="btn-secondary" onclick="App.closeModal()">Cerrar</button>`;
         html += `</div>`;
         this.openModal(html);
     },
 
     showPartyCoupleOptions(name1, name2) {
-        const p1 = this.state.partyData?.participants?.[name1.replace(/\./g, '_')];
-        const p2 = this.state.partyData?.participants?.[name2.replace(/\./g, '_')];
-        const isLeft1 = p1?.status === 'left';
-        const isLeft2 = p2?.status === 'left';
+        const balances = this.calculatePartyBalances();
+        const p1Data = this.state.partyData?.participants?.[name1.replace(/\./g, '_')];
+        const p2Data = this.state.partyData?.participants?.[name2.replace(/\./g, '_')];
+        const isLeft1 = p1Data?.status === 'left';
+        const isLeft2 = p2Data?.status === 'left';
 
-        // Si uno está fuera y el otro dentro
-        if (isLeft1 !== isLeft2) {
-            const activeName = isLeft1 ? name2 : name1;
-            const leftName = isLeft1 ? name1 : name2;
-            const isCustodian = this.state.partyData?.custodian === activeName;
-            let html = `<h3>💑 Pareja: ${activeName}</h3>`;
-            html += `<p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">
-                ${leftName} ya se fue a casa. ${activeName} asume la cuenta conjunta de la pareja.
-            </p>`;
-            html += `<div style="display: flex; flex-direction: column; gap: 0.75rem;">`;
+        const p1Paid = balances.paid[name1] || 0;
+        const p2Paid = balances.paid[name2] || 0;
+        const p1Spent = balances.spent[name1] || 0;
+        const p2Spent = balances.spent[name2] || 0;
 
-            if (!isCustodian) {
-                html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${activeName}')">🚩 Pasarle la banderola a ${activeName}</button>`;
-            }
+        const totalPaid = p1Paid + p2Paid;
+        const totalSpent = p1Spent + p2Spent;
+        const net = totalPaid - totalSpent;
 
-            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${activeName}')">&#128682; ${activeName} también se va a casa</button>`;
-            html += `<button class="btn-secondary" onclick="App.closeModal(); App.showPartyRefundModal('${activeName}')">💸 Ver balance de la pareja</button>`;
-            html += `</div>`;
-            this.openModal(html);
-            return;
+        let netText = '';
+        if (net > 0.01) {
+            netText = `<span style="color: #4ade80; font-weight: 700;">+${this.formatEuro(net)} (Les deben)</span>`;
+        } else if (net < -0.01) {
+            netText = `<span style="color: #f87171; font-weight: 700;">-${this.formatEuro(Math.abs(net))} (Deben pagar)</span>`;
+        } else {
+            netText = `<span style="color: var(--text-muted); font-weight: 700;">0,00€ (En paz)</span>`;
         }
-
-        // Si ambos están fuera
-        if (isLeft1 && isLeft2) {
-            this.showPartyRefundModal(name1);
-            return;
-        }
-
-        // Ambos activos
-        const isCustodian1 = this.state.partyData?.custodian === name1;
-        const isCustodian2 = this.state.partyData?.custodian === name2;
 
         let html = `<h3>💑 Pareja: ${name1} y ${name2}</h3>`;
-        html += `<div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">`;
+        html += `
+            <div style="background: rgba(255,255,255,0.04); border-radius: 10px; padding: 0.85rem; margin: 1rem 0; font-size: 0.9rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
+                    <span style="color: var(--text-muted);">Pagado conjunto:</span>
+                    <b>${this.formatEuro(totalPaid)}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.78rem; color: var(--text-muted); padding-left: 0.5rem;">
+                    <span>↳ ${name1}: ${this.formatEuro(p1Paid)} | ${name2}: ${this.formatEuro(p2Paid)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
+                    <span style="color: var(--text-muted);">Consumido conjunto:</span>
+                    <b>${this.formatEuro(totalSpent)}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.78rem; color: var(--text-muted); padding-left: 0.5rem;">
+                    <span>↳ ${name1}: ${this.formatEuro(p1Spent)} | ${name2}: ${this.formatEuro(p2Spent)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
+                    <span style="color: var(--text-muted);">Balance conjunto:</span>
+                    ${netText}
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        `;
 
-        if (!isCustodian1) {
-            html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${name1}')">🚩 Pasarle la banderola a ${name1}</button>`;
+        if (!isLeft1 && !isLeft2) {
+            // Ambos presentes
+            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name1}')">&#128682; Se va solo/a ${name1}</button>`;
+            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name2}')">&#128682; Se va solo/a ${name2}</button>`;
+            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.22); border-color: rgba(239,68,68,0.5); color: #f87171; font-weight: 600;" onclick="App.closeModal(); App.markCoupleAsLeft('${name1}', '${name2}')">&#128682;&#128682; Se van ambos a casa</button>`;
+        } else if (isLeft1 && isLeft2) {
+            // Ambos fuera
+            html += `<p style="color:#f87171; text-align:center; font-size:0.85rem;">Ambos se han retirado de la fiesta.</p>`;
+            html += `<button class="btn-secondary" onclick="App.closeModal(); App.markCoupleAsActive('${name1}', '${name2}')">🔄 Marcar a ambos de vuelta</button>`;
+        } else {
+            // Uno presente, uno fuera
+            const activeName = isLeft1 ? name2 : name1;
+            const leftName = isLeft1 ? name1 : name2;
+            html += `<p style="color:#f87171; font-size:0.85rem; text-align:center;">${leftName} ya se fue a casa. ${activeName} sigue en la fiesta.</p>`;
+            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${activeName}')">&#128682; ${activeName} también se va a casa</button>`;
+            html += `<button class="btn-secondary" onclick="App.closeModal(); App.markParticipantAsActive('${leftName}')">🔄 ${leftName} vuelve a estar presente</button>`;
         }
-        if (!isCustodian2) {
-            html += `<button class="btn-secondary" onclick="App.closeModal(); App.handleTransferCustody('${name2}')">🚩 Pasarle la banderola a ${name2}</button>`;
-        }
 
-        html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name1}')">&#128682; Se va solo/a ${name1}</button>`;
-        html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name2}')">&#128682; Se va solo/a ${name2}</button>`;
-        html += `<button class="btn-danger" style="background: rgba(239,68,68,0.22); border-color: rgba(239,68,68,0.5); color: #f87171; font-weight: 600;" onclick="App.closeModal(); App.markCoupleAsLeft('${name1}', '${name2}')">&#128682;&#128682; Se van ambos a casa</button>`;
-        html += `<button class="btn-secondary" onclick="App.closeModal(); App.showPartyRefundModal('${name1}')">💸 Ver balance de la pareja</button>`;
-
+        html += `<button class="btn-secondary" onclick="App.closeModal()">Cerrar</button>`;
         html += `</div>`;
         this.openModal(html);
     },
@@ -3598,7 +3673,7 @@ const App = {
             const participantRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${key}`);
             const currentData = this.state.partyData?.participants?.[key] || {};
             await set(participantRef, { ...currentData, name, status: 'left', leftAt: Date.now() });
-            // Registrar en historial
+            
             const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
             await set(historyRef, {
                 type: 'system',
@@ -3608,36 +3683,82 @@ const App = {
                 timestamp: Date.now()
             });
 
-            // Mostrar inmediatamente cuánto hay que devolverle del bote
             this.showPartyRefundModal(name);
         } catch (error) { console.error('Error marcando como ido:', error); }
     },
 
+    async markParticipantAsActive(name) {
+        if (!confirm(`¿Volver a marcar a ${name} como presente en la fiesta?`)) return;
+        try {
+            const key = name.replace(/\./g, '_');
+            const participantRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${key}`);
+            const currentData = this.state.partyData?.participants?.[key] || {};
+            await set(participantRef, { ...currentData, name, status: 'active', leftAt: null });
+
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'system',
+                amount: 0,
+                description: `👋 ${name} se volvió a unir a la fiesta`,
+                user: this.state.user,
+                timestamp: Date.now()
+            });
+        } catch (error) { console.error('Error reactivando participante:', error); }
+    },
+
+    async markCoupleAsActive(name1, name2) {
+        if (!confirm(`¿Volver a marcar a ${name1} y ${name2} como presentes en la fiesta?`)) return;
+        try {
+            const key1 = name1.replace(/\./g, '_');
+            const key2 = name2.replace(/\./g, '_');
+            const currentData1 = this.state.partyData?.participants?.[key1] || {};
+            const currentData2 = this.state.partyData?.participants?.[key2] || {};
+            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${key1}`), {
+                ...currentData1, name: name1, status: 'active', leftAt: null
+            });
+            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${key2}`), {
+                ...currentData2, name: name2, status: 'active', leftAt: null
+            });
+
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'system',
+                amount: 0,
+                description: `👋 ${name1} y ${name2} se volvieron a unir a la fiesta`,
+                user: this.state.user,
+                timestamp: Date.now()
+            });
+        } catch (error) { console.error('Error reactivando pareja:', error); }
+    },
+
     calculatePartyBalances() {
         const data = this.state.partyData || {};
-        const totalCollected = data.totalCollected || 0;
-        const totalSpent = data.totalSpent || 0;
-        const remainingBalance = Math.max(0, totalCollected - totalSpent);
-
         const allParticipants = data.participants ? Object.values(data.participants) : [];
         const participantNames = allParticipants.map(p => p.name);
 
-        const aports = {};
+        const paid = {};
         const spent = {};
         participantNames.forEach(n => {
-            aports[n] = 0;
+            paid[n] = 0;
             spent[n] = 0;
         });
 
+        let totalSpent = 0;
+        let roundCount = 0;
+
         if (data.history) {
             Object.values(data.history).forEach(item => {
-                if (item.type === 'income') {
-                    const name = item.description.replace('Aporte de ', '').trim();
-                    if (name) {
-                        aports[name] = (aports[name] || 0) + (item.amount || 0);
-                    }
-                } else if (item.type === 'expense') {
-                    const amount = item.amount || 0;
+                if (item.type === 'expense') {
+                    const amount = Number(item.amount || 0);
+                    totalSpent += amount;
+                    roundCount++;
+
+                    // Quién lo ha pagado
+                    const payer = item.payer || item.user || (participantNames[0] || 'Desconocido');
+                    if (paid[payer] === undefined) paid[payer] = 0;
+                    paid[payer] += amount;
+
+                    // Entre quiénes se divide
                     let targets = Array.isArray(item.beneficiaries) && item.beneficiaries.length > 0
                         ? item.beneficiaries
                         : participantNames;
@@ -3649,8 +3770,17 @@ const App = {
                     if (targets.length > 0) {
                         const split = amount / targets.length;
                         targets.forEach(target => {
-                            spent[target] = (spent[target] || 0) + split;
+                            if (spent[target] === undefined) spent[target] = 0;
+                            spent[target] += split;
                         });
+                    }
+                } else if (item.type === 'income') {
+                    // Soporte retrocompatible si una fiesta anterior tenía ingresos registrados
+                    const amount = Number(item.amount || 0);
+                    const name = item.description?.replace('Aporte de ', '').trim() || item.user;
+                    if (name) {
+                        if (paid[name] === undefined) paid[name] = 0;
+                        paid[name] += amount;
                     }
                 }
             });
@@ -3676,14 +3806,14 @@ const App = {
 
                 const p1 = p.name;
                 const p2 = partnerObj.name;
-                const p1Aport = aports[p1] || 0;
-                const p2Aport = aports[p2] || 0;
+                const p1Paid = paid[p1] || 0;
+                const p2Paid = paid[p2] || 0;
                 const p1Spent = spent[p1] || 0;
                 const p2Spent = spent[p2] || 0;
 
-                const unitAport = p1Aport + p2Aport;
+                const unitPaid = p1Paid + p2Paid;
                 const unitSpent = p1Spent + p2Spent;
-                const unitNet = unitAport - unitSpent;
+                const unitNet = unitPaid - unitSpent;
 
                 const p1Left = p.status === 'left';
                 const p2Left = partnerObj.status === 'left';
@@ -3706,21 +3836,20 @@ const App = {
                     leftName: oneLeft ? leftName : null,
                     p1,
                     p2,
-                    p1Aport,
-                    p2Aport,
+                    p1Paid,
+                    p2Paid,
                     p1Spent,
                     p2Spent,
-                    aport: unitAport,
+                    paid: unitPaid,
                     spent: unitSpent,
-                    net: unitNet,
-                    refunded: !!(p.refunded && partnerObj.refunded)
+                    net: unitNet
                 });
             } else {
-                // Individual (sin pareja registrada, o su pareja NO está en la fiesta)
+                // Individual (sin pareja en la fiesta)
                 processedKeys.add(pKey);
-                const pAport = aports[p.name] || 0;
+                const pPaid = paid[p.name] || 0;
                 const pSpent = spent[p.name] || 0;
-                const pNet = pAport - pSpent;
+                const pNet = pPaid - pSpent;
                 const hasLeft = p.status === 'left';
 
                 units.push({
@@ -3737,59 +3866,18 @@ const App = {
                     leftName: hasLeft ? p.name : null,
                     p1: p.name,
                     p2: null,
-                    p1Aport: pAport,
-                    p2Aport: 0,
+                    p1Paid: pPaid,
+                    p2Paid: 0,
                     p1Spent: pSpent,
                     p2Spent: 0,
-                    aport: pAport,
+                    paid: pPaid,
                     spent: pSpent,
-                    net: pNet,
-                    refunded: !!p.refunded
+                    net: pNet
                 });
             }
         });
 
-        // 1. Reparto del efectivo sobrante del bote (remainingBalance) a nivel de UNIDADES
-        units.forEach(u => {
-            u.refund = 0;
-            u.pendingToReceive = 0;
-        });
-
-        let totalPositiveNet = 0;
-        units.forEach(u => {
-            if (u.net > 0.001) totalPositiveNet += u.net;
-        });
-
-        if (totalPositiveNet <= remainingBalance + 0.05) {
-            units.forEach(u => {
-                if (u.net > 0.001) {
-                    u.refund = u.net;
-                }
-            });
-        } else {
-            const creditorsList = units
-                .filter(u => u.net > 0.001)
-                .sort((a, b) => a.net - b.net);
-
-            let cashPool = remainingBalance;
-
-            creditorsList.forEach(u => {
-                if (cashPool >= u.net - 0.001) {
-                    u.refund = u.net;
-                    u.pendingToReceive = 0;
-                    cashPool -= u.net;
-                } else if (cashPool > 0.001) {
-                    u.refund = cashPool;
-                    u.pendingToReceive = u.net - cashPool;
-                    cashPool = 0;
-                } else {
-                    u.refund = 0;
-                    u.pendingToReceive = u.net;
-                }
-            });
-        }
-
-        // 2. Ajuste de Cuentas por Bizum entre Unidades Deudoras y Acreedoras
+        // Cálculo de liquidación óptima por Bizum entre unidades
         const debts = [];
         const debtors = [];
         const creditors = [];
@@ -3797,9 +3885,8 @@ const App = {
         units.forEach(u => {
             if (u.net < -0.01) {
                 debtors.push({ name: u.shortName || u.displayName, amount: Math.abs(u.net) });
-            }
-            if (u.pendingToReceive > 0.01) {
-                creditors.push({ name: u.shortName || u.displayName, amount: u.pendingToReceive });
+            } else if (u.net > 0.01) {
+                creditors.push({ name: u.shortName || u.displayName, amount: u.net });
             }
         });
 
@@ -3828,33 +3915,22 @@ const App = {
             if (creditor.amount <= 0.01) cIdx++;
         }
 
-        // Mapeo retrocompatible por nombre individual
         const netBalances = {};
-        const refunds = {};
-        const pendingToReceive = {};
-
         participantNames.forEach(n => {
             const u = units.find(unit => unit.names.includes(n));
             if (u) {
                 netBalances[n] = u.net;
-                refunds[n] = u.refund;
-                pendingToReceive[n] = u.pendingToReceive;
             } else {
-                netBalances[n] = (aports[n] || 0) - (spent[n] || 0);
-                refunds[n] = 0;
-                pendingToReceive[n] = 0;
+                netBalances[n] = (paid[n] || 0) - (spent[n] || 0);
             }
         });
 
         return {
-            totalCollected,
             totalSpent,
-            remainingBalance,
-            aports,
+            roundCount,
+            paid,
             spent,
             netBalances,
-            refunds,
-            pendingToReceive,
             debts,
             units,
             participants: allParticipants
@@ -3862,31 +3938,22 @@ const App = {
     },
 
     showPartyRefundModal(name) {
-        const data = this.state.partyData;
-        if (!data) return;
         const balances = this.calculatePartyBalances();
-        
-        // Buscar la unidad correspondiente a este nombre
         const unit = balances.units.find(u => u.names.includes(name));
         if (!unit) return;
 
         const isCouple = unit.isCouple;
-        const pData = data.participants?.[name.replace(/\./g, '_')];
-        const alreadyRefunded = isCouple ? unit.refunded : pData?.refunded;
-
-        const aport = unit.aport;
-        const gastado = unit.spent;
+        const paid = unit.paid;
+        const spent = unit.spent;
         const net = unit.net;
-        const refundable = unit.refund || 0;
-        const pendingBizum = unit.pendingToReceive || 0;
 
-        let title = isCouple ? `💸 Pareja: ${unit.p1} y ${unit.p2}` : `💸 ${name} se fue antes`;
+        let title = isCouple ? `💸 Pareja: ${unit.p1} y ${unit.p2}` : `💸 Saldo de ${name}`;
         let html = `<h3>${title}</h3>`;
 
         if (isCouple && unit.oneLeft) {
             html += `
                 <div style="background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.3); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.85rem; font-size: 0.85rem; color: #fde047;">
-                    ℹ️ <b>${unit.activeName}</b> sigue en la fiesta consumiendo del fondo común. La liquidación definitiva se cerrará cuando ambos se hayan retirado o al finalizar la fiesta.
+                    ℹ️ <b>${unit.activeName}</b> sigue en la fiesta consumiendo. La liquidación definitiva se calculará al cerrar la fiesta.
                 </div>
             `;
         }
@@ -3894,17 +3961,17 @@ const App = {
         html += `
             <div style="background: rgba(255,255,255,0.03); border-radius: 10px; padding: 0.85rem; margin-bottom: 1rem; font-size: 0.9rem;">
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
-                    <span style="color: var(--text-muted);">${isCouple ? 'Pusieron en el bote:' : 'Puso en el bote:'}</span>
-                    <b>${this.formatEuro(aport)}</b>
+                    <span style="color: var(--text-muted);">${isCouple ? 'Pagaron en total:' : 'Pagó en total:'}</span>
+                    <b>${this.formatEuro(paid)}</b>
                 </div>
                 ${isCouple ? `
                     <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.78rem; color: var(--text-muted); padding-left: 0.5rem;">
-                        <span>↳ ${unit.p1}: ${this.formatEuro(unit.p1Aport)} | ${unit.p2}: ${this.formatEuro(unit.p2Aport)}</span>
+                        <span>↳ ${unit.p1}: ${this.formatEuro(unit.p1Paid)} | ${unit.p2}: ${this.formatEuro(unit.p2Paid)}</span>
                     </div>
                 ` : ''}
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem;">
                     <span style="color: var(--text-muted);">${isCouple ? 'Consumieron en rondas:' : 'Consumió en rondas:'}</span>
-                    <b style="color: #f87171;">${this.formatEuro(gastado)}</b>
+                    <b style="color: #f87171;">${this.formatEuro(spent)}</b>
                 </div>
                 ${isCouple ? `
                     <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.78rem; color: var(--text-muted); padding-left: 0.5rem;">
@@ -3912,39 +3979,37 @@ const App = {
                     </div>
                 ` : ''}
                 <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
-                    <span style="color: var(--text-muted);">Saldo a su favor:</span>
-                    <b style="color: ${net > 0 ? 'var(--success)' : (net < 0 ? '#ef4444' : 'var(--text-muted)')};">${net >= 0 ? '+' : ''}${this.formatEuro(net)}</b>
+                    <span style="color: var(--text-muted);">Balance neto:</span>
+                    <b style="color: ${net > 0 ? '#4ade80' : (net < 0 ? '#f87171' : 'var(--text-muted)')};">${net >= 0 ? '+' : ''}${this.formatEuro(net)}</b>
                 </div>
             </div>
         `;
 
-        if (alreadyRefunded) {
-            html += `<p style="color: var(--success);">✅ Ya retiró su dinero.</p>`;
-        } else if (isCouple && unit.oneLeft) {
-            html += `<p style="color: var(--text-muted); text-align: center; font-size: 0.85rem;">Mientras ${unit.activeName} continúe activo/a en la fiesta, el saldo conjunto se mantiene en el bote.</p>`;
-        } else if (refundable > 0.01) {
+        if (net > 0.01) {
             html += `
-                <div style="background: rgba(99,102,241,0.15); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">Se ${isCouple ? 'llevan' : 'lleva'} en efectivo del bote:</p>
-                    <span style="font-size: 1.8rem; font-weight: 700; color: #a5b4fc;">${this.formatEuro(refundable)}</span>
-                    ${pendingBizum > 0.01 ? `<p style="color: #f472b6; font-size: 0.82rem; margin-top: 0.4rem;">+ ${this.formatEuro(pendingBizum)} le llegarán por Bizum al cerrar la fiesta.</p>` : ''}
+                <div style="background: rgba(74, 222, 128, 0.12); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
+                    <p style="color: #4ade80; font-size: 0.85rem; margin-bottom: 0.3rem;">El grupo le debe dinero:</p>
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #4ade80;">+${this.formatEuro(net)}</span>
+                    <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 0.5rem;">
+                        Al finalizar la noche se calcularán los Bizums correspondientes para devolverle este saldo.
+                    </p>
                 </div>
-                <button class="btn-primary" style="width: 100%;" onclick="App.claimRefund('${name}')">Reclamar ${this.formatEuro(refundable)} en efectivo</button>
             `;
         } else if (net < -0.01) {
             html += `
                 <div style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
-                    <p style="color: #fca5a5; font-size: 0.85rem; margin-bottom: 0.3rem;">Debe dinero de su consumo:</p>
-                    <span style="font-size: 1.8rem; font-weight: 700; color: #ef4444;">${this.formatEuro(Math.abs(net))}</span>
+                    <p style="color: #fca5a5; font-size: 0.85rem; margin-bottom: 0.3rem;">Debe abonar de su consumo:</p>
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #ef4444;">-${this.formatEuro(Math.abs(net))}</span>
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
-                        Debe abonar esta cantidad (por Bizum o efectivo) al grupo para dejarlo cuadrado.
+                        Debe transferir esta cantidad por Bizum para dejar liquidada su parte.
                     </p>
                 </div>
             `;
         } else {
-            html += `<p style="color: var(--text-muted);">Está en paz con el grupo (ha consumido exactamente lo que puso).</p>`;
+            html += `<p style="color: var(--text-muted); text-align: center; margin-bottom: 1rem;">Está en paz con el grupo (consumió exactamente lo que pagó).</p>`;
         }
 
+        html += `<button class="btn-primary" style="width: 100%;" onclick="App.closeModal()">Entendido</button>`;
         this.openModal(html);
     },
 
@@ -3952,71 +4017,25 @@ const App = {
         const data = this.state.partyData;
         if (!data) return;
         const balances = this.calculatePartyBalances();
-        const { totalCollected, totalSpent, remainingBalance, aports, spent, netBalances, refunds, pendingToReceive, debts, units } = balances;
+        const { totalSpent, roundCount, debts, units } = balances;
         
-        // 1. Bloque de Reparto del Bote Físico
-        let refundHtml = '';
-        if (remainingBalance > 0.01 && units && units.length > 0) {
-            refundHtml = `
-                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.2rem; border-color: rgba(99, 102, 241, 0.4);">
-                    <h3 style="text-align: center; margin-bottom: 0.5rem; color: #a5b4fc; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>💵 Reparto en Metálico del Bote (${this.formatEuro(remainingBalance)})</span>
-                    </h3>
-                    <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
-                        Dinero físico que se lleva cada uno ahora mismo en mano:
-                    </p>
-                    <div style="max-height: 200px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.45rem;">
-            `;
-            
-            // Ordenar por devolución en metálico de mayor a menor
-            const sortedUnits = [...units].sort((a, b) => b.refund - a.refund);
-            
-            sortedUnits.forEach(u => {
-                const isDebtor = u.net < -0.01;
-                refundHtml += `
-                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; padding: 0.5rem 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.03); align-items: center;">
-                        <div style="display: flex; flex-direction: column;">
-                            <span style="color: var(--text-main); font-weight: 600;">${u.displayName} ${u.isCouple ? '<span class="badge-couple">💑 Pareja</span>' : ''}</span>
-                            <span style="font-size: 0.72rem; color: var(--text-muted);">
-                                ${u.isCouple
-                                    ? `Pusieron: ${this.formatEuro(u.aport)} (${u.p1}: ${this.formatEuro(u.p1Aport)} | ${u.p2}: ${this.formatEuro(u.p2Aport)}) | Gastaron: ${this.formatEuro(u.spent)} (${u.p1}: ${this.formatEuro(u.p1Spent)} | ${u.p2}: ${this.formatEuro(u.p2Spent)})`
-                                    : `Puso: ${this.formatEuro(u.aport)} | Gastó: ${this.formatEuro(u.spent)}`
-                                }
-                            </span>
-                        </div>
-                        <div style="text-align: right; flex-shrink: 0; margin-left: 0.5rem;">
-                            <span style="color: ${u.refund > 0.01 ? 'var(--success)' : (isDebtor ? '#f87171' : 'var(--text-muted)')}; font-weight: 700; font-size: 0.95rem; display: block;">
-                                ${u.refund > 0.01 ? `+${this.formatEuro(u.refund)} metálico` : (isDebtor ? `Debe ${this.formatEuro(Math.abs(u.net))}` : '0,00€')}
-                            </span>
-                            ${u.pendingToReceive > 0.01 ? `<small style="color: #f472b6; font-size: 0.72rem;">(+${this.formatEuro(u.pendingToReceive)} por Bizum)</small>` : ''}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            refundHtml += `
-                    </div>
-                </div>
-            `;
-        }
-
-        // 2. Bloque de Bizums (solo para cubrir lo que falta tras vaciar el bote)
+        // 1. Bloque de Bizums para liquidar cuentas
         let debtsHtml = '';
         if (debts && debts.length > 0) {
             debtsHtml = `
                 <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border: 1.5px solid rgba(236, 72, 153, 0.5); background: rgba(236, 72, 153, 0.05);">
-                    <h3 style="text-align: center; margin-bottom: 0.4rem; color: #f472b6; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <h3 style="text-align: center; margin-bottom: 0.4rem; color: #f472b6; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
                         <span>📱 Bizums para dejarlo 100% cuadrado</span>
                     </h3>
-                    <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.85rem;">
-                        Los que deben pagan a quienes les faltaba parte de su dinero tras repartir el bote:
+                    <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 0.85rem;">
+                        Pagos recomendados para liquidar todas las deudas con el mínimo número de transferencias:
                     </p>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.55rem;">
             `;
 
             debts.forEach(d => {
                 debtsHtml += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); font-size: 0.9rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); font-size: 0.92rem;">
                         <div style="display: flex; align-items: center; gap: 0.45rem;">
                             <b style="color: #f87171;">${d.from}</b>
                             <span style="color: var(--text-muted); font-size: 0.8rem;">le hace Bizum a</span>
@@ -4033,35 +4052,77 @@ const App = {
                     </div>
                 </div>
             `;
+        } else {
+            debtsHtml = `
+                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; text-align: center;">
+                    <span style="font-size: 2rem; display: block; margin-bottom: 0.35rem;">🎉</span>
+                    <h3 style="color: #4ade80; margin-bottom: 0.35rem;">¡Cuentas Cuadradas!</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">No hay deudas pendientes entre los participantes.</p>
+                </div>
+            `;
+        }
+
+        // 2. Bloque de Desglose por Persona / Pareja
+        let breakdownHtml = '';
+        if (units && units.length > 0) {
+            breakdownHtml = `
+                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.5rem; border-color: rgba(99, 102, 241, 0.4);">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem; color: #a5b4fc; font-size: 1.1rem;">
+                        📊 Balance de Cada Uno
+                    </h3>
+                    <div style="max-height: 220px; overflow-y: auto; padding-right: 0.35rem; display: flex; flex-direction: column; gap: 0.45rem;">
+            `;
+
+            units.forEach(u => {
+                let badge = '';
+                if (u.net > 0.01) {
+                    badge = `<span style="color: #4ade80; font-weight: 700;">+${this.formatEuro(u.net)} <small style="font-size:0.7rem;">(le deben)</small></span>`;
+                } else if (u.net < -0.01) {
+                    badge = `<span style="color: #f87171; font-weight: 700;">-${this.formatEuro(Math.abs(u.net))} <small style="font-size:0.7rem;">(debe)</small></span>`;
+                } else {
+                    badge = `<span style="color: var(--text-muted); font-weight: 700;">0,00€ <small style="font-size:0.7rem;">(en paz)</small></span>`;
+                }
+
+                breakdownHtml += `
+                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; padding: 0.55rem 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.03); align-items: center;">
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="color: var(--text-main); font-weight: 600;">${u.displayName} ${u.isCouple ? '<span class="badge-couple">💑 Pareja</span>' : ''}</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">
+                                Pagó: ${this.formatEuro(u.paid)} | Consumió: ${this.formatEuro(u.spent)}
+                            </span>
+                        </div>
+                        <div style="text-align: right; flex-shrink: 0; margin-left: 0.5rem;">
+                            ${badge}
+                        </div>
+                    </div>
+                `;
+            });
+
+            breakdownHtml += `
+                    </div>
+                </div>
+            `;
         }
         
         let summaryHtml = `
             <style>#btn-close-modal { display: none !important; }</style>
             <div class="final-summary">
-                <h2 style="text-align: center; margin-bottom: 1.5rem;">🎊 Resumen Final 🎊</h2>
-                <div class="summary-card glass" style="padding: 1.5rem; border-radius: 15px; margin-bottom: 1.5rem;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                        <span>Total Recaudado:</span>
-                        <b style="color: var(--success);">${this.formatEuro(totalCollected)}</b>
+                <h2 style="text-align: center; margin-bottom: 1.25rem;">⚖️ Liquidación de la Fiesta ⚖️</h2>
+                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.2rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 1.05rem;">
+                        <span>Total Gastado en la Fiesta:</span>
+                        <b style="color: var(--primary); font-size: 1.2rem;">${this.formatEuro(totalSpent)}</b>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                        <span>Total Gastado:</span>
-                        <b style="color: var(--danger);">${this.formatEuro(totalSpent)}</b>
-                    </div>
-                    <hr style="border: none; border-top: 1px dashed var(--glass-border); margin: 1rem 0;">
-                    <div style="display: flex; justify-content: space-between; font-size: 1.2rem;">
-                        <span>Sobran en el bote:</span>
-                        <b style="color: var(--primary);">${this.formatEuro(remainingBalance)}</b>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--text-muted);">
+                        <span>Total de Gastos / Rondas:</span>
+                        <b>${roundCount}</b>
                     </div>
                 </div>
                 ${debtsHtml}
-                ${refundHtml}
-                <p style="text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
-                    ¡Buena noche, amigos! 👋
-                </p>
-                <div class="actions" style="display: flex; gap: 1rem;">
-                    <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver</button>
-                    <button onclick="App.handleFinalCloseParty()" class="btn-primary" style="flex: 1;">Cerrar y Salir</button>
+                ${breakdownHtml}
+                <div class="actions" style="display: flex; gap: 0.75rem;">
+                    <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver a la fiesta</button>
+                    <button onclick="App.handleFinalCloseParty()" class="btn-primary" style="flex: 1;">Finalizar Fiesta</button>
                 </div>
             </div>
         `;
@@ -4173,236 +4234,7 @@ const App = {
         }
     },
 
-    async handleTransferCustody(name) {
-        if (this.state.partyData.custodian === name) return; // Ya es el custodio
-        
-        if (!confirm(`¿Quieres pasarle la banderola (y el dinero físico) a ${name}?`)) return;
-        
-        try {
-            await set(ref(this.db, `party_pots/${this.state.partyId}/custodian`), name);
-            
-            // Añadir al historial
-            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
-            await set(historyRef, {
-                type: 'system',
-                amount: 0,
-                description: `🚩 El bote pasa a manos de ${name}`,
-                user: this.state.user,
-                timestamp: Date.now()
-            });
-        } catch (error) { console.error(error); }
-    },
 
-    // Reclamar devolución del bote para un participante o pareja que se fue
-    async claimRefund(name) {
-        const balances = this.calculatePartyBalances();
-        if (balances.remainingBalance <= 0) {
-            alert('No hay dinero sobrante para reclamar.');
-            return;
-        }
-
-        const unit = balances.units ? balances.units.find(u => u.names.includes(name)) : null;
-        const refund = unit ? unit.refund : (balances.refunds[name] || 0);
-
-        if (refund <= 0.01) {
-            alert('No hay nada que reclamar para ' + name);
-            return;
-        }
-
-        if (unit && unit.isCouple && unit.oneLeft) {
-            alert(`Su pareja (${unit.activeName}) sigue activa en la fiesta consumiendo del fondo. La devolución se realiza cuando ambos se hayan retirado o al finalizar la fiesta.`);
-            return;
-        }
-
-        const isCouple = unit && unit.isCouple;
-        const refundLabel = isCouple ? `${unit.p1} y ${unit.p2}` : name;
-
-        // Actualizar total del bote
-        const newTotal = balances.totalCollected - refund;
-        await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
-
-        // Marcar como reembolsado
-        if (isCouple) {
-            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${unit.p1.replace(/\./g, '_')}/refunded`), true);
-            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${unit.p2.replace(/\./g, '_')}/refunded`), true);
-        } else {
-            await set(ref(this.db, `party_pots/${this.state.partyId}/participants/${name.replace(/\./g, '_')}/refunded`), true);
-        }
-
-        // Añadir entrada al historial
-        const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
-        await set(historyRef, {
-            type: 'refund',
-            amount: -refund,
-            description: isCouple ? `Reclamo de pareja (${refundLabel})` : `Reclamo de ${name}`,
-            user: this.state.user,
-            timestamp: Date.now()
-        });
-
-        alert(`${refundLabel} ha reclamado ${this.formatEuro(refund)} en efectivo del bote.`);
-        // Recargar UI
-        if (this.listenToParty) {
-            this.listenToParty(this.state.partyId);
-        } else {
-            location.reload();
-        }
-    },
-
-    async handlePartyAddMoney() {
-        const participants = this.state.partyData?.participants
-            ? Object.values(this.state.partyData.participants)
-                .filter(p => p.status !== 'left')
-                .map(p => p.name)
-            : [];
-
-        // Por defecto preseleccionar al usuario actual si está en la lista
-        this.state.tempPartyMoneyFriends = (participants.includes(this.state.user))
-            ? [this.state.user]
-            : (participants.length > 0 ? [participants[0]] : []);
-
-        const generateFriendButtons = () => {
-            if (participants.length === 0) {
-                return '<p class="empty-msg" style="width: 100%;">No hay participantes activos en la fiesta.</p>';
-            }
-            return participants.map(name => {
-                const isSelected = this.state.tempPartyMoneyFriends.includes(name);
-                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
-                const sizeClass = this.getNameLengthClass(name);
-                return `<button type="button" id="pm-btn-${idName}" class="participant-btn ${sizeClass} ${isSelected ? 'selected' : ''}" onclick="App.togglePartyMoneyFriend('${safeName}')" style="padding: 0.65rem 0.35rem; border-radius: var(--radius-sm); transform: none !important;">${name}</button>`;
-            }).join('');
-        };
-
-        const isAllSelected = participants.length > 0 && this.state.tempPartyMoneyFriends.length === participants.length;
-
-        const html = `
-            <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
-                <h3 style="margin-bottom: 0;">💰 Añadir Fondos al Bote</h3>
-                <div>
-                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿Cuánto dinero aporta cada uno? (€)</label>
-                    <input type="number" id="party-money-amount" placeholder="Ej: 10.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;">
-                </div>
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿Quiénes ponen esta cantidad?</label>
-                        <div class="selector-switch-group">
-                            <button type="button" id="switch-party-money-all" class="selector-switch-btn ${isAllSelected ? 'active' : ''}" onclick="App.toggleAllPartyMoneyFriends(true)">Todos</button>
-                            <button type="button" id="switch-party-money-none" class="selector-switch-btn ${this.state.tempPartyMoneyFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyMoneyFriends(false)">Ninguno</button>
-                        </div>
-                    </div>
-                    <div id="party-money-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
-                        ${generateFriendButtons()}
-                    </div>
-                    <small id="party-money-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
-                        ${this.state.tempPartyMoneyFriends.length} seleccionado(s)
-                    </small>
-                </div>
-                <button class="btn-primary" onclick="App.confirmPartyAddMoney()" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem;">Añadir al bote</button>
-            </div>
-        `;
-        this.openModal(html);
-    },
-
-    togglePartyMoneyFriend(name) {
-        if (!this.state.tempPartyMoneyFriends) this.state.tempPartyMoneyFriends = [];
-        const idx = this.state.tempPartyMoneyFriends.indexOf(name);
-        const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
-        const btn = document.getElementById(`pm-btn-${idName}`);
-
-        if (idx > -1) {
-            this.state.tempPartyMoneyFriends.splice(idx, 1);
-            if (btn) btn.classList.remove('selected');
-        } else {
-            this.state.tempPartyMoneyFriends.push(name);
-            if (btn) btn.classList.add('selected');
-        }
-        this.updatePartyMoneyFriendsUIState();
-    },
-
-    toggleAllPartyMoneyFriends(selectAll) {
-        const participants = this.state.partyData?.participants
-            ? Object.values(this.state.partyData.participants)
-                .filter(p => p.status !== 'left')
-                .map(p => p.name)
-            : [];
-
-        if (selectAll !== undefined) {
-            this.state.tempPartyMoneyFriends = selectAll ? [...participants] : [];
-        } else {
-            if (this.state.tempPartyMoneyFriends.length === participants.length) {
-                this.state.tempPartyMoneyFriends = [];
-            } else {
-                this.state.tempPartyMoneyFriends = [...participants];
-            }
-        }
-
-        participants.forEach(name => {
-            const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
-            const btn = document.getElementById(`pm-btn-${idName}`);
-            if (btn) {
-                if (this.state.tempPartyMoneyFriends.includes(name)) {
-                    btn.classList.add('selected');
-                } else {
-                    btn.classList.remove('selected');
-                }
-            }
-        });
-        this.updatePartyMoneyFriendsUIState();
-    },
-
-    updatePartyMoneyFriendsUIState() {
-        const participants = this.state.partyData?.participants
-            ? Object.values(this.state.partyData.participants)
-                .filter(p => p.status !== 'left')
-                .map(p => p.name)
-            : [];
-        const count = this.state.tempPartyMoneyFriends.length;
-        const total = participants.length;
-        const switchAll = document.getElementById('switch-party-money-all');
-        const switchNone = document.getElementById('switch-party-money-none');
-        if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
-        if (switchNone) switchNone.classList.toggle('active', count === 0);
-
-        const countText = document.getElementById('party-money-count-text');
-        if (countText) {
-            countText.textContent = `${count} de ${total} seleccionados`;
-        }
-    },
-
-    async confirmPartyAddMoney() {
-        const amountEl = document.getElementById('party-money-amount');
-        const amount = this.parseAmount(amountEl?.value);
-        const selected = [...(this.state.tempPartyMoneyFriends || [])];
-
-        if (selected.length === 0) return alert('Selecciona al menos a una persona que ponga dinero.');
-        if (isNaN(amount) || amount <= 0) return alert('Introduce una cantidad válida por persona.');
-
-        this.closeModal();
-
-        const friends = this.state.partyData?.participants
-            ? Object.values(this.state.partyData.participants).map(p => p.name)
-            : [];
-
-        let addedTotal = 0;
-        for (const friend of selected) {
-            if (!friends.includes(friend)) {
-                await this.addPartyFriendSilent(friend);
-            }
-
-            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
-            await set(historyRef, {
-                type: 'income',
-                amount: amount,
-                description: `Aporte de ${friend}`,
-                user: this.state.user,
-                timestamp: Date.now()
-            });
-            addedTotal += amount;
-        }
-
-        const newTotal = (this.state.partyData.totalCollected || 0) + addedTotal;
-        await set(ref(this.db, `party_pots/${this.state.partyId}/totalCollected`), newTotal);
-    },
 
     async handlePartyAddFriend() {
         try {
@@ -4417,7 +4249,7 @@ const App = {
             this.state.tempSelectionFriends = [];
             this.state.tempAvailablePartyMembers = availableMembers.map(m => m.name);
             
-            let html = `<h3>Añadir Amigos al Bote</h3>`;
+            let html = `<h3>Añadir Amigos a la Fiesta</h3>`;
             html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
             // Botones de selección rápida: Chicos, Chicas, Switch Todos/Ninguno
@@ -4446,7 +4278,7 @@ const App = {
             });
             
             if (availableMembers.length === 0) {
-                html += `<p class="empty-msg" style="grid-column: span 2;">Todos los miembros ya están en el bote.</p>`;
+                html += `<p class="empty-msg" style="grid-column: span 2;">Todos los miembros ya están en la fiesta.</p>`;
             }
             
             html += `</div>`;
@@ -4459,7 +4291,7 @@ const App = {
                         <input type="checkbox" id="chk-permanent-member" style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;">
                         <span style="font-size: 0.88rem; line-height: 1.35;">
                             <strong>Miembro permanente</strong><br>
-                            <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en este bote.</span>
+                            <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en esta fiesta.</span>
                         </span>
                     </label>
                     <button class="btn-secondary" onclick="App.confirmPartyCustomFriend()" style="width: 100%;">Añadir nombre escrito</button>
@@ -4479,7 +4311,7 @@ const App = {
         const isSelected = this.state.tempSelectionFriends.includes(name);
 
         if (isSelected) {
-            if (!confirm(`¿Seguro que quieres quitar a "${name}" del bote de la fiesta?`)) return;
+            if (!confirm(`¿Seguro que quieres quitar a "${name}" de la fiesta?`)) return;
             // Apagar y quitar del bote
             const idx = this.state.tempSelectionFriends.indexOf(name);
             this.state.tempSelectionFriends.splice(idx, 1);
@@ -4522,7 +4354,7 @@ const App = {
 
         if (toRemove.length > 0) {
             const namesText = toRemove.length === 1 ? `a "${toRemove[0]}"` : `a ${toRemove.length} amigos (${toRemove.join(', ')})`;
-            if (!confirm(`¿Seguro que quieres quitar del bote ${namesText}?`)) {
+            if (!confirm(`¿Seguro que quieres quitar de la fiesta ${namesText}?`)) {
                 // Restaurar switch visual
                 const total = available.length;
                 const count = (this.state.tempSelectionFriends || []).length;
@@ -4597,19 +4429,39 @@ const App = {
     },
 
     async handlePartyAddExpense() {
-        const participants = this.state.partyData?.participants
+        const allParticipants = this.state.partyData?.participants
             ? Object.values(this.state.partyData.participants)
-                .filter(p => p.status !== 'left')
-                .map(p => p.name)
             : [];
+        const activeParticipants = allParticipants
+            .filter(p => p.status !== 'left')
+            .map(p => p.name);
+        const participants = activeParticipants.length > 0
+            ? activeParticipants
+            : allParticipants.map(p => p.name);
+
+        if (participants.length === 0) {
+            alert('Primero añade participantes a la fiesta con el botón "+ Añadir Amigo".');
+            return;
+        }
 
         // Por defecto todos los amigos seleccionados
         this.state.tempPartyExpenseFriends = [...participants];
+        // Por defecto el usuario actual como pagador si está en la fiesta, o el primero
+        this.state.tempPartyExpensePayer = (participants.includes(this.state.user))
+            ? this.state.user
+            : participants[0];
 
-        const generateFriendButtons = () => {
-            if (participants.length === 0) {
-                return '<p class="empty-msg" style="width: 100%;">No hay participantes en la fiesta.</p>';
-            }
+        const generatePayerButtons = () => {
+            return participants.map(name => {
+                const isSelected = (this.state.tempPartyExpensePayer === name);
+                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                const sizeClass = this.getNameLengthClass(name);
+                return `<button type="button" id="pe-payer-btn-${idName}" class="participant-btn ${sizeClass} ${isSelected ? 'selected' : ''}" onclick="App.setPartyExpensePayer('${safeName}')" style="padding: 0.65rem 0.35rem; border-radius: var(--radius-sm); transform: none !important;">${name}</button>`;
+            }).join('');
+        };
+
+        const generateBeneficiaryButtons = () => {
             return participants.map(name => {
                 const isSelected = this.state.tempPartyExpenseFriends.includes(name);
                 const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
@@ -4626,31 +4478,51 @@ const App = {
                 <h3 style="margin-bottom: 0;">💸 Anotar Gasto / Ronda</h3>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿Cuánto ha costado? (€)</label>
-                    <input type="number" id="party-expense-amount" placeholder="Ej: 15.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;">
+                    <input type="number" id="party-expense-amount" placeholder="Ej: 15.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;" oninput="App.updatePartyExpenseFriendsUIState()">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿En qué se ha gastado?</label>
                     <input type="text" id="party-expense-desc" placeholder="Ej: Ronda de cañas, cubatas..." value="Ronda" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; box-sizing: border-box;">
                 </div>
                 <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿A quiénes incluye esta ronda?</label>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.45rem; display:block;">¿Quién lo ha pagado? 💳</label>
+                    <div id="party-expense-payer-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; max-height: 25vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                        ${generatePayerButtons()}
+                    </div>
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
+                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿Entre quiénes se divide? 👥</label>
                         <div class="selector-switch-group">
                             <button type="button" id="switch-party-expense-all" class="selector-switch-btn ${isAllSelected ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(true)">Todos</button>
                             <button type="button" id="switch-party-expense-none" class="selector-switch-btn ${this.state.tempPartyExpenseFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(false)">Ninguno</button>
                         </div>
                     </div>
-                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
-                        ${generateFriendButtons()}
+                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; max-height: 28vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                        ${generateBeneficiaryButtons()}
                     </div>
-                    <small id="party-expense-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
-                        ${this.state.tempPartyExpenseFriends.length} de ${participants.length} seleccionados
-                    </small>
+                    <div id="party-expense-split-preview" style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.85rem; text-align: center; color: #c7d2fe; margin-top: 0.6rem;">
+                        Pagado por <b>${this.state.tempPartyExpensePayer}</b> · Dividido entre <b>${participants.length}</b> personas
+                    </div>
                 </div>
                 <button class="btn-primary" onclick="App.confirmPartyAddExpense()" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem;">Anotar Gasto</button>
             </div>
         `;
         this.openModal(html);
+        setTimeout(() => this.updatePartyExpenseFriendsUIState(), 50);
+    },
+
+    setPartyExpensePayer(name) {
+        this.state.tempPartyExpensePayer = name;
+        const grid = document.getElementById('party-expense-payer-grid');
+        if (grid) {
+            const buttons = grid.querySelectorAll('button');
+            buttons.forEach(btn => btn.classList.remove('selected'));
+            const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+            const targetBtn = document.getElementById(`pe-payer-btn-${idName}`);
+            if (targetBtn) targetBtn.classList.add('selected');
+        }
+        this.updatePartyExpenseFriendsUIState();
     },
 
     togglePartyExpenseFriend(name) {
@@ -4702,16 +4574,28 @@ const App = {
         const participants = this.state.partyData?.participants
             ? Object.values(this.state.partyData.participants).map(p => p.name)
             : [];
-        const count = this.state.tempPartyExpenseFriends.length;
+        const selected = this.state.tempPartyExpenseFriends || [];
+        const count = selected.length;
         const total = participants.length;
         const switchAll = document.getElementById('switch-party-expense-all');
         const switchNone = document.getElementById('switch-party-expense-none');
         if (switchAll) switchAll.classList.toggle('active', count === total && total > 0);
         if (switchNone) switchNone.classList.toggle('active', count === 0);
 
-        const countText = document.getElementById('party-expense-count-text');
-        if (countText) {
-            countText.textContent = `${count} de ${total} seleccionados`;
+        const amountEl = document.getElementById('party-expense-amount');
+        const amount = this.parseAmount(amountEl?.value) || 0;
+        const payer = this.state.tempPartyExpensePayer || 'Nadie';
+
+        const previewEl = document.getElementById('party-expense-split-preview');
+        if (previewEl) {
+            if (count === 0) {
+                previewEl.innerHTML = `⚠️ <span style="color:#f87171;">Selecciona al menos a una persona para dividir el gasto.</span>`;
+            } else if (amount > 0) {
+                const perPerson = amount / count;
+                previewEl.innerHTML = `💳 Pagado por <b>${payer}</b><br><span style="font-size: 1.05rem; font-weight:700; color: #a5b4fc;">${this.formatEuro(perPerson)}</span> / persona (${count} pers.)`;
+            } else {
+                previewEl.innerHTML = `💳 Pagado por <b>${payer}</b> · Dividido entre <b>${count}</b> personas`;
+            }
         }
     },
 
@@ -4720,9 +4604,15 @@ const App = {
         const descEl = document.getElementById('party-expense-desc');
         const amount = this.parseAmount(amountEl?.value);
         let desc = descEl?.value?.trim() || 'Ronda';
+        const payer = this.state.tempPartyExpensePayer;
 
         if (isNaN(amount) || amount <= 0) {
             alert('Por favor introduce un importe válido.');
+            return;
+        }
+
+        if (!payer) {
+            alert('Por favor indica quién ha pagado este gasto.');
             return;
         }
 
@@ -4732,7 +4622,7 @@ const App = {
         const selected = [...(this.state.tempPartyExpenseFriends || [])];
 
         if (participants.length > 0 && selected.length === 0) {
-            alert('Debes seleccionar al menos a un amigo para esta ronda.');
+            alert('Debes seleccionar al menos a una persona entre las que se divide el gasto.');
             return;
         }
 
@@ -4748,12 +4638,22 @@ const App = {
             type: 'expense',
             amount: amount,
             description: desc,
+            payer: payer,
             beneficiaries: selected,
             user: this.state.user,
             timestamp: Date.now()
         });
 
-        const newTotal = (this.state.partyData.totalSpent || 0) + amount;
+        // Recalcular totalSpent a partir del historial actualizado
+        const histSnap = await get(ref(this.db, `party_pots/${this.state.partyId}/history`));
+        let newTotal = 0;
+        if (histSnap.exists()) {
+            Object.values(histSnap.val()).forEach(item => {
+                if (item.type === 'expense') newTotal += Number(item.amount || 0);
+            });
+        } else {
+            newTotal = (this.state.partyData?.totalSpent || 0) + amount;
+        }
         await set(ref(this.db, `party_pots/${this.state.partyId}/totalSpent`), newTotal);
     },
 
@@ -4798,6 +4698,7 @@ const App = {
         const allAvailableForEdit = Array.from(new Set([...activeParticipants, ...existingBeneficiaries]));
 
         this.state.tempPartyExpenseFriends = [...existingBeneficiaries];
+        this.state.tempPartyExpensePayer = item.payer || item.user || allAvailableForEdit[0] || '';
 
         // Limpiar sufijo "(Nombre1, Nombre2)" de la descripción para el input
         let cleanDesc = item.description || 'Ronda';
@@ -4805,9 +4706,22 @@ const App = {
             cleanDesc = cleanDesc.substring(0, cleanDesc.lastIndexOf('(')).trim();
         }
 
+        const generatePayerButtons = () => {
+            if (allAvailableForEdit.length === 0) {
+                return '<p class="empty-msg" style="width: 100%;">No hay participantes.</p>';
+            }
+            return allAvailableForEdit.map(name => {
+                const isSelected = (this.state.tempPartyExpensePayer === name);
+                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
+                const sizeClass = this.getNameLengthClass(name);
+                return `<button type="button" id="pe-payer-btn-${idName}" class="participant-btn ${sizeClass} ${isSelected ? 'selected' : ''}" onclick="App.setPartyExpensePayer('${safeName}')" style="padding: 0.65rem 0.35rem; border-radius: var(--radius-sm); transform: none !important;">${name}</button>`;
+            }).join('');
+        };
+
         const generateFriendButtons = () => {
             if (allAvailableForEdit.length === 0) {
-                return '<p class="empty-msg" style="width: 100%;">No hay participantes en la fiesta.</p>';
+                return '<p class="empty-msg" style="width: 100%;">No hay participantes.</p>';
             }
             return allAvailableForEdit.map(name => {
                 const isSelected = this.state.tempPartyExpenseFriends.includes(name);
@@ -4825,31 +4739,38 @@ const App = {
                 <h3 style="margin-bottom: 0;">✏️ Modificar Gasto / Ronda</h3>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">Importe (€)</label>
-                    <input type="number" id="party-expense-amount" value="${Number(item.amount || 0).toFixed(2)}" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;">
+                    <input type="number" id="party-expense-amount" value="${Number(item.amount || 0).toFixed(2)}" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;" oninput="App.updatePartyExpenseFriendsUIState()">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">Concepto / Descripción</label>
                     <input type="text" id="party-expense-desc" value="${cleanDesc}" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; box-sizing: border-box;">
                 </div>
                 <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿A quiénes incluye esta ronda?</label>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.45rem; display:block;">¿Quién lo ha pagado? 💳</label>
+                    <div id="party-expense-payer-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; max-height: 25vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                        ${generatePayerButtons()}
+                    </div>
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
+                        <label style="font-size:0.85rem; color: var(--text-muted); margin: 0;">¿Entre quiénes se divide? 👥</label>
                         <div class="selector-switch-group">
                             <button type="button" id="switch-party-expense-all" class="selector-switch-btn ${isAllSelected ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(true)">Todos</button>
                             <button type="button" id="switch-party-expense-none" class="selector-switch-btn ${this.state.tempPartyExpenseFriends.length === 0 ? 'active' : ''}" onclick="App.toggleAllPartyExpenseFriends(false)">Ninguno</button>
                         </div>
                     </div>
-                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; max-height: 38vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
+                    <div id="party-expense-friends-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; max-height: 28vh; overflow-y: auto; overflow-x: hidden; padding: 0.2rem; box-sizing: border-box;">
                         ${generateFriendButtons()}
                     </div>
-                    <small id="party-expense-count-text" style="color: var(--text-muted); font-size: 0.8rem; display: block; text-align: right; margin-top: 0.35rem;">
-                        ${this.state.tempPartyExpenseFriends.length} de ${allAvailableForEdit.length} seleccionados
-                    </small>
+                    <div id="party-expense-split-preview" style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.85rem; text-align: center; color: #c7d2fe; margin-top: 0.6rem;">
+                        Pagado por <b>${this.state.tempPartyExpensePayer}</b> · Dividido entre <b>${this.state.tempPartyExpenseFriends.length}</b> personas
+                    </div>
                 </div>
                 <button class="btn-primary" onclick="App.confirmPartySaveEditedExpense('${historyId}')" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem;">Guardar Cambios</button>
             </div>
         `;
         this.openModal(html);
+        setTimeout(() => this.updatePartyExpenseFriendsUIState(), 50);
     },
 
     async confirmPartySaveEditedExpense(historyId) {
@@ -4860,6 +4781,7 @@ const App = {
         const descEl = document.getElementById('party-expense-desc');
         const amount = this.parseAmount(amountEl?.value);
         let desc = descEl?.value?.trim() || 'Ronda';
+        const payer = this.state.tempPartyExpensePayer || item.payer || item.user;
 
         if (isNaN(amount) || amount <= 0) {
             alert('Por favor introduce un importe válido.');
@@ -4872,7 +4794,7 @@ const App = {
         const selected = [...(this.state.tempPartyExpenseFriends || [])];
 
         if (participants.length > 0 && selected.length === 0) {
-            alert('Debes seleccionar al menos a un amigo para esta ronda.');
+            alert('Debes seleccionar al menos a una persona para este gasto.');
             return;
         }
 
@@ -4889,6 +4811,7 @@ const App = {
                 ...item,
                 amount: amount,
                 description: desc,
+                payer: payer,
                 beneficiaries: selected,
                 editedAt: Date.now()
             });
