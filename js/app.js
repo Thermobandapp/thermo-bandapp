@@ -871,6 +871,29 @@ const App = {
                     </div>
                 </div>
 
+                <div style="display: flex; gap: 0.75rem;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Graduación (% vol)</label>
+                        <input type="number" id="product-alcohol-input" step="0.1" min="0" max="100" placeholder="Ej: 5.0" onkeydown="if(event.key==='Enter') App.confirmSaveNewProduct()" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Centilitros (cl)</label>
+                        <input type="number" id="product-cl-input" step="1" min="0" max="1000" placeholder="Ej: 33" onkeydown="if(event.key==='Enter') App.confirmSaveNewProduct()" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">Atajos rápidos de bebida:</label>
+                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(5, 20, '🍺', false)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍺 Caña (5% · 20cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(5, 33, '🍺', false)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍺 Tercio (5% · 33cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(13, 15, '🍷', false)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍷 Vino (13% · 15cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(40, 5, '🥃', false)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🥃 Chupito (40% · 5cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(12, 30, '🍹', false)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍹 Cubata (12% · 30cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(0, 0, '🥤', false)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🥤 Sin alcohol (0%)</button>
+                    </div>
+                </div>
+
                 <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-top: 0.25rem;">
                     <input type="checkbox" id="product-escote-chk" style="width: 1.2rem; height: 1.2rem; accent-color: var(--primary); cursor: pointer; margin-top: 0.15rem;">
                     <span style="font-size: 0.88rem; line-height: 1.35;">
@@ -900,6 +923,12 @@ const App = {
         const iconInput = document.getElementById('product-icon-input')?.value.trim() || '🍴';
         const allowEscote = document.getElementById('product-escote-chk')?.checked ?? false;
 
+        const alcoholInput = document.getElementById('product-alcohol-input')?.value.trim();
+        const alcohol = alcoholInput !== '' && !isNaN(alcoholInput) ? Math.max(0, parseFloat(alcoholInput)) : 0;
+
+        const clInput = document.getElementById('product-cl-input')?.value.trim();
+        const cl = clInput !== '' && !isNaN(clInput) ? Math.max(0, parseFloat(clInput)) : 0;
+
         this.closeModal();
 
         try {
@@ -908,7 +937,9 @@ const App = {
                 name: nameInput,
                 price,
                 icon: iconInput,
-                allowEscote: Boolean(allowEscote)
+                allowEscote: Boolean(allowEscote),
+                alcohol,
+                cl
             };
             await set(productRef, productData);
 
@@ -960,6 +991,29 @@ const App = {
                     </div>
                 </div>
 
+                <div style="display: flex; gap: 0.75rem;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Graduación (% vol)</label>
+                        <input type="number" id="edit-product-alcohol-input" step="0.1" min="0" max="100" value="${item.alcohol !== undefined ? item.alcohol : ''}" placeholder="Ej: 5.0" onkeydown="if(event.key==='Enter') App.confirmSaveEditProduct('${id}')" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Centilitros (cl)</label>
+                        <input type="number" id="edit-product-cl-input" step="1" min="0" max="1000" value="${item.cl !== undefined ? item.cl : ''}" placeholder="Ej: 33" onkeydown="if(event.key==='Enter') App.confirmSaveEditProduct('${id}')" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 1rem; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">Atajos rápidos de bebida:</label>
+                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(5, 20, '🍺', true)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍺 Caña (5% · 20cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(5, 33, '🍺', true)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍺 Tercio (5% · 33cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(13, 15, '🍷', true)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍷 Vino (13% · 15cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(40, 5, '🥃', true)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🥃 Chupito (40% · 5cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(12, 30, '🍹', true)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🍹 Cubata (12% · 30cl)</button>
+                        <button type="button" class="btn-icon-small" onclick="App.setAlcoholPreset(0, 0, '🥤', true)" style="padding: 0.25rem 0.45rem; font-size: 0.75rem;">🥤 Sin alcohol (0%)</button>
+                    </div>
+                </div>
+
                 <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-top: 0.25rem;">
                     <input type="checkbox" id="edit-product-escote-chk" ${isEscoteChecked ? 'checked' : ''} style="width: 1.2rem; height: 1.2rem; accent-color: var(--primary); cursor: pointer; margin-top: 0.15rem;">
                     <span style="font-size: 0.88rem; line-height: 1.35;">
@@ -980,6 +1034,16 @@ const App = {
         setTimeout(() => document.getElementById('edit-product-name-input')?.focus(), 80);
     },
 
+    setAlcoholPreset(alcohol, cl, emoji, isEdit = false) {
+        const prefix = isEdit ? 'edit-product-' : 'product-';
+        const alcEl = document.getElementById(`${prefix}alcohol-input`);
+        const clEl = document.getElementById(`${prefix}cl-input`);
+        const iconEl = document.getElementById(`${prefix}icon-input`);
+        if (alcEl) alcEl.value = (alcohol !== null && alcohol !== undefined) ? alcohol : '';
+        if (clEl) clEl.value = (cl !== null && cl !== undefined) ? cl : '';
+        if (iconEl && emoji) iconEl.value = emoji;
+    },
+
     async confirmSaveEditProduct(id) {
         if (!this.state.tableId) return;
 
@@ -993,6 +1057,12 @@ const App = {
         const iconInput = document.getElementById('edit-product-icon-input')?.value.trim() || '🍴';
         const allowEscote = document.getElementById('edit-product-escote-chk')?.checked ?? false;
 
+        const alcoholInput = document.getElementById('edit-product-alcohol-input')?.value.trim();
+        const alcohol = alcoholInput !== '' && !isNaN(alcoholInput) ? Math.max(0, parseFloat(alcoholInput)) : 0;
+
+        const clInput = document.getElementById('edit-product-cl-input')?.value.trim();
+        const cl = clInput !== '' && !isNaN(clInput) ? Math.max(0, parseFloat(clInput)) : 0;
+
         const oldProduct = this.state.tableData?.menu?.[id] || {};
         const oldName = oldProduct.name || '';
         const oldPrice = Number(oldProduct.price || 0);
@@ -1004,7 +1074,9 @@ const App = {
                 name: nameInput,
                 price,
                 icon: iconInput,
-                allowEscote: Boolean(allowEscote)
+                allowEscote: Boolean(allowEscote),
+                alcohol,
+                cl
             };
 
             const barName = this.getBarName();
@@ -1120,6 +1192,12 @@ const App = {
             };
             if (product.id) {
                 orderData.productId = product.id;
+            }
+            if (product.alcohol !== undefined && product.alcohol !== null) {
+                orderData.alcohol = Number(product.alcohol) || 0;
+            }
+            if (product.cl !== undefined && product.cl !== null) {
+                orderData.cl = Number(product.cl) || 0;
             }
             await set(orderRef, orderData);
         }
@@ -1727,6 +1805,9 @@ const App = {
         }
 
         Object.entries(menu).forEach(([id, item]) => {
+            const alcoholBadge = (item.alcohol > 0 || item.cl > 0)
+                ? `<span class="badge-escote" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.72rem; padding: 0.15rem 0.4rem; border-radius: 4px; margin-top: 0.15rem;">🍺 ${item.alcohol > 0 ? item.alcohol + '%' : ''}${item.alcohol > 0 && item.cl > 0 ? ' · ' : ''}${item.cl > 0 ? item.cl + 'cl' : ''}</span>`
+                : '';
             const div = document.createElement('div');
             div.className = 'menu-item glass';
             div.innerHTML = `
@@ -1736,6 +1817,7 @@ const App = {
                 <span class="item-name">${item.name}</span>
                 <span class="item-price">${this.formatEuro(item.price)}</span>
                 ${item.allowEscote ? '<span class="badge-escote">💎 A Escote</span>' : ''}
+                ${alcoholBadge}
             `;
             div.onclick = (e) => {
                 if (e.target.classList.contains('btn-edit-small') || e.target.classList.contains('btn-delete-menu-small')) return;
@@ -2189,7 +2271,9 @@ const App = {
                     const productMock = {
                         id: match ? match[0] : (lastOrder.productId || null),
                         name: match ? match[1].name : lastOrder.productName,
-                        price: match ? match[1].price : lastOrder.price
+                        price: match ? match[1].price : lastOrder.price,
+                        alcohol: (match && match[1].alcohol !== undefined) ? match[1].alcohol : (lastOrder.alcohol || 0),
+                        cl: (match && match[1].cl !== undefined) ? match[1].cl : (lastOrder.cl || 0)
                     };
                     await this.addOrder(productMock, name);
                 }
@@ -2824,32 +2908,141 @@ const App = {
     },
 
     showBorrachuzoModal(data) {
-        // Contar rondas individuales (excluir SHARED)
         const orders = Object.values(data.orders || {});
+        const menu = data.menu || {};
+
+        // Calcular alcohol puro consumido por usuario y conteo de consumiciones
+        const alcoholByUser = {};
         const countByUser = {};
+        let tableHasAlcoholData = false;
+
         orders.forEach(o => {
-            if (o.user && o.user !== 'SHARED') {
+            if (!o) return;
+
+            // Determinar graduación y centilitros
+            let alcohol = (o.alcohol !== undefined && o.alcohol !== null) ? Number(o.alcohol) : null;
+            let cl = (o.cl !== undefined && o.cl !== null) ? Number(o.cl) : null;
+
+            // Si la orden no tiene alcohol o cl, buscar en el menú
+            if (alcohol === null || cl === null) {
+                const menuItem = (o.productId && menu[o.productId]) 
+                    ? menu[o.productId] 
+                    : Object.values(menu).find(m => m.name === o.productName);
+                if (menuItem) {
+                    if (alcohol === null && menuItem.alcohol !== undefined && menuItem.alcohol !== null) {
+                        alcohol = Number(menuItem.alcohol);
+                    }
+                    if (cl === null && menuItem.cl !== undefined && menuItem.cl !== null) {
+                        cl = Number(menuItem.cl);
+                    }
+                }
+            }
+
+            alcohol = Number(alcohol || 0);
+            cl = Number(cl || 0);
+
+            // Alcohol puro en cl: cl * (% / 100)
+            const pureAlcohol = cl > 0 && alcohol > 0 ? (cl * (alcohol / 100)) : 0;
+            if (pureAlcohol > 0) {
+                tableHasAlcoholData = true;
+            }
+
+            // Distribuir consumo
+            if (o.user === 'SHARED') {
+                // Escote compartido: repartir entre beneficiarios
+                let beneficiaries = [];
+                if (Array.isArray(o.beneficiaries) && o.beneficiaries.length > 0) {
+                    beneficiaries = o.beneficiaries;
+                } else {
+                    const participants = Object.values(data.participants || {});
+                    const tableStart = Number(data.createdAt || 0);
+                    const orderTime = Number(o.timestamp || tableStart);
+                    const present = participants.filter(p => Number(p.joinedAt || tableStart) <= orderTime);
+                    beneficiaries = (present.length > 0 ? present : participants).map(p => p.name);
+                }
+                if (beneficiaries.length > 0) {
+                    const splitAlcohol = pureAlcohol / beneficiaries.length;
+                    beneficiaries.forEach(u => {
+                        alcoholByUser[u] = (alcoholByUser[u] || 0) + splitAlcohol;
+                        countByUser[u] = (countByUser[u] || 0) + (1 / beneficiaries.length);
+                    });
+                }
+            } else if (o.user) {
+                alcoholByUser[o.user] = (alcoholByUser[o.user] || 0) + pureAlcohol;
                 countByUser[o.user] = (countByUser[o.user] || 0) + 1;
             }
         });
 
         let borrachuzosHTML = '';
         let titulo = 'Borrachuzo del día';
-        if (Object.keys(countByUser).length === 0) {
-            borrachuzosHTML = '<p style="margin:0.5rem 0;color:#374151;">Nadie pidió rondas 😅</p>';
+
+        if (tableHasAlcoholData) {
+            // Ordenar de mayor a menor consumo de alcohol
+            const drinkers = Object.entries(alcoholByUser)
+                .filter(([, pureCl]) => pureCl > 0.05)
+                .sort((a, b) => b[1] - a[1]);
+
+            if (drinkers.length === 0) {
+                borrachuzosHTML = '<p style="margin:0.5rem 0;color:#374151;">¡Hoy todos sobrios! Nadie bebió alcohol 😇</p>';
+            } else {
+                const maxAlcohol = drinkers[0][1];
+                // Tolerancia de 0.05 cl para considerar empates
+                const winners = drinkers.filter(([, pureCl]) => Math.abs(pureCl - maxAlcohol) < 0.05).map(([name]) => name);
+                titulo = winners.length > 1 ? 'Borrachuzos del día' : 'Borrachuzo del día';
+
+                // Equivalencia orientativa en cañas estándar (20cl a 5% = 1cl de alcohol puro)
+                const equivCanas = (maxAlcohol / 1.0).toFixed(1).replace('.0', '');
+
+                borrachuzosHTML = `
+                    <p style="font-size:1.25rem;margin:0.5rem 0 0.2rem;color:#111827;font-weight:800;">
+                        🍺 ${winners.join(', ')}
+                    </p>
+                    <p style="color:#d97706;font-size:0.95rem;margin:0 0 0.35rem;font-weight:700;">
+                        ${maxAlcohol.toFixed(1)} cl de alcohol puro <span style="font-size:0.85rem;color:#6b7280;font-weight:400;">(≈ ${equivCanas} cañas)</span>
+                    </p>
+                `;
+
+                if (drinkers.length > 1) {
+                    borrachuzosHTML += `
+                        <div style="margin-top: 0.75rem; border-top: 1px dashed rgba(236, 72, 153, 0.3); padding-top: 0.6rem; text-align: left;">
+                            <p style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #9d174d; font-weight: 700; margin: 0 0 0.4rem;">
+                                📊 Ranking de consumo:
+                            </p>
+                            <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                                ${drinkers.slice(0, 5).map(([name, pureCl], idx) => {
+                                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`;
+                                    const canas = (pureCl / 1.0).toFixed(1).replace('.0', '');
+                                    return `
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; background: rgba(255,255,255,0.7); padding: 0.25rem 0.5rem; border-radius: 6px;">
+                                            <span><strong>${medal}</strong> ${name}</span>
+                                            <span style="font-weight: 600; color: #4b5563;">${pureCl.toFixed(1)} cl <span style="font-size: 0.75rem; color: #9ca3af;">(≈${canas}🍺)</span></span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
         } else {
-            const maxCount = Math.max(...Object.values(countByUser));
-            const winners = Object.entries(countByUser)
-                .filter(([, c]) => c === maxCount)
-                .map(([name]) => name);
-            titulo = winners.length > 1 ? 'Borrachuzos del día' : 'Borrachuzo del día';
-            borrachuzosHTML = `
-                <p style="font-size:1.1rem;margin:0.5rem 0 0.25rem;color:#111827;">
-                    🍺 <strong>${winners.join(', ')}</strong>
-                </p>
-                <p style="color:#6b7280;font-size:0.85rem;margin:0;">
-                    (${maxCount} ronda${maxCount !== 1 ? 's' : ''})
-                </p>`;
+            // Fallback: conteo tradicional por rondas
+            const countEntries = Object.entries(countByUser).filter(([, c]) => c > 0);
+            if (countEntries.length === 0) {
+                borrachuzosHTML = '<p style="margin:0.5rem 0;color:#374151;">Nadie pidió rondas 😅</p>';
+            } else {
+                const maxCount = Math.max(...countEntries.map(([, c]) => c));
+                const winners = countEntries
+                    .filter(([, c]) => c === maxCount)
+                    .map(([name]) => name);
+                titulo = winners.length > 1 ? 'Borrachuzos del día' : 'Borrachuzo del día';
+                borrachuzosHTML = `
+                    <p style="font-size:1.1rem;margin:0.5rem 0 0.25rem;color:#111827;">
+                        🍺 <strong>${winners.join(', ')}</strong>
+                    </p>
+                    <p style="color:#6b7280;font-size:0.85rem;margin:0;">
+                        (${maxCount} ronda${maxCount !== 1 ? 's' : ''})
+                    </p>`;
+            }
         }
 
         const html = `
