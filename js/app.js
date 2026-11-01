@@ -3431,13 +3431,20 @@ const App = {
                 }
 
                 let subtitle = '';
+                const uPaidSettlement = (balances.settlementPaid?.[u.p1] || 0) + (u.isCouple ? (balances.settlementPaid?.[u.p2] || 0) : 0);
+                const uReceivedSettlement = (balances.settlementReceived?.[u.p1] || 0) + (u.isCouple ? (balances.settlementReceived?.[u.p2] || 0) : 0);
+
                 if (u.isCouple) {
                     subtitle = `Pagaron: <b>${this.formatEuro(u.paid)}</b> | Consumieron: <b>${this.formatEuro(u.spent)}</b>`;
+                    if (uPaidSettlement > 0) subtitle += ` | Reembolsado: <b>+${this.formatEuro(uPaidSettlement)}</b>`;
+                    if (uReceivedSettlement > 0) subtitle += ` | Cobrado: <b>-${this.formatEuro(uReceivedSettlement)}</b>`;
                     if (u.oneLeft) {
                         subtitle += `<br><span style="color:#f87171; font-size: 0.7rem;">(${u.leftName} fuera)</span>`;
                     }
                 } else {
                     subtitle = `Pagó: <b>${this.formatEuro(u.paid)}</b> | Consumió: <b>${this.formatEuro(u.spent)}</b>`;
+                    if (uPaidSettlement > 0) subtitle += ` | Reembolsado: <b>+${this.formatEuro(uPaidSettlement)}</b>`;
+                    if (uReceivedSettlement > 0) subtitle += ` | Cobrado: <b>-${this.formatEuro(uReceivedSettlement)}</b>`;
                 }
 
                 div.innerHTML = `
@@ -3475,12 +3482,30 @@ const App = {
                     const isExpense = item.type === 'expense';
                     const isIncome = item.type === 'income';
                     const isSystem = item.type === 'system';
+                    const isSettlement = item.type === 'settlement';
 
                     if (isSystem) {
                         div.innerHTML = `
                             <div class="info" style="text-align: center; width: 100%;">
                                 <span>${item.description}</span>
                                 <small style="display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem;">${new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
+                            </div>
+                        `;
+                    } else if (isSettlement) {
+                        const timeStr = new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        div.innerHTML = `
+                            <div class="info" style="flex: 1; min-width: 0; padding-right: 0.5rem;">
+                                <b style="font-size: 0.95rem; color: #34d399;">🤝 Reembolso Pagado</b><br>
+                                <span style="font-size: 0.85rem; color: var(--text-main);">${item.from} ➔ ${item.to}</span>
+                                <small style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; display: block; margin-top: 0.15rem;">
+                                    Anotado por <b style="color: var(--primary-light);">${item.user || 'Desconocido'}</b> (${timeStr})
+                                </small>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+                                <span class="amount" style="color: #34d399; font-size: 1rem; font-weight: 700;">
+                                    ${this.formatEuro(item.amount)}
+                                </span>
+                                <button class="btn-icon-small" title="Anular reembolso" onclick="App.handlePartyDeleteSettlement('${id}')" style="padding: 0.2rem 0.35rem; font-size: 0.85rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
                             </div>
                         `;
                     } else {
@@ -3491,7 +3516,7 @@ const App = {
 
                         div.innerHTML = `
                             <div class="info" style="flex: 1; min-width: 0; padding-right: 0.5rem;">
-                                <b style="font-size: 0.95rem;">${item.description}</b><br>
+                                <b style="font-size: 0.95rem;">${item.description || 'Gasto'}</b><br>
                                 <small style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; display: block; margin-top: 0.15rem;">
                                     Pagó: <b style="color: var(--primary-light);">${payer}</b>${splitText} (${timeStr})
                                 </small>
@@ -3524,7 +3549,9 @@ const App = {
         const balances = this.calculatePartyBalances();
         const paid = balances.paid[name] || 0;
         const spent = balances.spent[name] || 0;
-        const net = paid - spent;
+        const sPaid = balances.settlementPaid?.[name] || 0;
+        const sReceived = balances.settlementReceived?.[name] || 0;
+        const net = balances.netBalances?.[name] !== undefined ? balances.netBalances[name] : ((paid - spent) + sPaid - sReceived);
         const pData = this.state.partyData?.participants?.[name.replace(/\./g, '_')];
         const hasLeft = pData?.status === 'left';
 
@@ -3548,6 +3575,16 @@ const App = {
                     <span style="color: var(--text-muted);">Total consumido:</span>
                     <b>${this.formatEuro(spent)}</b>
                 </div>
+                ${sPaid > 0 ? `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; color: #34d399;">
+                    <span>Reembolsos pagados:</span>
+                    <b>+${this.formatEuro(sPaid)}</b>
+                </div>` : ''}
+                ${sReceived > 0 ? `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; color: #60a5fa;">
+                    <span>Reembolsos cobrados:</span>
+                    <b>-${this.formatEuro(sReceived)}</b>
+                </div>` : ''}
                 <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
                     <span style="color: var(--text-muted);">Balance neto:</span>
                     ${netText}
@@ -3580,7 +3617,10 @@ const App = {
 
         const totalPaid = p1Paid + p2Paid;
         const totalSpent = p1Spent + p2Spent;
-        const net = totalPaid - totalSpent;
+        const unit = balances.units.find(u => u.names.includes(name1));
+        const net = unit ? unit.net : (totalPaid - totalSpent);
+        const sPaid = unit ? unit.settlementPaid : ((balances.settlementPaid?.[name1] || 0) + (balances.settlementPaid?.[name2] || 0));
+        const sReceived = unit ? unit.settlementReceived : ((balances.settlementReceived?.[name1] || 0) + (balances.settlementReceived?.[name2] || 0));
 
         let netText = '';
         if (net > 0.01) {
@@ -3608,6 +3648,16 @@ const App = {
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.78rem; color: var(--text-muted); padding-left: 0.5rem;">
                     <span>↳ ${name1}: ${this.formatEuro(p1Spent)} | ${name2}: ${this.formatEuro(p2Spent)}</span>
                 </div>
+                ${sPaid > 0 ? `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; color: #34d399;">
+                    <span>Reembolsos pagados:</span>
+                    <b>+${this.formatEuro(sPaid)}</b>
+                </div>` : ''}
+                ${sReceived > 0 ? `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; color: #60a5fa;">
+                    <span>Reembolsos cobrados:</span>
+                    <b>-${this.formatEuro(sReceived)}</b>
+                </div>` : ''}
                 <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
                     <span style="color: var(--text-muted);">Balance conjunto:</span>
                     ${netText}
@@ -3738,16 +3788,22 @@ const App = {
 
         const paid = {};
         const spent = {};
+        const settlementPaid = {};
+        const settlementReceived = {};
+        const settlements = [];
+
         participantNames.forEach(n => {
             paid[n] = 0;
             spent[n] = 0;
+            settlementPaid[n] = 0;
+            settlementReceived[n] = 0;
         });
 
         let totalSpent = 0;
         let roundCount = 0;
 
         if (data.history) {
-            Object.values(data.history).forEach(item => {
+            Object.entries(data.history).forEach(([histId, item]) => {
                 if (item.type === 'expense') {
                     const amount = Number(item.amount || 0);
                     totalSpent += amount;
@@ -3782,6 +3838,34 @@ const App = {
                         if (paid[name] === undefined) paid[name] = 0;
                         paid[name] += amount;
                     }
+                } else if (item.type === 'settlement') {
+                    const amount = Number(item.amount || 0);
+                    settlements.push({ id: histId, ...item, amount });
+
+                    // Atribuir pagos de reembolsos a participantes individuales
+                    const fromList = Array.isArray(item.fromNames) && item.fromNames.length > 0
+                        ? item.fromNames
+                        : (participantNames.includes(item.from) ? [item.from] : (item.from ? item.from.split(' y ').map(s => s.trim()) : []));
+                    
+                    const toList = Array.isArray(item.toNames) && item.toNames.length > 0
+                        ? item.toNames
+                        : (participantNames.includes(item.to) ? [item.to] : (item.to ? item.to.split(' y ').map(s => s.trim()) : []));
+
+                    if (fromList.length > 0) {
+                        const fromSplit = amount / fromList.length;
+                        fromList.forEach(name => {
+                            if (settlementPaid[name] === undefined) settlementPaid[name] = 0;
+                            settlementPaid[name] += fromSplit;
+                        });
+                    }
+
+                    if (toList.length > 0) {
+                        const toSplit = amount / toList.length;
+                        toList.forEach(name => {
+                            if (settlementReceived[name] === undefined) settlementReceived[name] = 0;
+                            settlementReceived[name] += toSplit;
+                        });
+                    }
                 }
             });
         }
@@ -3811,9 +3895,16 @@ const App = {
                 const p1Spent = spent[p1] || 0;
                 const p2Spent = spent[p2] || 0;
 
+                const p1SettlementPaid = settlementPaid[p1] || 0;
+                const p2SettlementPaid = settlementPaid[p2] || 0;
+                const p1SettlementReceived = settlementReceived[p1] || 0;
+                const p2SettlementReceived = settlementReceived[p2] || 0;
+
                 const unitPaid = p1Paid + p2Paid;
                 const unitSpent = p1Spent + p2Spent;
-                const unitNet = unitPaid - unitSpent;
+                const unitSettlementPaid = p1SettlementPaid + p2SettlementPaid;
+                const unitSettlementReceived = p1SettlementReceived + p2SettlementReceived;
+                const unitNet = (unitPaid - unitSpent) + unitSettlementPaid - unitSettlementReceived;
 
                 const p1Left = p.status === 'left';
                 const p2Left = partnerObj.status === 'left';
@@ -3840,6 +3931,8 @@ const App = {
                     p2Paid,
                     p1Spent,
                     p2Spent,
+                    settlementPaid: unitSettlementPaid,
+                    settlementReceived: unitSettlementReceived,
                     paid: unitPaid,
                     spent: unitSpent,
                     net: unitNet
@@ -3849,7 +3942,9 @@ const App = {
                 processedKeys.add(pKey);
                 const pPaid = paid[p.name] || 0;
                 const pSpent = spent[p.name] || 0;
-                const pNet = pPaid - pSpent;
+                const pSettlementPaid = settlementPaid[p.name] || 0;
+                const pSettlementReceived = settlementReceived[p.name] || 0;
+                const pNet = (pPaid - pSpent) + pSettlementPaid - pSettlementReceived;
                 const hasLeft = p.status === 'left';
 
                 units.push({
@@ -3870,6 +3965,8 @@ const App = {
                     p2Paid: 0,
                     p1Spent: pSpent,
                     p2Spent: 0,
+                    settlementPaid: pSettlementPaid,
+                    settlementReceived: pSettlementReceived,
                     paid: pPaid,
                     spent: pSpent,
                     net: pNet
@@ -3884,9 +3981,9 @@ const App = {
 
         units.forEach(u => {
             if (u.net < -0.01) {
-                debtors.push({ name: u.shortName || u.displayName, amount: Math.abs(u.net) });
+                debtors.push({ name: u.shortName || u.displayName, amount: Math.abs(u.net), unit: u });
             } else if (u.net > 0.01) {
-                creditors.push({ name: u.shortName || u.displayName, amount: u.net });
+                creditors.push({ name: u.shortName || u.displayName, amount: u.net, unit: u });
             }
         });
 
@@ -3903,7 +4000,9 @@ const App = {
             if (transfer > 0.01) {
                 debts.push({
                     from: debtor.name,
+                    fromNames: debtor.unit ? debtor.unit.names : [debtor.name],
                     to: creditor.name,
+                    toNames: creditor.unit ? creditor.unit.names : [creditor.name],
                     amount: transfer
                 });
             }
@@ -3921,7 +4020,7 @@ const App = {
             if (u) {
                 netBalances[n] = u.net;
             } else {
-                netBalances[n] = (paid[n] || 0) - (spent[n] || 0);
+                netBalances[n] = (paid[n] || 0) - (spent[n] || 0) + (settlementPaid[n] || 0) - (settlementReceived[n] || 0);
             }
         });
 
@@ -3930,6 +4029,9 @@ const App = {
             roundCount,
             paid,
             spent,
+            settlementPaid,
+            settlementReceived,
+            settlements,
             netBalances,
             debts,
             units,
@@ -3978,6 +4080,18 @@ const App = {
                         <span>↳ ${unit.p1}: ${this.formatEuro(unit.p1Spent)} | ${unit.p2}: ${this.formatEuro(unit.p2Spent)}</span>
                     </div>
                 ` : ''}
+                ${unit.settlementPaid > 0 ? `
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; color: #34d399;">
+                        <span>Reembolsos pagados:</span>
+                        <b>+${this.formatEuro(unit.settlementPaid)}</b>
+                    </div>
+                ` : ''}
+                ${unit.settlementReceived > 0 ? `
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; color: #60a5fa;">
+                        <span>Reembolsos cobrados:</span>
+                        <b>-${this.formatEuro(unit.settlementReceived)}</b>
+                    </div>
+                ` : ''}
                 <div style="display:flex; justify-content:space-between; border-top: 1px dashed var(--glass-border); padding-top: 0.35rem;">
                     <span style="color: var(--text-muted);">Balance neto:</span>
                     <b style="color: ${net > 0 ? '#4ade80' : (net < 0 ? '#f87171' : 'var(--text-muted)')};">${net >= 0 ? '+' : ''}${this.formatEuro(net)}</b>
@@ -4003,6 +4117,7 @@ const App = {
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
                         Debe transferir esta cantidad por Bizum para dejar liquidada su parte.
                     </p>
+                    <button class="btn-primary" style="width: 100%; margin-top: 0.75rem; font-size: 0.88rem; padding: 0.6rem;" onclick="App.closeModal(); App.handlePartyGoHome()">⚖️ Ver y saldar reembolsos</button>
                 </div>
             `;
         } else {
@@ -4017,7 +4132,7 @@ const App = {
         const data = this.state.partyData;
         if (!data) return;
         const balances = this.calculatePartyBalances();
-        const { totalSpent, roundCount, debts, units } = balances;
+        const { totalSpent, roundCount, debts, units, settlements } = balances;
         
         // 1. Bloque de Bizums para liquidar cuentas
         let debtsHtml = '';
@@ -4030,26 +4145,41 @@ const App = {
                     <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 0.85rem;">
                         Pagos recomendados para liquidar todas las deudas con el mínimo número de transferencias:
                     </p>
-                    <div style="display: flex; flex-direction: column; gap: 0.55rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem;">
             `;
 
             debts.forEach(d => {
+                const safeFrom = (d.from || '').replace(/'/g, "\\'");
+                const safeTo = (d.to || '').replace(/'/g, "\\'");
+                const safeFromNames = (d.fromNames || []).join(',');
+                const safeToNames = (d.toNames || []).join(',');
+
                 debtsHtml += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); font-size: 0.92rem;">
-                        <div style="display: flex; align-items: center; gap: 0.45rem;">
-                            <b style="color: #f87171;">${d.from}</b>
-                            <span style="color: var(--text-muted); font-size: 0.8rem;">le hace Bizum a</span>
-                            <b style="color: #60a5fa;">${d.to}</b>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 0.85rem; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.92rem; flex-wrap: wrap; gap: 0.35rem;">
+                            <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                                <b style="color: #f87171;">${d.from}</b>
+                                <span style="color: var(--text-muted); font-size: 0.8rem;">le hace Bizum a</span>
+                                <b style="color: #60a5fa;">${d.to}</b>
+                            </div>
+                            <span style="font-weight: 700; color: #f43f5e; font-size: 1.1rem; white-space: nowrap;">
+                                ${this.formatEuro(d.amount)}
+                            </span>
                         </div>
-                        <span style="font-weight: 700; color: #f43f5e; font-size: 1.05rem; white-space: nowrap;">
-                            ${this.formatEuro(d.amount)}
-                        </span>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 0.2rem;">
+                            <button type="button" class="btn-sm" onclick="App.handlePartyMarkDebtPaid('${safeFrom}', '${safeTo}', ${d.amount}, '${safeFromNames}', '${safeToNames}')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; font-weight: 600; padding: 0.4rem 0.85rem; border-radius: 6px; font-size: 0.84rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <span>✓</span> Marcar como pagado
+                            </button>
+                        </div>
                     </div>
                 `;
             });
 
             debtsHtml += `
                     </div>
+                    <button type="button" class="btn-secondary" onclick="App.showPartyManualRefundModal()" style="width: 100%; margin-top: 0.75rem; font-size: 0.85rem; padding: 0.5rem;">
+                        ➕ Registrar otro reembolso manual
+                    </button>
                 </div>
             `;
         } else {
@@ -4058,6 +4188,50 @@ const App = {
                     <span style="font-size: 2rem; display: block; margin-bottom: 0.35rem;">🎉</span>
                     <h3 style="color: #4ade80; margin-bottom: 0.35rem;">¡Cuentas Cuadradas!</h3>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">No hay deudas pendientes entre los participantes.</p>
+                    <button type="button" class="btn-secondary" onclick="App.showPartyManualRefundModal()" style="margin-top: 0.85rem; font-size: 0.82rem; padding: 0.45rem 0.85rem;">
+                        ➕ Registrar reembolso manual
+                    </button>
+                </div>
+            `;
+        }
+
+        // 1.5. Bloque de Reembolsos ya pagados
+        let settledHtml = '';
+        if (settlements && settlements.length > 0) {
+            settledHtml = `
+                <div class="summary-card glass" style="padding: 1.1rem; border-radius: 15px; margin-bottom: 1.5rem; border: 1.5px solid rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.05);">
+                    <h3 style="text-align: center; margin-bottom: 0.35rem; color: #34d399; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>✅ Reembolsos Pagados (${settlements.length})</span>
+                    </h3>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
+                        Reembolsos y transferencias que ya han sido saldados:
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            `;
+
+            settlements.forEach(s => {
+                settledHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); font-size: 0.88rem;">
+                        <div style="display: flex; flex-direction: column;">
+                            <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                                <b style="color: #a7f3d0;">${s.from}</b>
+                                <span style="color: var(--text-muted); font-size: 0.78rem;">pagó a</span>
+                                <b style="color: #93c5fd;">${s.to}</b>
+                            </div>
+                            <small style="color: var(--text-muted); font-size: 0.72rem;">${new Date(s.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <span style="font-weight: 700; color: #34d399; font-size: 1rem;">
+                                ${this.formatEuro(s.amount)}
+                            </span>
+                            <button class="btn-icon-small" title="Deshacer reembolso" onclick="App.handlePartyDeleteSettlement('${s.id}')" style="padding: 0.25rem 0.45rem; font-size: 0.8rem; border-radius: var(--radius-sm); background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171;">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            settledHtml += `
+                    </div>
                 </div>
             `;
         }
@@ -4083,12 +4257,16 @@ const App = {
                     badge = `<span style="color: var(--text-muted); font-weight: 700;">0,00€ <small style="font-size:0.7rem;">(en paz)</small></span>`;
                 }
 
+                let subDetails = `Pagó: ${this.formatEuro(u.paid)} | Consumió: ${this.formatEuro(u.spent)}`;
+                if (u.settlementPaid > 0) subDetails += ` | Reembolsó: +${this.formatEuro(u.settlementPaid)}`;
+                if (u.settlementReceived > 0) subDetails += ` | Cobró: -${this.formatEuro(u.settlementReceived)}`;
+
                 breakdownHtml += `
                     <div style="display: flex; justify-content: space-between; font-size: 0.88rem; padding: 0.55rem 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.03); align-items: center;">
                         <div style="display: flex; flex-direction: column;">
                             <span style="color: var(--text-main); font-weight: 600;">${u.displayName} ${u.isCouple ? '<span class="badge-couple">💑 Pareja</span>' : ''}</span>
                             <span style="font-size: 0.72rem; color: var(--text-muted);">
-                                Pagó: ${this.formatEuro(u.paid)} | Consumió: ${this.formatEuro(u.spent)}
+                                ${subDetails}
                             </span>
                         </div>
                         <div style="text-align: right; flex-shrink: 0; margin-left: 0.5rem;">
@@ -4119,6 +4297,7 @@ const App = {
                     </div>
                 </div>
                 ${debtsHtml}
+                ${settledHtml}
                 ${breakdownHtml}
                 <div class="actions" style="display: flex; gap: 0.75rem;">
                     <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver a la fiesta</button>
@@ -4128,6 +4307,145 @@ const App = {
         `;
         
         this.openModal(summaryHtml, true);
+    },
+
+    async handlePartyMarkDebtPaid(from, to, defaultAmount, fromNamesStr, toNamesStr) {
+        const input = prompt(`¿Cuánto ha pagado ${from} a ${to}? (€):`, Number(defaultAmount || 0).toFixed(2));
+        if (input === null) return;
+        const amount = this.parseAmount(input);
+        if (isNaN(amount) || amount <= 0) {
+            alert('Por favor introduce un importe válido.');
+            return;
+        }
+
+        try {
+            const fromNames = fromNamesStr ? fromNamesStr.split(',') : [from];
+            const toNames = toNamesStr ? toNamesStr.split(',') : [to];
+
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'settlement',
+                amount: amount,
+                from: from,
+                to: to,
+                fromNames: fromNames,
+                toNames: toNames,
+                description: `Reembolso: ${from} pagó a ${to}`,
+                user: this.state.user || 'Desconocido',
+                timestamp: Date.now()
+            });
+
+            this.handlePartyGoHome();
+        } catch (error) {
+            console.error('Error registrando reembolso:', error);
+            alert('Error al registrar el pago del reembolso.');
+        }
+    },
+
+    async handlePartyDeleteSettlement(historyId) {
+        if (!confirm('¿Seguro que quieres anular este pago de reembolso? La deuda volverá a quedar pendiente.')) return;
+        try {
+            const itemRef = ref(this.db, `party_pots/${this.state.partyId}/history/${historyId}`);
+            await set(itemRef, null);
+            this.handlePartyGoHome();
+        } catch (error) {
+            console.error('Error anulando reembolso:', error);
+            alert('Error al anular el reembolso.');
+        }
+    },
+
+    showPartyManualRefundModal() {
+        const balances = this.calculatePartyBalances();
+        const units = balances.units || [];
+        if (units.length < 2) {
+            alert('Se necesitan al menos dos participantes para registrar un reembolso.');
+            return;
+        }
+
+        const optionsHtml = units.map(u => `<option value="${u.shortName || u.displayName}">${u.displayName}</option>`).join('');
+
+        const html = `
+            <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+                <h3 style="margin-bottom: 0;">🤝 Anotar Reembolso Manual</h3>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿Quién paga el reembolso? (Deudor)</label>
+                    <select id="manual-refund-from" style="width: 100%; padding: 0.75rem; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-main); border: 1px solid var(--glass-border); font-size: 1rem;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿Quién recibe el dinero? (Acreedor)</label>
+                    <select id="manual-refund-to" style="width: 100%; padding: 0.75rem; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-main); border: 1px solid var(--glass-border); font-size: 1rem;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">Importe transferido (€)</label>
+                    <input type="number" id="manual-refund-amount" placeholder="Ej: 10.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;">
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    <button class="btn-secondary" onclick="App.handlePartyGoHome()" style="flex: 1;">Volver</button>
+                    <button class="btn-primary" onclick="App.confirmPartyManualRefund()" style="flex: 1;">Guardar Pago</button>
+                </div>
+            </div>
+        `;
+        this.openModal(html);
+        setTimeout(() => {
+            const toSel = document.getElementById('manual-refund-to');
+            if (toSel && toSel.options.length > 1) {
+                toSel.selectedIndex = 1;
+            }
+        }, 50);
+    },
+
+    async confirmPartyManualRefund() {
+        const fromSel = document.getElementById('manual-refund-from');
+        const toSel = document.getElementById('manual-refund-to');
+        const amountEl = document.getElementById('manual-refund-amount');
+
+        const from = fromSel?.value;
+        const to = toSel?.value;
+        const amount = this.parseAmount(amountEl?.value);
+
+        if (!from || !to) {
+            alert('Selecciona quién paga y quién recibe.');
+            return;
+        }
+        if (from === to) {
+            alert('El pagador y el receptor no pueden ser la misma persona.');
+            return;
+        }
+        if (isNaN(amount) || amount <= 0) {
+            alert('Introduce un importe válido mayor que 0.');
+            return;
+        }
+
+        const balances = this.calculatePartyBalances();
+        const fromUnit = balances.units.find(u => (u.shortName || u.displayName) === from);
+        const toUnit = balances.units.find(u => (u.shortName || u.displayName) === to);
+
+        const fromNames = fromUnit ? fromUnit.names : [from];
+        const toNames = toUnit ? toUnit.names : [to];
+
+        try {
+            const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
+            await set(historyRef, {
+                type: 'settlement',
+                amount: amount,
+                from: from,
+                to: to,
+                fromNames: fromNames,
+                toNames: toNames,
+                description: `Reembolso: ${from} pagó a ${to}`,
+                user: this.state.user || 'Desconocido',
+                timestamp: Date.now()
+            });
+
+            this.handlePartyGoHome();
+        } catch (error) {
+            console.error('Error registrando reembolso manual:', error);
+            alert('Error al registrar el reembolso.');
+        }
     },
 
     async handleFinalCloseParty() {
@@ -4475,14 +4793,17 @@ const App = {
 
         const html = `
             <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
-                <h3 style="margin-bottom: 0;">💸 Anotar Gasto / Ronda</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;">
+                    <h3 style="margin: 0;">💸 Anotar Gasto / Ronda</h3>
+                    <button type="button" onclick="App.cancelPartyAddExpense()" style="background: none; border: none; font-size: 1.4rem; color: var(--text-muted); cursor: pointer; padding: 0 0.35rem; line-height: 1;" title="Cerrar sin guardar">✕</button>
+                </div>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿Cuánto ha costado? (€)</label>
-                    <input type="number" id="party-expense-amount" placeholder="Ej: 15.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;" oninput="App.updatePartyExpenseFriendsUIState()">
+                    <input type="number" id="party-expense-amount" placeholder="Ej: 15.00" step="0.01" style="width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; box-sizing: border-box;" oninput="App.updatePartyExpenseFriendsUIState()" onkeydown="if(event.key === 'Enter') App.confirmPartyAddExpense()">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿En qué se ha gastado?</label>
-                    <input type="text" id="party-expense-desc" placeholder="Ej: Ronda de cañas, cubatas..." value="Ronda" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; box-sizing: border-box;">
+                    <input type="text" id="party-expense-desc" placeholder="Ej: Ronda de cañas, cubatas..." value="" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') App.confirmPartyAddExpense()">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.45rem; display:block;">¿Quién lo ha pagado? 💳</label>
@@ -4505,11 +4826,27 @@ const App = {
                         Pagado por <b>${this.state.tempPartyExpensePayer}</b> · Dividido entre <b>${participants.length}</b> personas
                     </div>
                 </div>
-                <button class="btn-primary" onclick="App.confirmPartyAddExpense()" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem;">Anotar Gasto</button>
+                <div style="text-align: center; margin-top: 0.15rem;">
+                    <button type="button" onclick="App.cancelPartyAddExpense()" style="background: none; border: none; color: var(--text-muted); font-size: 0.82rem; text-decoration: underline; cursor: pointer;">Cancelar sin guardar</button>
+                </div>
             </div>
         `;
+        this.state.isPartyAddExpenseModal = true;
         this.openModal(html);
+        const closeBtn = document.getElementById('btn-close-modal');
+        if (closeBtn) {
+            closeBtn.textContent = 'Anotar gasto y volver';
+            closeBtn.className = 'btn-primary';
+            closeBtn.style.padding = '0.95rem';
+            closeBtn.style.fontSize = '1.05rem';
+            closeBtn.style.fontWeight = '700';
+        }
         setTimeout(() => this.updatePartyExpenseFriendsUIState(), 50);
+    },
+
+    cancelPartyAddExpense() {
+        this.state.isPartyAddExpenseModal = false;
+        this.closeModal();
     },
 
     setPartyExpensePayer(name) {
@@ -4603,11 +4940,11 @@ const App = {
         const amountEl = document.getElementById('party-expense-amount');
         const descEl = document.getElementById('party-expense-desc');
         const amount = this.parseAmount(amountEl?.value);
-        let desc = descEl?.value?.trim() || 'Ronda';
+        let desc = descEl?.value?.trim() || 'Gasto';
         const payer = this.state.tempPartyExpensePayer;
 
         if (isNaN(amount) || amount <= 0) {
-            alert('Por favor introduce un importe válido.');
+            alert('Por favor introduce un importe válido (o pulsa ✕ para cancelar).');
             return;
         }
 
@@ -4631,6 +4968,7 @@ const App = {
             desc += ` (${selected.join(', ')})`;
         }
 
+        this.state.isPartyAddExpenseModal = false;
         this.closeModal();
 
         const historyRef = push(ref(this.db, `party_pots/${this.state.partyId}/history`));
@@ -4701,7 +5039,7 @@ const App = {
         this.state.tempPartyExpensePayer = item.payer || item.user || allAvailableForEdit[0] || '';
 
         // Limpiar sufijo "(Nombre1, Nombre2)" de la descripción para el input
-        let cleanDesc = item.description || 'Ronda';
+        let cleanDesc = item.description || '';
         if (cleanDesc.includes('(')) {
             cleanDesc = cleanDesc.substring(0, cleanDesc.lastIndexOf('(')).trim();
         }
@@ -4780,7 +5118,7 @@ const App = {
         const amountEl = document.getElementById('party-expense-amount');
         const descEl = document.getElementById('party-expense-desc');
         const amount = this.parseAmount(amountEl?.value);
-        let desc = descEl?.value?.trim() || 'Ronda';
+        let desc = descEl?.value?.trim() || 'Gasto';
         const payer = this.state.tempPartyExpensePayer || item.payer || item.user;
 
         if (isNaN(amount) || amount <= 0) {
@@ -4940,15 +5278,24 @@ const App = {
         const closeBtn = document.getElementById('btn-close-modal');
         if (closeBtn) {
             closeBtn.style.display = hideCloseBtn ? 'none' : '';
-            if (!this.state.currentOrderProduct) {
+            if (!this.state.currentOrderProduct && !this.state.isPartyAddExpenseModal) {
                 closeBtn.textContent = 'Volver';
                 closeBtn.className = 'btn-secondary';
+                closeBtn.style.padding = '';
+                closeBtn.style.fontSize = '';
+                closeBtn.style.fontWeight = '';
             }
         }
     },
 
     closeModal() {
+        if (this.state.isPartyAddExpenseModal) {
+            this.confirmPartyAddExpense();
+            return;
+        }
+
         this.state.isAuditModalOpen = false;
+        this.state.isPartyAddExpenseModal = false;
         const orderProduct = this.state.currentOrderProduct;
         const selectedParticipants = (this.state.tempSelection && this.state.tempSelection.length > 0)
             ? [...this.state.tempSelection]
@@ -4962,6 +5309,9 @@ const App = {
         if (closeBtn) {
             closeBtn.textContent = 'Volver';
             closeBtn.className = 'btn-secondary';
+            closeBtn.style.padding = '';
+            closeBtn.style.fontSize = '';
+            closeBtn.style.fontWeight = '';
         }
 
         this.display.modalOverlay.classList.add('hidden');

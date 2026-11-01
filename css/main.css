@@ -1519,6 +1519,11 @@ body.light-theme .badge-escote {
     border-left: 3px solid var(--danger);
 }
 
+.history-item.settlement {
+    border-left: 3px solid #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
 .history-item.system {
     border-left: none;
     background: transparent;
