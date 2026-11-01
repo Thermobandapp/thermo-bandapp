@@ -2997,8 +2997,8 @@ const App = {
                     <p style="font-size:1.25rem;margin:0.5rem 0 0.2rem;color:#111827;font-weight:800;">
                         🍺 ${winners.join(', ')}
                     </p>
-                    <p style="color:#d97706;font-size:0.95rem;margin:0 0 0.35rem;font-weight:700;">
-                        ${maxAlcohol.toFixed(1)} cl de alcohol puro <span style="font-size:0.85rem;color:#6b7280;font-weight:400;">(≈ ${equivCanas} cañas)</span>
+                    <p style="color:#d97706;font-size:1.05rem;margin:0 0 0.35rem;font-weight:700;">
+                        ${maxAlcohol.toFixed(1)} cl <span style="font-size:0.9rem;color:#4b5563;font-weight:600;">(≈ ${equivCanas} cañas)</span>
                     </p>
                 `;
 
@@ -3008,14 +3008,19 @@ const App = {
                             <p style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #9d174d; font-weight: 700; margin: 0 0 0.4rem;">
                                 📊 Ranking de consumo:
                             </p>
-                            <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
                                 ${drinkers.slice(0, 5).map(([name, pureCl], idx) => {
                                     const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`;
                                     const canas = (pureCl / 1.0).toFixed(1).replace('.0', '');
                                     return `
-                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; background: rgba(255,255,255,0.7); padding: 0.25rem 0.5rem; border-radius: 6px;">
-                                            <span><strong>${medal}</strong> ${name}</span>
-                                            <span style="font-weight: 600; color: #4b5563;">${pureCl.toFixed(1)} cl <span style="font-size: 0.75rem; color: #9ca3af;">(≈${canas}🍺)</span></span>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; background: #ffffff; padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                                            <span style="color: #111827 !important; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                                                <span style="font-size: 1rem;">${medal}</span>
+                                                <span style="color: #111827 !important;">${name}</span>
+                                            </span>
+                                            <span style="font-weight: 700; color: #d97706;">
+                                                ${pureCl.toFixed(1)} cl <span style="font-size: 0.78rem; color: #6b7280; font-weight: 500;">(≈${canas}🍺)</span>
+                                            </span>
                                         </div>
                                     `;
                                 }).join('')}
@@ -3036,10 +3041,10 @@ const App = {
                     .map(([name]) => name);
                 titulo = winners.length > 1 ? 'Borrachuzos del día' : 'Borrachuzo del día';
                 borrachuzosHTML = `
-                    <p style="font-size:1.1rem;margin:0.5rem 0 0.25rem;color:#111827;">
+                    <p style="font-size:1.15rem;margin:0.5rem 0 0.25rem;color:#111827;font-weight:800;">
                         🍺 <strong>${winners.join(', ')}</strong>
                     </p>
-                    <p style="color:#6b7280;font-size:0.85rem;margin:0;">
+                    <p style="color:#4b5563;font-size:0.9rem;margin:0;font-weight:600;">
                         (${maxCount} ronda${maxCount !== 1 ? 's' : ''})
                     </p>`;
             }
@@ -3048,8 +3053,8 @@ const App = {
         const html = `
             <div style="text-align:center;padding:0.5rem 0 1rem;">
                 <div style="font-size:2.5rem;margin-bottom:0.5rem;">🎉</div>
-                <h2 style="margin:0 0 0.25rem;font-size:1.3rem;color:#111827;">¡Mesa cerrada!</h2>
-                <p style="margin:0 0 1rem;color:#6b7280;font-size:0.9rem;">¡Hasta la próxima quedada! 🍻</p>
+                <h2 style="margin:0 0 0.25rem;font-size:1.3rem;color:#ffffff;">¡Mesa cerrada!</h2>
+                <p style="margin:0 0 1rem;color:#9ca3af;font-size:0.9rem;">¡Hasta la próxima quedada! 🍻</p>
                 <div style="background:#fdf2f8;border:2px solid #ec4899;border-radius:12px;padding:1rem;margin-bottom:1.25rem;">
                     <p style="margin:0 0 0.4rem;font-weight:700;color:#be185d;font-size:1rem;">
                         🏆 ${titulo}:
