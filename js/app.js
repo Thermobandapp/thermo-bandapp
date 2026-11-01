@@ -4794,7 +4794,7 @@ const App = {
         const html = `
             <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;">
-                    <h3 style="margin: 0;">💸 Anotar Gasto / Ronda</h3>
+                    <h3 style="margin: 0;">💸 Anotar Gasto</h3>
                     <button type="button" onclick="App.cancelPartyAddExpense()" style="background: none; border: none; font-size: 1.4rem; color: var(--text-muted); cursor: pointer; padding: 0 0.35rem; line-height: 1;" title="Cerrar sin guardar">✕</button>
                 </div>
                 <div>
@@ -4803,7 +4803,7 @@ const App = {
                 </div>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; display:block;">¿En qué se ha gastado?</label>
-                    <input type="text" id="party-expense-desc" placeholder="Ej: Ronda de cañas, cubatas..." value="" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') App.confirmPartyAddExpense()">
+                    <input type="text" id="party-expense-desc" placeholder="" value="" style="width: 100%; padding: 0.85rem 1rem; font-size: 1rem; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') App.confirmPartyAddExpense()">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.45rem; display:block;">¿Quién lo ha pagado? 💳</label>
@@ -4841,7 +4841,14 @@ const App = {
             closeBtn.style.fontSize = '1.05rem';
             closeBtn.style.fontWeight = '700';
         }
-        setTimeout(() => this.updatePartyExpenseFriendsUIState(), 50);
+        setTimeout(() => {
+            this.updatePartyExpenseFriendsUIState();
+            const descEl = document.getElementById('party-expense-desc');
+            if (descEl) {
+                descEl.value = '';
+                descEl.placeholder = '';
+            }
+        }, 50);
     },
 
     cancelPartyAddExpense() {
