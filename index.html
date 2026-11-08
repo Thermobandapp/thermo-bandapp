@@ -17,7 +17,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <!-- Estilos -->
-    <link rel="stylesheet" href="css/main.css?v=53">
+    <link rel="stylesheet" href="css/main.css?v=54">
 </head>
 <body class="dark-theme">
     <div id="app">
@@ -198,7 +198,7 @@
 
                     <!-- Lista de resultados -->
                     <div style="position: relative;">
-                        <div id="history-list-container" class="list-container scroll-fade-bottom" style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 62vh; overflow-y: auto; overflow-x: hidden; padding-right: 0.65rem; box-sizing: border-box;">
+                        <div id="history-list-container" class="list-container scroll-fade-bottom has-custom-scroll" style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 62vh; overflow-y: auto; overflow-x: hidden; padding-right: 0.65rem; box-sizing: border-box;">
                             <p class="empty-msg">Cargando quedadas de Firebase...</p>
                         </div>
                         <div id="history-scroll-track" class="history-scroll-track">
@@ -482,15 +482,10 @@
                 </div>
             </div>
         </div>
-
-        <!-- Indicador de Scroll de Pantalla / Página -->
-        <div id="page-scroll-track" class="page-scroll-track">
-            <div id="page-scroll-thumb" class="page-scroll-thumb"></div>
-        </div>
     </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-    <script type="module" src="js/app.js?v=53"></script>
+    <script type="module" src="js/app.js?v=54"></script>
 </body>
 </html>

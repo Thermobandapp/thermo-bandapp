@@ -52,7 +52,6 @@ const App = {
         this.loadLocalSession();
         this.initDecimalNormalizer();
         this.initScrollFades();
-        this.updatePageScrollIndicator();
     },
 
     initTheme() {
@@ -561,10 +560,8 @@ const App = {
             editTableBtn.addEventListener('click', () => this.handleRenameTable());
         }
 
-        // Monitoreo de scroll en página y ventana para indicadores visuales visibles en cada pantalla
-        window.addEventListener('scroll', () => this.updatePageScrollIndicator(), { passive: true });
+        // Monitoreo de resize para indicadores visuales de scroll
         window.addEventListener('resize', () => {
-            this.updatePageScrollIndicator();
             this.updateModalScrollIndicator();
             this.updateHistoryScrollIndicator();
         }, { passive: true });
@@ -3102,11 +3099,6 @@ const App = {
                 }
             }
         }
-
-        // Actualizar indicador de scroll de la nueva pantalla al entrar
-        this.updatePageScrollIndicator();
-        setTimeout(() => this.updatePageScrollIndicator(), 60);
-        setTimeout(() => this.updatePageScrollIndicator(), 250);
     },
 
     async handleLeaveTable() {
@@ -5900,52 +5892,12 @@ const App = {
         this.display.modalOverlay.classList.add('hidden');
         document.body.classList.remove('modal-open');
 
-        // Restaurar indicador de página al cerrar modal
-        this.updatePageScrollIndicator();
-        setTimeout(() => this.updatePageScrollIndicator(), 80);
-
         if (orderProduct && selectedParticipants && selectedParticipants.length > 0) {
             this.addOrder(orderProduct, selectedParticipants);
         }
     },
 
     // --- MÉTODOS DE SCROLL FADE INFERIOR Y SCROLLBARS ---
-    updatePageScrollIndicator() {
-        const trackEl = document.getElementById('page-scroll-track');
-        const thumbEl = document.getElementById('page-scroll-thumb');
-        if (!trackEl || !thumbEl) return;
-
-        if (document.body.classList.contains('modal-open')) {
-            trackEl.classList.remove('visible');
-            return;
-        }
-
-        const docEl = document.documentElement;
-        const body = document.body;
-        const scrollHeight = Math.max(docEl.scrollHeight, body.scrollHeight);
-        const clientHeight = window.innerHeight;
-        const hasScroll = scrollHeight > (clientHeight + 10);
-
-        if (!hasScroll) {
-            trackEl.classList.remove('visible');
-            return;
-        }
-
-        trackEl.classList.add('visible');
-        const trackHeight = trackEl.clientHeight;
-        if (trackHeight <= 0) return;
-
-        const thumbHeight = Math.max(28, (clientHeight / scrollHeight) * trackHeight);
-        const scrollTop = window.scrollY || window.pageYOffset || docEl.scrollTop || 0;
-        const maxScroll = scrollHeight - clientHeight;
-        const scrollRatio = maxScroll > 0 ? (scrollTop / maxScroll) : 0;
-        const maxThumbTop = trackHeight - thumbHeight;
-        const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
-
-        thumbEl.style.height = `${thumbHeight}px`;
-        thumbEl.style.top = `${thumbTop}px`;
-    },
-
     updateModalScrollIndicator() {
         const trackEl = document.getElementById('modal-scroll-track');
         const thumbEl = document.getElementById('modal-scroll-thumb');

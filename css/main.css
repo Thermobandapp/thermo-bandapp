@@ -1302,43 +1302,26 @@ body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
     mask-image: none;
 }
 
-/* Indicadores visuales de scroll que aparecen de inmediato al entrar en cada pantalla/modal */
-.page-scroll-track {
-    position: fixed;
-    right: max(3px, calc((100vw - 500px) / 2 + 3px));
-    top: calc(75px + env(safe-area-inset-top));
-    bottom: calc(78px + env(safe-area-inset-bottom));
-    width: 6px;
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 9999px;
-    z-index: 95;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.25s ease;
+/* Contenedores con barra de scroll personalizada (oculta la nativa del navegador para evitar barras dobles) */
+.has-custom-scroll,
+.modal-card .modal-summary-body,
+.modal-card #modal-content,
+.modal-card .ticket-body,
+.modal-card .participant-grid,
+#history-list-container {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 
-body.light-theme .page-scroll-track {
-    background: rgba(44, 37, 35, 0.1);
-}
-
-.page-scroll-track.visible {
-    opacity: 1;
-}
-
-.page-scroll-thumb {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    min-height: 28px;
-    background: #818cf8;
-    border-radius: 9999px;
-    box-shadow: 0 0 6px rgba(129, 140, 248, 0.6);
-}
-
-body.light-theme .page-scroll-thumb {
-    background: #c2410c;
-    box-shadow: 0 0 5px rgba(194, 65, 12, 0.4);
+.has-custom-scroll::-webkit-scrollbar,
+.modal-card .modal-summary-body::-webkit-scrollbar,
+.modal-card #modal-content::-webkit-scrollbar,
+.modal-card .ticket-body::-webkit-scrollbar,
+.modal-card .participant-grid::-webkit-scrollbar,
+#history-list-container::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 /* Indicador de scroll dentro de modales */
