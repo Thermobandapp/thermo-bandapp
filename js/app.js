@@ -7138,13 +7138,18 @@ Reglas obligatorias:
                                     📅 ${dateStr}
                                 </div>
                             </div>
-                            <div style="text-align: right; white-space: nowrap;">
-                                <div style="font-size: 1.15rem; font-weight: 800; color: #10b981;">
-                                    ${this.formatEuro(item.totalAmount)}
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="text-align: right; white-space: nowrap;">
+                                    <div style="font-size: 1.15rem; font-weight: 800; color: #10b981;">
+                                        ${this.formatEuro(item.totalAmount)}
+                                    </div>
+                                    <div style="font-size: 0.72rem; color: var(--text-muted);">
+                                        total
+                                    </div>
                                 </div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted);">
-                                    total
-                                </div>
+                                <button type="button" class="btn-delete-small" onclick="event.stopPropagation(); App.deleteTableFromHistory('${item.id}')" title="Borrar mesa de Firebase" style="padding: 0.35rem 0.5rem; font-size: 0.95rem; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #ef4444; cursor: pointer;">
+                                    🗑️
+                                </button>
                             </div>
                         </div>
 
@@ -7179,13 +7184,18 @@ Reglas obligatorias:
                                     📅 ${dateStr}
                                 </div>
                             </div>
-                            <div style="text-align: right; white-space: nowrap;">
-                                <div style="font-size: 1.15rem; font-weight: 800; color: #f59e0b;">
-                                    ${this.formatEuro(item.totalSpent)}
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="text-align: right; white-space: nowrap;">
+                                    <div style="font-size: 1.15rem; font-weight: 800; color: #f59e0b;">
+                                        ${this.formatEuro(item.totalSpent)}
+                                    </div>
+                                    <div style="font-size: 0.72rem; color: var(--text-muted);">
+                                        gastado
+                                    </div>
                                 </div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted);">
-                                    gastado
-                                </div>
+                                <button type="button" class="btn-delete-small" onclick="event.stopPropagation(); App.deletePartyFromHistory('${item.id}')" title="Borrar fiesta de Firebase" style="padding: 0.35rem 0.5rem; font-size: 0.95rem; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #ef4444; cursor: pointer;">
+                                    🗑️
+                                </button>
                             </div>
                         </div>
 
@@ -7371,11 +7381,14 @@ Reglas obligatorias:
                 ${bodyHtml}
 
                 <!-- Botones inferiores -->
-                <div style="display: flex; gap: 0.6rem; margin-top: 1rem;">
-                    <button type="button" class="btn-primary" onclick="App.copyTableSummaryWhatsApp('${item.id}')" style="flex: 1; padding: 0.75rem; font-size: 0.9rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
-                        📋 Copiar para WhatsApp
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                    <button type="button" class="btn-primary" onclick="App.copyTableSummaryWhatsApp('${item.id}')" style="flex: 2; min-width: 150px; padding: 0.75rem; font-size: 0.88rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
+                        📋 Copiar WhatsApp
                     </button>
-                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1.2rem;">
+                    <button type="button" class="btn-secondary" onclick="App.deleteTableFromHistory('${item.id}')" style="padding: 0.75rem 0.9rem; font-size: 0.88rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-weight: 600;">
+                        🗑️ Borrar
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1rem;">
                         Cerrar
                     </button>
                 </div>
@@ -7566,11 +7579,14 @@ Reglas obligatorias:
                 ${bodyHtml}
 
                 <!-- Botones inferiores -->
-                <div style="display: flex; gap: 0.6rem; margin-top: 1rem;">
-                    <button type="button" class="btn-primary" onclick="App.copyPartySummaryWhatsApp('${item.id}')" style="flex: 1; padding: 0.75rem; font-size: 0.9rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
-                        📋 Copiar para WhatsApp
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                    <button type="button" class="btn-primary" onclick="App.copyPartySummaryWhatsApp('${item.id}')" style="flex: 2; min-width: 150px; padding: 0.75rem; font-size: 0.88rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
+                        📋 Copiar WhatsApp
                     </button>
-                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1.2rem;">
+                    <button type="button" class="btn-secondary" onclick="App.deletePartyFromHistory('${item.id}')" style="padding: 0.75rem 0.9rem; font-size: 0.88rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-weight: 600;">
+                        🗑️ Borrar
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1rem;">
                         Cerrar
                     </button>
                 </div>
@@ -7633,6 +7649,68 @@ Reglas obligatorias:
             alert('¡Resumen de la fiesta copiado al portapapeles! Listo para pegar en WhatsApp 📋');
         } catch (e) {
             prompt('Copia el resumen para WhatsApp:', text);
+        }
+    },
+
+    async deleteTableFromHistory(tableId) {
+        const item = this.state.historyTables.find(t => t.id === tableId);
+        const name = item ? item.name : tableId;
+
+        if (!confirm(`⚠️ ¿Seguro que quieres borrar la mesa "${name}" definitivamente de Firebase?\n\nEsta acción eliminará todos sus pedidos y datos para siempre.`)) {
+            return;
+        }
+
+        try {
+            await set(ref(this.db, `tables/${tableId}`), null);
+            await this.addLog('delete_table', { tableId, name });
+
+            if (this.state.tableId === tableId) {
+                this.state.tableId = null;
+                this.state.tableData = null;
+                localStorage.removeItem('thermo_tableId');
+            }
+
+            this.state.historyTables = this.state.historyTables.filter(t => t.id !== tableId);
+
+            const badgeTables = document.getElementById('history-badge-tables');
+            if (badgeTables) badgeTables.textContent = `(${this.state.historyTables.length})`;
+
+            this.closeModal();
+            this.renderHistoryList();
+        } catch (error) {
+            console.error('Error al borrar la mesa de Firebase:', error);
+            alert('Error al borrar la mesa de la base de datos.');
+        }
+    },
+
+    async deletePartyFromHistory(partyId) {
+        const item = this.state.historyParties.find(p => p.id === partyId);
+        const name = item ? item.name : partyId;
+
+        if (!confirm(`⚠️ ¿Seguro que quieres borrar la fiesta "${name}" definitivamente de Firebase?\n\nEsta acción eliminará su bote, gastos y saldos para siempre.`)) {
+            return;
+        }
+
+        try {
+            await set(ref(this.db, `party_pots/${partyId}`), null);
+            await this.addLog('delete_party', { partyId, name });
+
+            if (this.state.partyId === partyId) {
+                this.state.partyId = null;
+                this.state.partyData = null;
+                localStorage.removeItem('thermo_partyId');
+            }
+
+            this.state.historyParties = this.state.historyParties.filter(p => p.id !== partyId);
+
+            const badgeParties = document.getElementById('history-badge-parties');
+            if (badgeParties) badgeParties.textContent = `(${this.state.historyParties.length})`;
+
+            this.closeModal();
+            this.renderHistoryList();
+        } catch (error) {
+            console.error('Error al borrar la fiesta de Firebase:', error);
+            alert('Error al borrar la fiesta de la base de datos.');
         }
     }
 };
