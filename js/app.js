@@ -52,6 +52,7 @@ const App = {
         this.loadLocalSession();
         this.initDecimalNormalizer();
         this.initScrollFades();
+        this.updatePageScrollIndicator();
     },
 
     initTheme() {
@@ -559,6 +560,14 @@ const App = {
         if (editTableBtn) {
             editTableBtn.addEventListener('click', () => this.handleRenameTable());
         }
+
+        // Monitoreo de scroll en página y ventana para indicadores visuales visibles en cada pantalla
+        window.addEventListener('scroll', () => this.updatePageScrollIndicator(), { passive: true });
+        window.addEventListener('resize', () => {
+            this.updatePageScrollIndicator();
+            this.updateModalScrollIndicator();
+            this.updateHistoryScrollIndicator();
+        }, { passive: true });
     },
 
     switchSetupMode(mode, element) {
@@ -3093,6 +3102,11 @@ const App = {
                 }
             }
         }
+
+        // Actualizar indicador de scroll de la nueva pantalla al entrar
+        this.updatePageScrollIndicator();
+        setTimeout(() => this.updatePageScrollIndicator(), 60);
+        setTimeout(() => this.updatePageScrollIndicator(), 250);
     },
 
     async handleLeaveTable() {
@@ -5849,6 +5863,9 @@ const App = {
             }
         }
         this.initScrollFades();
+        this.updateModalScrollIndicator();
+        setTimeout(() => this.updateModalScrollIndicator(), 60);
+        setTimeout(() => this.updateModalScrollIndicator(), 250);
     },
 
     closeModal() {
@@ -5877,12 +5894,150 @@ const App = {
             closeBtn.style.fontWeight = '';
         }
 
+        const modalTrack = document.getElementById('modal-scroll-track');
+        if (modalTrack) modalTrack.classList.remove('visible');
+
         this.display.modalOverlay.classList.add('hidden');
         document.body.classList.remove('modal-open');
+
+        // Restaurar indicador de página al cerrar modal
+        this.updatePageScrollIndicator();
+        setTimeout(() => this.updatePageScrollIndicator(), 80);
 
         if (orderProduct && selectedParticipants && selectedParticipants.length > 0) {
             this.addOrder(orderProduct, selectedParticipants);
         }
+    },
+
+    // --- MÉTODOS DE SCROLL FADE INFERIOR Y SCROLLBARS ---
+    updatePageScrollIndicator() {
+        const trackEl = document.getElementById('page-scroll-track');
+        const thumbEl = document.getElementById('page-scroll-thumb');
+        if (!trackEl || !thumbEl) return;
+
+        if (document.body.classList.contains('modal-open')) {
+            trackEl.classList.remove('visible');
+            return;
+        }
+
+        const docEl = document.documentElement;
+        const body = document.body;
+        const scrollHeight = Math.max(docEl.scrollHeight, body.scrollHeight);
+        const clientHeight = window.innerHeight;
+        const hasScroll = scrollHeight > (clientHeight + 10);
+
+        if (!hasScroll) {
+            trackEl.classList.remove('visible');
+            return;
+        }
+
+        trackEl.classList.add('visible');
+        const trackHeight = trackEl.clientHeight;
+        if (trackHeight <= 0) return;
+
+        const thumbHeight = Math.max(28, (clientHeight / scrollHeight) * trackHeight);
+        const scrollTop = window.scrollY || window.pageYOffset || docEl.scrollTop || 0;
+        const maxScroll = scrollHeight - clientHeight;
+        const scrollRatio = maxScroll > 0 ? (scrollTop / maxScroll) : 0;
+        const maxThumbTop = trackHeight - thumbHeight;
+        const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
+
+        thumbEl.style.height = `${thumbHeight}px`;
+        thumbEl.style.top = `${thumbTop}px`;
+    },
+
+    updateModalScrollIndicator() {
+        const trackEl = document.getElementById('modal-scroll-track');
+        const thumbEl = document.getElementById('modal-scroll-thumb');
+        const modalCard = document.querySelector('.modal-card');
+        if (!trackEl || !thumbEl || !modalCard) return;
+
+        const overlay = document.getElementById('modal-overlay');
+        if (!overlay || overlay.classList.contains('hidden')) {
+            trackEl.classList.remove('visible');
+            return;
+        }
+
+        const scrollable = modalCard.querySelector('.modal-summary-body') || 
+                           modalCard.querySelector('.participant-grid') || 
+                           modalCard.querySelector('.ticket-body') || 
+                           document.getElementById('modal-content');
+
+        if (!scrollable) {
+            trackEl.classList.remove('visible');
+            return;
+        }
+
+        const scrollHeight = scrollable.scrollHeight;
+        const clientHeight = scrollable.clientHeight;
+        const hasScroll = scrollHeight > (clientHeight + 4);
+
+        if (!hasScroll) {
+            trackEl.classList.remove('visible');
+            return;
+        }
+
+        // Alinear la barra de scroll visual directamente con la zona scrolleable
+        const cardRect = modalCard.getBoundingClientRect();
+        const scrollRect = scrollable.getBoundingClientRect();
+        const topOffset = Math.max(10, scrollRect.top - cardRect.top);
+        const bottomOffset = Math.max(10, cardRect.bottom - scrollRect.bottom);
+
+        trackEl.style.top = `${topOffset}px`;
+        trackEl.style.bottom = `${bottomOffset}px`;
+        trackEl.classList.add('visible');
+
+        if (!scrollable._modalIndicatorListening) {
+            scrollable._modalIndicatorListening = true;
+            scrollable.addEventListener('scroll', () => this.updateModalScrollIndicator(), { passive: true });
+        }
+
+        const trackHeight = trackEl.clientHeight;
+        if (trackHeight <= 0) return;
+
+        const thumbHeight = Math.max(24, (clientHeight / scrollHeight) * trackHeight);
+        const maxScroll = scrollHeight - clientHeight;
+        const scrollRatio = maxScroll > 0 ? (scrollable.scrollTop / maxScroll) : 0;
+        const maxThumbTop = trackHeight - thumbHeight;
+        const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
+
+        thumbEl.style.height = `${thumbHeight}px`;
+        thumbEl.style.top = `${thumbTop}px`;
+    },
+
+    updateHistoryScrollIndicator() {
+        const trackEl = document.getElementById('history-scroll-track');
+        const thumbEl = document.getElementById('history-scroll-thumb');
+        const listEl = document.getElementById('history-list-container');
+        if (!trackEl || !thumbEl || !listEl) return;
+
+        const scrollHeight = listEl.scrollHeight;
+        const clientHeight = listEl.clientHeight;
+        const hasScroll = scrollHeight > (clientHeight + 4);
+
+        if (!hasScroll) {
+            trackEl.classList.remove('visible');
+            return;
+        }
+
+        trackEl.classList.add('visible');
+
+        if (!listEl._historyIndicatorListening) {
+            listEl._historyIndicatorListening = true;
+            listEl.addEventListener('scroll', () => this.updateHistoryScrollIndicator(), { passive: true });
+        }
+
+        const trackHeight = trackEl.clientHeight;
+        if (trackHeight <= 0) return;
+
+        const thumbHeight = Math.max(24, (clientHeight / scrollHeight) * trackHeight);
+        const maxScroll = scrollHeight - clientHeight;
+        const scrollRatio = maxScroll > 0 ? (listEl.scrollTop / maxScroll) : 0;
+        const maxThumbTop = trackHeight - thumbHeight;
+        const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
+
+        thumbEl.style.height = `${thumbHeight}px`;
+        thumbEl.style.top = `${thumbTop}px`;
     },
 
     // --- MÉTODOS DE SCROLL FADE INFERIOR Y SCROLLBARS ---
@@ -7397,6 +7552,9 @@ Reglas obligatorias:
 
         container.innerHTML = html;
         this.initScrollFades();
+        this.updateHistoryScrollIndicator();
+        setTimeout(() => this.updateHistoryScrollIndicator(), 60);
+        setTimeout(() => this.updateHistoryScrollIndicator(), 250);
     },
 
     showHistoryTableDetail(tableId) {

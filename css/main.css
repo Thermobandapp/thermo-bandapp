@@ -1302,6 +1302,123 @@ body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
     mask-image: none;
 }
 
+/* Indicadores visuales de scroll que aparecen de inmediato al entrar en cada pantalla/modal */
+.page-scroll-track {
+    position: fixed;
+    right: max(3px, calc((100vw - 500px) / 2 + 3px));
+    top: calc(75px + env(safe-area-inset-top));
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    width: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    z-index: 95;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+body.light-theme .page-scroll-track {
+    background: rgba(44, 37, 35, 0.1);
+}
+
+.page-scroll-track.visible {
+    opacity: 1;
+}
+
+.page-scroll-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 28px;
+    background: #818cf8;
+    border-radius: 9999px;
+    box-shadow: 0 0 6px rgba(129, 140, 248, 0.6);
+}
+
+body.light-theme .page-scroll-thumb {
+    background: #c2410c;
+    box-shadow: 0 0 5px rgba(194, 65, 12, 0.4);
+}
+
+/* Indicador de scroll dentro de modales */
+.modal-scroll-track {
+    position: absolute;
+    right: 3px;
+    top: 50px;
+    bottom: 55px;
+    width: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    z-index: 40;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+body.light-theme .modal-scroll-track {
+    background: rgba(44, 37, 35, 0.1);
+}
+
+.modal-scroll-track.visible {
+    opacity: 1;
+}
+
+.modal-scroll-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 24px;
+    background: #818cf8;
+    border-radius: 9999px;
+    box-shadow: 0 0 6px rgba(129, 140, 248, 0.6);
+}
+
+body.light-theme .modal-scroll-thumb {
+    background: #c2410c;
+    box-shadow: 0 0 5px rgba(194, 65, 12, 0.4);
+}
+
+/* Indicador de scroll en la lista del historial */
+.history-scroll-track {
+    position: absolute;
+    right: 2px;
+    top: 4px;
+    bottom: 4px;
+    width: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+body.light-theme .history-scroll-track {
+    background: rgba(44, 37, 35, 0.1);
+}
+
+.history-scroll-track.visible {
+    opacity: 1;
+}
+
+.history-scroll-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 24px;
+    background: #818cf8;
+    border-radius: 9999px;
+    box-shadow: 0 0 6px rgba(129, 140, 248, 0.6);
+}
+
+body.light-theme .history-scroll-thumb {
+    background: #c2410c;
+    box-shadow: 0 0 5px rgba(194, 65, 12, 0.4);
+}
+
 @keyframes zoomIn {
     from { opacity: 0; transform: scale(0.9); }
     to { opacity: 1; transform: scale(1); }

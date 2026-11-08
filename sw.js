@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thermobanda-v52';
+const CACHE_NAME = 'thermobanda-v53';
 const ASSETS = [
   './',
   './index.html',
