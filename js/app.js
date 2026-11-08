@@ -1784,31 +1784,31 @@ const App = {
                 <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-bottom: 0.2rem;">
                     Gestionar asistencia a la mesa:
                 </div>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                     ${p1Active ? `
-                        <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName1}')">
-                            🚪 Sacar a ${name1}
+                        <button type="button" class="btn-leave-home" onclick="App.kickParticipant('${safeName1}')">
+                            🚪 ${name1} se va a casa
                         </button>
                     ` : `
-                        <div style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
-                            ${name1} ya está fuera
+                        <div style="padding: 0.75rem 0.5rem; font-size: 0.88rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                            ${name1} ya se fue a casa
                         </div>
                     `}
                     ${p2Active ? `
-                        <button class="btn-secondary" style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="App.kickParticipant('${safeName2}')">
-                            🚪 Sacar a ${name2}
+                        <button type="button" class="btn-leave-home" onclick="App.kickParticipant('${safeName2}')">
+                            🚪 ${name2} se va a casa
                         </button>
                     ` : `
-                        <div style="flex: 1; min-width: 130px; padding: 0.65rem 0.5rem; font-size: 0.85rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
-                            ${name2} ya está fuera
+                        <div style="padding: 0.75rem 0.5rem; font-size: 0.88rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                            ${name2} ya se fue a casa
                         </div>
                     `}
+                    ${(p1Active && p2Active) ? `
+                        <button type="button" class="btn-leave-home primary-danger" onclick="App.kickCouple('${safeName1}', '${safeName2}')">
+                            🚪🚪 Se van ambos a casa
+                        </button>
+                    ` : ''}
                 </div>
-                ${(p1Active && p2Active) ? `
-                    <button class="btn-primary" style="background: var(--danger); padding: 0.65rem; font-size: 0.9rem; width: 100%;" onclick="App.kickCouple('${safeName1}', '${safeName2}')">
-                        🚪 Sacar a ambos de la mesa
-                    </button>
-                ` : ''}
                 <button onclick="App.closeModal()" class="btn-secondary" style="margin-top: 0.3rem; width: 100%;">
                     Cerrar
                 </button>
@@ -2215,7 +2215,7 @@ const App = {
         html += `</div>`;
 
         if (pInfo?.status === 'active') {
-            html += `<button class="btn-primary" style="background: var(--danger); margin-top: 1rem; width: 100%;" onclick="App.kickParticipant('${name.replace(/'/g, "\\'")}')">Sacar de la mesa 🚪</button>`;
+            html += `<button type="button" class="btn-leave-home" style="margin-top: 1rem;" onclick="App.kickParticipant('${name.replace(/'/g, "\\'")}')">🚪 Marcar que se ha ido a casa</button>`;
         }
 
         // Si el participante se ha ido y no ha reclamado, ofrecer botón de reclamo y mostrar monto disponible
@@ -4027,11 +4027,11 @@ const App = {
         `;
 
         if (!hasLeft) {
-            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name}')">&#128682; Marcar que se ha ido a casa</button>`;
+            html += `<button type="button" class="btn-leave-home" onclick="App.closeModal(); App.markParticipantAsLeft('${name}')">🚪 Marcar que se ha ido a casa</button>`;
         } else {
-            html += `<button class="btn-secondary" onclick="App.closeModal(); App.markParticipantAsActive('${name}')">🔄 Volver a marcar como presente</button>`;
+            html += `<button type="button" class="btn-secondary" style="min-height: 48px; padding: 0.85rem; font-size: 0.95rem; font-weight: 600;" onclick="App.closeModal(); App.markParticipantAsActive('${name}')">🔄 Volver a marcar como presente</button>`;
         }
-        html += `<button class="btn-secondary" onclick="App.closeModal()">Cerrar</button>`;
+        html += `<button type="button" class="btn-secondary" style="min-height: 44px; padding: 0.75rem;" onclick="App.closeModal()">Cerrar</button>`;
         html += `</div>`;
         this.openModal(html);
     },
@@ -4101,23 +4101,23 @@ const App = {
 
         if (!isLeft1 && !isLeft2) {
             // Ambos presentes
-            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name1}')">&#128682; Se va solo/a ${name1}</button>`;
-            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${name2}')">&#128682; Se va solo/a ${name2}</button>`;
-            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.22); border-color: rgba(239,68,68,0.5); color: #f87171; font-weight: 600;" onclick="App.closeModal(); App.markCoupleAsLeft('${name1}', '${name2}')">&#128682;&#128682; Se van ambos a casa</button>`;
+            html += `<button type="button" class="btn-leave-home" onclick="App.closeModal(); App.markParticipantAsLeft('${name1}')">🚪 Se va solo/a ${name1}</button>`;
+            html += `<button type="button" class="btn-leave-home" onclick="App.closeModal(); App.markParticipantAsLeft('${name2}')">🚪 Se va solo/a ${name2}</button>`;
+            html += `<button type="button" class="btn-leave-home primary-danger" onclick="App.closeModal(); App.markCoupleAsLeft('${name1}', '${name2}')">🚪🚪 Se van ambos a casa</button>`;
         } else if (isLeft1 && isLeft2) {
             // Ambos fuera
-            html += `<p style="color:#f87171; text-align:center; font-size:0.85rem;">Ambos se han retirado de la fiesta.</p>`;
-            html += `<button class="btn-secondary" onclick="App.closeModal(); App.markCoupleAsActive('${name1}', '${name2}')">🔄 Marcar a ambos de vuelta</button>`;
+            html += `<p style="color:#ef4444; text-align:center; font-size:0.9rem; font-weight:600;">Ambos se han retirado de la fiesta.</p>`;
+            html += `<button type="button" class="btn-secondary" style="min-height: 48px; padding: 0.85rem; font-size: 0.95rem; font-weight: 600;" onclick="App.closeModal(); App.markCoupleAsActive('${name1}', '${name2}')">🔄 Marcar a ambos de vuelta</button>`;
         } else {
             // Uno presente, uno fuera
             const activeName = isLeft1 ? name2 : name1;
             const leftName = isLeft1 ? name1 : name2;
-            html += `<p style="color:#f87171; font-size:0.85rem; text-align:center;">${leftName} ya se fue a casa. ${activeName} sigue en la fiesta.</p>`;
-            html += `<button class="btn-danger" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171;" onclick="App.closeModal(); App.markParticipantAsLeft('${activeName}')">&#128682; ${activeName} también se va a casa</button>`;
-            html += `<button class="btn-secondary" onclick="App.closeModal(); App.markParticipantAsActive('${leftName}')">🔄 ${leftName} vuelve a estar presente</button>`;
+            html += `<p style="color:#ef4444; font-size:0.9rem; text-align:center; font-weight:600;">${leftName} ya se fue a casa. ${activeName} sigue en la fiesta.</p>`;
+            html += `<button type="button" class="btn-leave-home" onclick="App.closeModal(); App.markParticipantAsLeft('${activeName}')">🚪 ${activeName} también se va a casa</button>`;
+            html += `<button type="button" class="btn-secondary" style="min-height: 48px; padding: 0.85rem; font-size: 0.95rem; font-weight: 600;" onclick="App.closeModal(); App.markParticipantAsActive('${leftName}')">🔄 ${leftName} vuelve a estar presente</button>`;
         }
 
-        html += `<button class="btn-secondary" onclick="App.closeModal()">Cerrar</button>`;
+        html += `<button type="button" class="btn-secondary" style="min-height: 44px; padding: 0.75rem;" onclick="App.closeModal()">Cerrar</button>`;
         html += `</div>`;
         this.openModal(html);
     },

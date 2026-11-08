@@ -2184,3 +2184,70 @@ body.light-theme [style*="background:rgba(16, 185, 129"] {
     color: #166534 !important;
     border-color: rgba(22, 101, 52, 0.35) !important;
 }
+
+/* Botones para indicar que un asistente se va a casa (en resumen individual o de pareja) */
+.btn-leave-home {
+    width: 100%;
+    min-height: 48px;
+    padding: 0.85rem 1.1rem;
+    font-size: 0.98rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1.5px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    text-align: center;
+}
+
+.btn-leave-home:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.6);
+    transform: translateY(-1px);
+}
+
+.btn-leave-home.primary-danger {
+    background: #dc2626;
+    border-color: #b91c1c;
+    color: #ffffff;
+}
+
+.btn-leave-home.primary-danger:hover {
+    background: #b91c1c;
+}
+
+/* Modo claro: botones de salida con fondo claro y texto rojo oscuro nítido (#991b1b) */
+body.light-theme .btn-leave-home {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-color: rgba(185, 28, 28, 0.4) !important;
+    color: #991b1b !important;
+}
+
+body.light-theme .btn-leave-home:hover {
+    background: rgba(239, 68, 68, 0.18) !important;
+    border-color: #991b1b !important;
+}
+
+body.light-theme .btn-leave-home.primary-danger {
+    background: #b91c1c !important;
+    border-color: #991b1b !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .btn-leave-home.primary-danger:hover {
+    background: #991b1b !important;
+}
+
+/* Fallback de alto contraste para cualquier texto de peligro en modo claro */
+body.light-theme .btn-danger,
+body.light-theme [style*="color: #f87171"],
+body.light-theme [style*="color:#f87171"],
+body.light-theme [style*="color: #fca5a5"],
+body.light-theme [style*="color:#fca5a5"] {
+    color: #991b1b !important;
+}
