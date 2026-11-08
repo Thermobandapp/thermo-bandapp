@@ -1108,13 +1108,14 @@ body.modal-open {
 
 #modal-content {
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding-right: 0.2rem;
+    padding-right: 0.65rem;
     box-sizing: border-box;
 }
 
@@ -1144,10 +1145,12 @@ body.modal-open {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding-right: 0.2rem;
+    padding-right: 0.65rem;
     padding-bottom: 0.25rem;
+    box-sizing: border-box;
 }
 
 .modal-summary-footer {
@@ -1173,38 +1176,47 @@ body.modal-open {
 /* Scrollbar estilizado general */
 * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+    scrollbar-color: #818cf8 rgba(255, 255, 255, 0.08);
 }
 
 body.light-theme * {
-    scrollbar-color: rgba(44, 37, 35, 0.3) transparent;
+    scrollbar-color: #c2410c rgba(44, 37, 35, 0.08);
 }
 
 /* WebKit (Chrome, Safari, iOS Safari, Android Webview, Edge) */
 ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
     border-radius: 9999px;
 }
 
+::-webkit-scrollbar-thumb {
+    background: #818cf8;
+    border-radius: 9999px;
+    box-shadow: 0 0 5px rgba(129, 140, 248, 0.45);
+}
+
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.48);
+    background: #a5b4fc;
+    box-shadow: 0 0 7px rgba(165, 180, 252, 0.65);
+}
+
+/* Modo claro */
+body.light-theme ::-webkit-scrollbar-track {
+    background: rgba(44, 37, 35, 0.08);
 }
 
 body.light-theme ::-webkit-scrollbar-thumb {
-    background: rgba(44, 37, 35, 0.28);
+    background: #c2410c;
+    box-shadow: 0 0 4px rgba(194, 65, 12, 0.3);
 }
 
 body.light-theme ::-webkit-scrollbar-thumb:hover {
-    background: rgba(44, 37, 35, 0.45);
+    background: #ea580c;
 }
 
 /* Contenedores con scroll semi-permanente destacado */
@@ -1215,7 +1227,7 @@ body.light-theme ::-webkit-scrollbar-thumb:hover {
 #history-list-container,
 .dropdown-list {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.05);
+    scrollbar-color: #818cf8 rgba(255, 255, 255, 0.12);
 }
 
 body.light-theme .modal-summary-body,
@@ -1224,7 +1236,7 @@ body.light-theme .participant-grid,
 body.light-theme .ticket-body,
 body.light-theme #history-list-container,
 body.light-theme .dropdown-list {
-    scrollbar-color: rgba(44, 37, 35, 0.36) rgba(44, 37, 35, 0.06);
+    scrollbar-color: #c2410c rgba(44, 37, 35, 0.1);
 }
 
 .modal-summary-body::-webkit-scrollbar-track,
@@ -1233,7 +1245,7 @@ body.light-theme .dropdown-list {
 .ticket-body::-webkit-scrollbar-track,
 #history-list-container::-webkit-scrollbar-track,
 .dropdown-list::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 9999px;
 }
 
@@ -1243,7 +1255,7 @@ body.light-theme .participant-grid::-webkit-scrollbar-track,
 body.light-theme .ticket-body::-webkit-scrollbar-track,
 body.light-theme #history-list-container::-webkit-scrollbar-track,
 body.light-theme .dropdown-list::-webkit-scrollbar-track {
-    background: rgba(44, 37, 35, 0.06);
+    background: rgba(44, 37, 35, 0.1);
 }
 
 .modal-summary-body::-webkit-scrollbar-thumb,
@@ -1252,8 +1264,9 @@ body.light-theme .dropdown-list::-webkit-scrollbar-track {
 .ticket-body::-webkit-scrollbar-thumb,
 #history-list-container::-webkit-scrollbar-thumb,
 .dropdown-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.42);
+    background: #818cf8;
     border-radius: 9999px;
+    box-shadow: 0 0 6px rgba(129, 140, 248, 0.55);
 }
 
 body.light-theme .modal-summary-body::-webkit-scrollbar-thumb,
@@ -1262,7 +1275,8 @@ body.light-theme .participant-grid::-webkit-scrollbar-thumb,
 body.light-theme .ticket-body::-webkit-scrollbar-thumb,
 body.light-theme #history-list-container::-webkit-scrollbar-thumb,
 body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
-    background: rgba(44, 37, 35, 0.38);
+    background: #c2410c;
+    box-shadow: 0 0 5px rgba(194, 65, 12, 0.35);
 }
 
 /* Degradado suave inferior (Opción 2) */
@@ -1271,9 +1285,16 @@ body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
     transition: -webkit-mask-image 0.22s ease-out, mask-image 0.22s ease-out;
 }
 
+/* El degradado desvanece el contenido del fondo pero conserva la franja derecha del scrollbar siempre 100% visible */
 .scroll-fade-bottom[data-scroll-bottom="true"] {
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 36px), transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 36px), transparent 100%);
+    -webkit-mask-image: 
+        linear-gradient(to bottom, #000 0%, #000 calc(100% - 36px), transparent 100%),
+        linear-gradient(to left, #000 0%, #000 14px, transparent 14px);
+    -webkit-mask-composite: source-over;
+    mask-image: 
+        linear-gradient(to bottom, #000 0%, #000 calc(100% - 36px), transparent 100%),
+        linear-gradient(to left, #000 0%, #000 14px, transparent 14px);
+    mask-composite: add;
 }
 
 .scroll-fade-bottom[data-scroll-bottom="false"] {
@@ -1294,6 +1315,9 @@ body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
     margin-bottom: 1.5rem;
     max-height: 50vh;
     overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.5rem;
+    box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
 }
@@ -1932,6 +1956,9 @@ body.light-theme .ticket-receipt {
 .ticket-body {
     margin-bottom: 0.75rem;
     overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.5rem;
+    box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
     flex: 1 1 auto;
     min-height: 0;
