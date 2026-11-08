@@ -4306,9 +4306,32 @@ const App = {
         } catch (error) { console.error('Error reactivando pareja:', error); }
     },
 
-    calculatePartyBalances() {
-        const data = this.state.partyData || {};
+    calculatePartyBalances(customPartyData = null) {
+        const data = customPartyData || this.state.partyData || {};
         const allParticipants = data.participants ? Object.values(data.participants) : [];
+        const registeredNames = new Set(allParticipants.map(p => p.name));
+
+        // Asegurar que si hay personas en el historial que no estaban en participants, se incluyan
+        if (data.history) {
+            Object.values(data.history).forEach(item => {
+                if (item && item.type === 'expense') {
+                    const payer = item.payer || item.user;
+                    if (payer && !registeredNames.has(payer)) {
+                        registeredNames.add(payer);
+                        allParticipants.push({ name: payer, status: 'active' });
+                    }
+                    if (Array.isArray(item.beneficiaries)) {
+                        item.beneficiaries.forEach(b => {
+                            if (b && !registeredNames.has(b)) {
+                                registeredNames.add(b);
+                                allParticipants.push({ name: b, status: 'active' });
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
         const participantNames = allParticipants.map(p => p.name);
 
         const paid = {};
@@ -7176,10 +7199,16 @@ Reglas obligatorias:
                 const allParties = partiesSnap.val();
                 for (const [id, pData] of Object.entries(allParties)) {
                     if (!pData || id === 'null') continue;
-                    const date = pData.finishedAt || pData.createdAt || Date.now();
                     const history = Object.values(pData.history || {});
                     const expenses = history.filter(h => h.type === 'expense');
                     const incomes = history.filter(h => h.type === 'income');
+
+                    let date = pData.finishedAt || pData.createdAt;
+                    if (!date && history.length > 0) {
+                        const timestamps = history.map(h => h.timestamp).filter(Boolean);
+                        if (timestamps.length > 0) date = Math.max(...timestamps);
+                    }
+                    if (!date) date = this.extractDateFromTableId(id) || Date.now();
 
                     const partyBalances = this.calculatePartyBalances(pData);
                     const totalSpent = partyBalances.totalSpent !== undefined 
@@ -7188,7 +7217,9 @@ Reglas obligatorias:
                     const totalDebts = (partyBalances.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
                     const totalPaid = Math.max(0, totalSpent - totalDebts);
 
-                    const participantNames = Object.values(pData.participants || {}).map(p => p.name || '').filter(Boolean);
+                    const participantNames = partyBalances.participants
+                        ? partyBalances.participants.map(p => p.name)
+                        : Object.values(pData.participants || {}).map(p => p.name || '').filter(Boolean);
 
                     partiesList.push({
                         id,
@@ -7558,7 +7589,7 @@ Reglas obligatorias:
         const item = this.state.historyParties.find(p => p.id === partyId);
         if (!item || !item.raw) return alert('No se encontraron datos para esta fiesta.');
 
-        this.state.historyActivePartyDetailTab = this.state.historyActivePartyDetailTab || 'balances';
+        this.state.historyActivePartyDetailTab = 'balances';
         this.renderHistoryPartyDetailModal(item);
     },
 
