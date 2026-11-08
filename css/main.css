@@ -1060,6 +1060,13 @@ body.light-theme .badge-escote {
     font-size: 0.9rem;
 }
 
+/* Bloqueo de scroll de fondo cuando hay un modal abierto */
+body.modal-open {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    touch-action: none;
+}
+
 /* Modales */
 .modal-overlay {
     position: fixed;
@@ -1079,6 +1086,8 @@ body.light-theme .badge-escote {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     box-sizing: border-box;
     overflow: hidden;
+    overscroll-behavior: contain;
+    touch-action: none;
 }
 
 .modal-card {
@@ -1094,11 +1103,13 @@ body.light-theme .badge-escote {
     box-sizing: border-box;
     overflow: hidden;
     position: relative;
+    overscroll-behavior: contain;
 }
 
 #modal-content {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
@@ -1134,6 +1145,7 @@ body.light-theme .badge-escote {
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding-right: 0.2rem;
     padding-bottom: 0.25rem;
 }
@@ -1167,6 +1179,8 @@ body.light-theme .badge-escote {
     margin-bottom: 1.5rem;
     max-height: 50vh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .participant-btn {

@@ -400,6 +400,85 @@ const App = {
         }
         this.buttons.leaveTable.addEventListener('click', () => this.handleLeaveTable());
         document.getElementById('btn-close-modal').addEventListener('click', () => this.closeModal());
+
+        // Prevenir que el scroll del modal se transmita a la ventana de fondo (Scroll Chaining)
+        if (this.display.modalOverlay) {
+            let touchStartY = 0;
+
+            this.display.modalOverlay.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches.length === 1) {
+                    touchStartY = e.touches[0].clientY;
+                }
+            }, { passive: true });
+
+            this.display.modalOverlay.addEventListener('touchmove', (e) => {
+                // Si el toque es sobre el fondo oscurecido o un área no scrollable, bloquear totalmente
+                if (e.target === this.display.modalOverlay) {
+                    e.preventDefault();
+                    return;
+                }
+
+                // Buscar el contenedor scrollable más cercano
+                let el = e.target;
+                let scrollableEl = null;
+                while (el && el !== this.display.modalOverlay) {
+                    const style = window.getComputedStyle(el);
+                    const overflowY = style.overflowY;
+                    if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+                        scrollableEl = el;
+                        break;
+                    }
+                    el = el.parentElement;
+                }
+
+                // Si se toca un elemento que no scrollea (cabecera, pestañas, botones...), bloquear scroll
+                if (!scrollableEl) {
+                    e.preventDefault();
+                    return;
+                }
+
+                // Si está en un contenedor scrolleable pero llega a los topes, evitar que transmita el scroll al fondo
+                if (e.touches && e.touches.length === 1) {
+                    const currentY = e.touches[0].clientY;
+                    const deltaY = currentY - touchStartY;
+                    const isAtTop = scrollableEl.scrollTop <= 0;
+                    const isAtBottom = scrollableEl.scrollTop + scrollableEl.clientHeight >= scrollableEl.scrollHeight - 1;
+
+                    if (isAtTop && deltaY > 0) {
+                        e.preventDefault();
+                        return;
+                    }
+                    if (isAtBottom && deltaY < 0) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            }, { passive: false });
+
+            // En dispositivos con rueda de ratón o trackpad, evitar que el scroll escape del modal
+            this.display.modalOverlay.addEventListener('wheel', (e) => {
+                let el = e.target;
+                let scrollableEl = null;
+                while (el && el !== this.display.modalOverlay) {
+                    const style = window.getComputedStyle(el);
+                    const overflowY = style.overflowY;
+                    if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+                        scrollableEl = el;
+                        break;
+                    }
+                    el = el.parentElement;
+                }
+                if (!scrollableEl) {
+                    e.preventDefault();
+                    return;
+                }
+                const isAtTop = scrollableEl.scrollTop <= 0;
+                const isAtBottom = scrollableEl.scrollTop + scrollableEl.clientHeight >= scrollableEl.scrollHeight - 1;
+                if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
         this.display.finishTable.addEventListener('click', () => this.handleFinishTable());
         this.display.addFriendManual.addEventListener('click', () => this.handleAddFriendManual());
         if (this.buttons.showTicket) {
@@ -5731,6 +5810,7 @@ const App = {
     },
 
     openModal(html, hideCloseBtn = false) {
+        document.body.classList.add('modal-open');
         this.display.modalContent.innerHTML = html;
         this.display.modalOverlay.classList.remove('hidden');
         const closeBtn = document.getElementById('btn-close-modal');
@@ -5773,6 +5853,7 @@ const App = {
         }
 
         this.display.modalOverlay.classList.add('hidden');
+        document.body.classList.remove('modal-open');
 
         if (orderProduct && selectedParticipants && selectedParticipants.length > 0) {
             this.addOrder(orderProduct, selectedParticipants);
