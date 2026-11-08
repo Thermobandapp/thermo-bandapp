@@ -3115,26 +3115,30 @@ const App = {
         });
 
         const html = `
-            <div class="ticket-receipt">
-                <div class="ticket-header">
-                    <h3>${barName}</h3>
-                    <p>${dateStr}</p>
-                    <p>--------------------------------</p>
-                </div>
-                <div class="ticket-body">
-                    ${itemsHtml}
-                </div>
-                <div class="ticket-footer">
-                    <p>--------------------------------</p>
-                    <div class="ticket-total">
-                        <span>TOTAL</span>
-                        <span>${this.formatEuro(total)}</span>
+            <div class="modal-summary-shell">
+                <div class="modal-summary-body">
+                    <div class="ticket-receipt">
+                        <div class="ticket-header">
+                            <h3>${barName}</h3>
+                            <p>${dateStr}</p>
+                            <p>--------------------------------</p>
+                        </div>
+                        <div class="ticket-body">
+                            ${itemsHtml}
+                        </div>
+                        <div class="ticket-footer">
+                            <p>--------------------------------</p>
+                            <div class="ticket-total">
+                                <span>TOTAL</span>
+                                <span>${this.formatEuro(total)}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.6rem;">
-                <button onclick="App.startTicketAudit()" class="btn-secondary" style="border-color: var(--primary); background: rgba(99, 102, 241, 0.15); font-weight: 600;">📸 Cuadrar con Ticket del Bar</button>
-                <button onclick="App.closeModal()" class="btn-primary">Cerrar Ticket</button>
+                <div class="modal-summary-footer">
+                    <button onclick="App.startTicketAudit()" class="btn-secondary" style="border-color: var(--primary); background: rgba(99, 102, 241, 0.15); font-weight: 600; padding: 0.65rem; border-radius: 8px;">📸 Cuadrar con Ticket del Bar</button>
+                    <button onclick="App.closeModal()" class="btn-primary" style="padding: 0.65rem; border-radius: 8px;">Cerrar Ticket</button>
+                </div>
             </div>
         `;
 
@@ -4725,24 +4729,30 @@ const App = {
         
         let summaryHtml = `
             <style>#btn-close-modal { display: none !important; }</style>
-            <div class="final-summary">
-                <h2 style="text-align: center; margin-bottom: 1.25rem;">⚖️ Liquidación de la Fiesta ⚖️</h2>
-                <div class="summary-card glass" style="padding: 1.2rem; border-radius: 15px; margin-bottom: 1.2rem;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 1.05rem;">
-                        <span>Total Gastado en la Fiesta:</span>
-                        <b style="color: var(--primary); font-size: 1.2rem;">${this.formatEuro(totalSpent)}</b>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--text-muted);">
-                        <span>Total de Gastos / Rondas:</span>
-                        <b>${roundCount}</b>
+            <div class="modal-summary-shell final-summary">
+                <div class="modal-summary-header">
+                    <h2 style="text-align: center; margin-bottom: 0.5rem; font-size: 1.15rem;">⚖️ Liquidación de la Fiesta ⚖️</h2>
+                    <div class="summary-card glass" style="padding: 0.85rem 1rem; border-radius: 12px; margin-bottom: 0.25rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem; font-size: 1rem;">
+                            <span>Total Gastado:</span>
+                            <b style="color: var(--primary); font-size: 1.15rem;">${this.formatEuro(totalSpent)}</b>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-muted);">
+                            <span>Total de Gastos / Rondas:</span>
+                            <b>${roundCount}</b>
+                        </div>
                     </div>
                 </div>
-                ${debtsHtml}
-                ${settledHtml}
-                ${breakdownHtml}
-                <div class="actions" style="display: flex; gap: 0.75rem;">
-                    <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1;">Volver a la fiesta</button>
-                    <button onclick="App.handleFinalCloseParty()" class="btn-primary" style="flex: 1;">Finalizar Fiesta</button>
+                <div class="modal-summary-body">
+                    ${debtsHtml}
+                    ${settledHtml}
+                    ${breakdownHtml}
+                </div>
+                <div class="modal-summary-footer">
+                    <div class="modal-summary-footer-row">
+                        <button onclick="App.closeModal()" class="btn-secondary" style="flex: 1; padding: 0.65rem; border-radius: 8px;">Volver a la fiesta</button>
+                        <button onclick="App.handleFinalCloseParty()" class="btn-primary" style="flex: 1; padding: 0.65rem; border-radius: 8px;">Finalizar Fiesta</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -7260,7 +7270,7 @@ Reglas obligatorias:
                 bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No se registraron consumiciones en el ticket.</p>';
             } else {
                 bodyHtml = `
-                    <div style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 0.75rem; max-height: 48vh; overflow-y: auto;">
+                    <div style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 0.75rem;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
                             <thead>
                                 <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.78rem;">
@@ -7290,7 +7300,7 @@ Reglas obligatorias:
                 bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay participantes registrados.</p>';
             } else {
                 bodyHtml = `
-                    <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 48vh; overflow-y: auto;">
+                    <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                         ${userEntries.map(([name, total]) => {
                             const orders = summary.userOrders[name] || [];
                             return `
@@ -7335,7 +7345,7 @@ Reglas obligatorias:
                         </p>
                     </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 32vh; overflow-y: auto;">
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
                         ${summary.drinkers.map(([name, pureCl], idx) => {
                             const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`;
                             const canas = (pureCl / 1.0).toFixed(1).replace('.0', '');
@@ -7357,54 +7367,60 @@ Reglas obligatorias:
         }
 
         const modalHtml = `
-            <div style="text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 0.4rem;">
-                            <span style="font-size: 1.3rem;">🍻</span>
-                            <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">${item.name}</h3>
+            <div class="modal-summary-shell">
+                <div class="modal-summary-header">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="font-size: 1.3rem;">🍻</span>
+                                <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">${item.name}</h3>
+                            </div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
+                                📅 ${dateStr}
+                            </div>
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
-                            📅 ${dateStr}
+                        <div style="text-align: right;">
+                            <span style="font-size: 1.25rem; font-weight: 800; color: #10b981;">${this.formatEuro(summary.totalBill)}</span>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">total cuenta</div>
                         </div>
                     </div>
-                    <div style="text-align: right;">
-                        <span style="font-size: 1.25rem; font-weight: 800; color: #10b981;">${this.formatEuro(summary.totalBill)}</span>
-                        <div style="font-size: 0.7rem; color: var(--text-muted);">total cuenta</div>
+
+                    <div style="display: inline-block; font-size: 0.72rem; padding: 0.2rem 0.55rem; background: rgba(99, 102, 241, 0.12); color: #818cf8; border-radius: 4px; font-weight: 600; margin-bottom: 0.65rem;">
+                        🔒 Mesa Archivada en Firebase
+                    </div>
+
+                    <!-- Sub-pestañas -->
+                    <div style="display: flex; gap: 0.35rem; margin-bottom: 0.5rem;">
+                        <button type="button" class="modal-subtab-btn ${currentTab === 'ticket' ? 'active' : ''}" onclick="App.switchHistoryModalTab('ticket', '${item.id}')">
+                            🧾 Ticket (${Object.keys(summary.ticketItems).length})
+                        </button>
+                        <button type="button" class="modal-subtab-btn ${currentTab === 'cuentas' ? 'active' : ''}" onclick="App.switchHistoryModalTab('cuentas', '${item.id}')">
+                            👥 Cuentas (${Object.keys(summary.userTotals).length})
+                        </button>
+                        <button type="button" class="modal-subtab-btn ${currentTab === 'borrachuzo' ? 'active' : ''}" onclick="App.switchHistoryModalTab('borrachuzo', '${item.id}')">
+                            🏆 Borrachuzo
+                        </button>
                     </div>
                 </div>
 
-                <div style="display: inline-block; font-size: 0.72rem; padding: 0.2rem 0.55rem; background: rgba(99, 102, 241, 0.12); color: #818cf8; border-radius: 4px; font-weight: 600; margin-bottom: 0.75rem;">
-                    🔒 Mesa Archivada en Firebase
+                <!-- Contenido con scroll independiente -->
+                <div class="modal-summary-body">
+                    ${bodyHtml}
                 </div>
 
-                <!-- Sub-pestañas -->
-                <div style="display: flex; gap: 0.35rem; margin-bottom: 0.85rem;">
-                    <button type="button" class="modal-subtab-btn ${currentTab === 'ticket' ? 'active' : ''}" onclick="App.switchHistoryModalTab('ticket', '${item.id}')">
-                        🧾 Ticket (${Object.keys(summary.ticketItems).length})
-                    </button>
-                    <button type="button" class="modal-subtab-btn ${currentTab === 'cuentas' ? 'active' : ''}" onclick="App.switchHistoryModalTab('cuentas', '${item.id}')">
-                        👥 Cuentas (${Object.keys(summary.userTotals).length})
-                    </button>
-                    <button type="button" class="modal-subtab-btn ${currentTab === 'borrachuzo' ? 'active' : ''}" onclick="App.switchHistoryModalTab('borrachuzo', '${item.id}')">
-                        🏆 Borrachuzo
-                    </button>
-                </div>
-
-                <!-- Contenido -->
-                ${bodyHtml}
-
-                <!-- Botones inferiores -->
-                <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
-                    <button type="button" class="btn-primary" onclick="App.copyTableSummaryWhatsApp('${item.id}')" style="flex: 2; min-width: 150px; padding: 0.75rem; font-size: 0.88rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
+                <!-- Botones inferiores SIEMPRE visibles -->
+                <div class="modal-summary-footer">
+                    <button type="button" class="btn-primary" onclick="App.copyTableSummaryWhatsApp('${item.id}')" style="width: 100%; padding: 0.65rem; font-size: 0.88rem; font-weight: 700; background: #25D366; border: none; color: #ffffff; border-radius: 8px;">
                         📋 Copiar WhatsApp
                     </button>
-                    <button type="button" class="btn-secondary" onclick="App.deleteTableFromHistory('${item.id}')" style="padding: 0.75rem 0.9rem; font-size: 0.88rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-weight: 600;">
-                        🗑️ Borrar
-                    </button>
-                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1rem;">
-                        Cerrar
-                    </button>
+                    <div class="modal-summary-footer-row">
+                        <button type="button" class="btn-secondary" onclick="App.deleteTableFromHistory('${item.id}')" style="flex: 1; padding: 0.65rem 0.75rem; font-size: 0.88rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-weight: 600; border-radius: 8px;">
+                            🗑️ Borrar
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="App.closeModal()" style="flex: 1.3; padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 700; border-radius: 8px;">
+                            Cerrar
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -7479,7 +7495,7 @@ Reglas obligatorias:
                     </div>
                 ` : ''}
 
-                <div style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 44vh; overflow-y: auto;">
+                <div style="display: flex; flex-direction: column; gap: 0.45rem;">
                     ${partyBalances.units.map(u => {
                         const isPlus = u.net >= 0.01;
                         const isMinus = u.net <= -0.01;
@@ -7509,7 +7525,7 @@ Reglas obligatorias:
                 bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay gastos registrados en esta fiesta.</p>';
             } else {
                 bodyHtml = `
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 48vh; overflow-y: auto;">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                         ${expenses.map(exp => `
                             <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; text-align: left;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
@@ -7530,7 +7546,7 @@ Reglas obligatorias:
                 bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay pagos ni reembolsos registrados.</p>';
             } else if (settlements.length > 0) {
                 bodyHtml = `
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 48vh; overflow-y: auto;">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                         ${settlements.map(s => `
                             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
                                 <div>
@@ -7544,7 +7560,7 @@ Reglas obligatorias:
                 `;
             } else {
                 bodyHtml = `
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 48vh; overflow-y: auto;">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                         ${incomes.map(inc => `
                             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
                                 <div>
@@ -7560,60 +7576,66 @@ Reglas obligatorias:
         }
 
         const modalHtml = `
-            <div style="text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 0.4rem;">
-                            <span style="font-size: 1.3rem;">🍹</span>
-                            <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">${item.name}</h3>
+            <div class="modal-summary-shell">
+                <div class="modal-summary-header">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="font-size: 1.3rem;">🍹</span>
+                                <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">${item.name}</h3>
+                            </div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
+                                📅 ${dateStr}
+                            </div>
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
-                            📅 ${dateStr}
+                        <div style="text-align: right;">
+                            <span style="font-size: 1.25rem; font-weight: 800; color: #f59e0b;">${this.formatEuro(totalSpent)}</span>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">gastado total</div>
                         </div>
                     </div>
-                    <div style="text-align: right;">
-                        <span style="font-size: 1.25rem; font-weight: 800; color: #f59e0b;">${this.formatEuro(totalSpent)}</span>
-                        <div style="font-size: 0.7rem; color: var(--text-muted);">gastado total</div>
+
+                    <div style="display: inline-block; font-size: 0.72rem; padding: 0.2rem 0.55rem; background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-radius: 4px; font-weight: 600; margin-bottom: 0.65rem;">
+                        🔒 Fiesta Archivada en Firebase
+                    </div>
+
+                    <!-- Sub-pestañas -->
+                    <div style="display: flex; gap: 0.35rem; margin-bottom: 0.5rem;">
+                        <button type="button" class="modal-subtab-btn ${currentTab === 'balances' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('balances', '${item.id}')">
+                            ⚖️ Saldos (${partyBalances.units.length})
+                        </button>
+                        <button type="button" class="modal-subtab-btn ${currentTab === 'expenses' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('expenses', '${item.id}')">
+                            🛒 Gastos (${expenses.length})
+                        </button>
+                        ${settlements.length > 0 ? `
+                            <button type="button" class="modal-subtab-btn ${currentTab === 'settlements' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('settlements', '${item.id}')">
+                                💳 Pagos (${settlements.length})
+                            </button>
+                        ` : (incomes.length > 0 ? `
+                            <button type="button" class="modal-subtab-btn ${currentTab === 'incomes' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('incomes', '${item.id}')">
+                                💰 Bote (${incomes.length})
+                            </button>
+                        ` : '')}
                     </div>
                 </div>
 
-                <div style="display: inline-block; font-size: 0.72rem; padding: 0.2rem 0.55rem; background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-radius: 4px; font-weight: 600; margin-bottom: 0.75rem;">
-                    🔒 Fiesta Archivada en Firebase
+                <!-- Contenido con scroll independiente -->
+                <div class="modal-summary-body">
+                    ${bodyHtml}
                 </div>
 
-                <!-- Sub-pestañas -->
-                <div style="display: flex; gap: 0.35rem; margin-bottom: 0.85rem;">
-                    <button type="button" class="modal-subtab-btn ${currentTab === 'balances' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('balances', '${item.id}')">
-                        ⚖️ Saldos (${partyBalances.units.length})
-                    </button>
-                    <button type="button" class="modal-subtab-btn ${currentTab === 'expenses' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('expenses', '${item.id}')">
-                        🛒 Gastos (${expenses.length})
-                    </button>
-                    ${settlements.length > 0 ? `
-                        <button type="button" class="modal-subtab-btn ${currentTab === 'settlements' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('settlements', '${item.id}')">
-                            💳 Pagos (${settlements.length})
-                        </button>
-                    ` : (incomes.length > 0 ? `
-                        <button type="button" class="modal-subtab-btn ${currentTab === 'incomes' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('incomes', '${item.id}')">
-                            💰 Bote (${incomes.length})
-                        </button>
-                    ` : '')}
-                </div>
-
-                <!-- Contenido -->
-                ${bodyHtml}
-
-                <!-- Botones inferiores -->
-                <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
-                    <button type="button" class="btn-primary" onclick="App.copyPartySummaryWhatsApp('${item.id}')" style="flex: 2; min-width: 150px; padding: 0.75rem; font-size: 0.88rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
+                <!-- Botones inferiores SIEMPRE visibles -->
+                <div class="modal-summary-footer">
+                    <button type="button" class="btn-primary" onclick="App.copyPartySummaryWhatsApp('${item.id}')" style="width: 100%; padding: 0.65rem; font-size: 0.88rem; font-weight: 700; background: #25D366; border: none; color: #ffffff; border-radius: 8px;">
                         📋 Copiar WhatsApp
                     </button>
-                    <button type="button" class="btn-secondary" onclick="App.deletePartyFromHistory('${item.id}')" style="padding: 0.75rem 0.9rem; font-size: 0.88rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-weight: 600;">
-                        🗑️ Borrar
-                    </button>
-                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1rem;">
-                        Cerrar
-                    </button>
+                    <div class="modal-summary-footer-row">
+                        <button type="button" class="btn-secondary" onclick="App.deletePartyFromHistory('${item.id}')" style="flex: 1; padding: 0.65rem 0.75rem; font-size: 0.88rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-weight: 600; border-radius: 8px;">
+                            🗑️ Borrar
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="App.closeModal()" style="flex: 1.3; padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 700; border-radius: 8px;">
+                            Cerrar
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
