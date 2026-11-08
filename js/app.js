@@ -2995,14 +2995,22 @@ const App = {
                 barButtons.forEach(b => b.classList.add('hidden'));
                 partyButtons.forEach(b => b.classList.remove('hidden'));
                 // Cambiar texto del botón a "Dejar la fiesta"
-                const leaveSpan = this.buttons.leaveTable.querySelector('span:first-child');
-                if (leaveSpan) leaveSpan.textContent = 'Dejar la fiesta';
+                const targetWord = document.getElementById('leave-target-word');
+                if (targetWord) targetWord.textContent = 'fiesta';
+                else {
+                    const leaveSpan = this.buttons.leaveTable.querySelector('span:first-child');
+                    if (leaveSpan) leaveSpan.textContent = 'Dejar la fiesta';
+                }
             } else {
                 barButtons.forEach(b => b.classList.remove('hidden'));
                 partyButtons.forEach(b => b.classList.add('hidden'));
                 // Restaurar texto a "Dejar la mesa"
-                const leaveSpan = this.buttons.leaveTable.querySelector('span:first-child');
-                if (leaveSpan) leaveSpan.textContent = 'Dejar la mesa';
+                const targetWord = document.getElementById('leave-target-word');
+                if (targetWord) targetWord.textContent = 'mesa';
+                else {
+                    const leaveSpan = this.buttons.leaveTable.querySelector('span:first-child');
+                    if (leaveSpan) leaveSpan.textContent = 'Dejar la mesa';
+                }
             }
         }
     },

@@ -523,42 +523,54 @@ body {
     .header-logo h1 {
         font-size: 1.2rem;
     }
-    .btn-leave {
-        padding: 0.45rem 0.6rem;
-        font-size: 0.78rem;
-    }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 330px) {
     .main-header {
-        padding: 0.75rem 0.5rem 0.5rem 0.5rem;
+        padding: 0.75rem 0.4rem 0.5rem 0.4rem;
     }
     .header-logo h1 {
         font-size: 1.05rem;
     }
-    .btn-leave span:first-child {
+    .btn-leave-lines {
         display: none;
-    }
-    .btn-leave {
-        padding: 0.45rem 0.55rem;
     }
 }
 
 .btn-leave {
     background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.25);
     color: #f87171;
-    padding: 0.5rem 0.75rem;
+    padding: 0.35rem 0.55rem;
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
-    font-weight: 600;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    justify-content: center;
+    gap: 0.35rem;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+.btn-leave-lines {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+    line-height: 1.1;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.btn-leave .icon {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+body.light-theme .btn-leave {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-color: rgba(185, 28, 28, 0.35) !important;
+    color: #991b1b !important;
 }
 
 .btn-leave:hover {
