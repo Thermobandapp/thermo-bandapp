@@ -289,26 +289,37 @@ body.light-theme .selector-switch-btn.active {
     box-shadow: 0 1px 4px rgba(194, 65, 12, 0.25);
 }
 
+/* Columna de controles de configuración en cabecera */
+.header-settings-col {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
 /* Botón flotante/en cabecera para cambio de tema */
 .btn-theme-toggle {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--glass-border);
     color: var(--text-main);
-    padding: 0.45rem 0.65rem;
+    padding: 0.15rem 0.4rem;
+    width: 100%;
+    height: 23px;
     border-radius: var(--radius-sm);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    font-size: 0.88rem;
-    font-weight: 600;
+    justify-content: center;
+    font-size: 0.85rem;
+    line-height: 1;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(8px);
 }
 
 .btn-theme-toggle:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
 }
 
 html {
@@ -497,21 +508,33 @@ body {
     gap: 0.5rem;
 }
 
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+}
+
 @media (max-width: 480px) {
     .main-header {
-        padding: 0.9rem 0.9rem 0.65rem 0.9rem;
+        padding: 0.85rem 0.75rem 0.6rem 0.75rem;
+        gap: 0.4rem;
     }
     .header-logo h1 {
-        font-size: 1.25rem;
+        font-size: 1.2rem;
+    }
+    .btn-leave {
+        padding: 0.45rem 0.6rem;
+        font-size: 0.78rem;
     }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 360px) {
     .main-header {
-        padding: 0.75rem 0.65rem 0.55rem 0.65rem;
+        padding: 0.75rem 0.5rem 0.5rem 0.5rem;
     }
     .header-logo h1 {
-        font-size: 1.12rem;
+        font-size: 1.05rem;
     }
     .btn-leave span:first-child {
         display: none;
@@ -531,9 +554,11 @@ body {
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.45rem;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .btn-leave:hover {

@@ -17,7 +17,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <!-- Estilos -->
-    <link rel="stylesheet" href="css/main.css?v=42">
+    <link rel="stylesheet" href="css/main.css?v=43">
 </head>
 <body class="dark-theme">
     <div id="app">
@@ -34,15 +34,17 @@
                     <span id="header-user-name" style="font-size: 0.85rem; color: var(--secondary);"></span>
                 </div>
             </div>
-            <div class="header-controls" style="display: flex; align-items: center; gap: 0.4rem;">
-                <div class="font-size-selector" role="group" aria-label="Tamaño de texto" title="Tamaño de letra">
-                    <button type="button" class="font-size-btn active" data-size="small" onclick="App.setFontSize('small')" title="Tamaño normal (actual)">A</button>
-                    <button type="button" class="font-size-btn" data-size="medium" onclick="App.setFontSize('medium')" title="Tamaño mediano">A</button>
-                    <button type="button" class="font-size-btn" data-size="large" onclick="App.setFontSize('large')" title="Tamaño grande (+10% máx)">A</button>
+            <div class="header-controls">
+                <div class="header-settings-col" title="Ajustes de vista">
+                    <div class="font-size-selector" role="group" aria-label="Tamaño de texto" title="Tamaño de letra">
+                        <button type="button" class="font-size-btn active" data-size="small" onclick="App.setFontSize('small')" title="Tamaño normal (actual)">A</button>
+                        <button type="button" class="font-size-btn" data-size="medium" onclick="App.setFontSize('medium')" title="Tamaño mediano">A</button>
+                        <button type="button" class="font-size-btn" data-size="large" onclick="App.setFontSize('large')" title="Tamaño grande (+10% máx)">A</button>
+                    </div>
+                    <button id="btn-toggle-theme" class="btn-theme-toggle" onclick="App.toggleTheme()" title="Cambiar a Modo Claro / Oscuro">
+                        <span id="theme-toggle-icon">☀️</span>
+                    </button>
                 </div>
-                <button id="btn-toggle-theme" class="btn-theme-toggle" onclick="App.toggleTheme()" title="Cambiar a Modo Claro / Oscuro">
-                    <span id="theme-toggle-icon">☀️</span>
-                </button>
                 <button id="btn-leave-table" class="btn-leave hidden">
                     <span>Dejar la mesa</span>
                     <span class="icon">🚪</span>
@@ -473,6 +475,6 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-    <script type="module" src="js/app.js?v=42"></script>
+    <script type="module" src="js/app.js?v=43"></script>
 </body>
 </html>
