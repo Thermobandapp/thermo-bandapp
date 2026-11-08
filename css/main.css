@@ -2061,3 +2061,33 @@ body.light-theme .modal-subtab-btn.active {
     background: var(--primary);
     color: #ffffff;
 }
+
+.btn-header-history {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+    border-radius: var(--radius-sm);
+    padding: 0.2rem 0.55rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s ease;
+}
+
+.btn-header-history:hover {
+    background: rgba(245, 158, 11, 0.25);
+    transform: translateY(-1px);
+}
+
+.btn-header-history:active {
+    transform: scale(0.96);
+}
+
+body.light-theme .btn-header-history {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(217, 119, 6, 0.4);
+    color: #b45309;
+}

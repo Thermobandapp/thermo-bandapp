@@ -578,8 +578,8 @@ const App = {
 
     updateHeaderUser() {
         const headerUserName = document.getElementById('header-user-name');
-        if (headerUserName && this.state.user) {
-            headerUserName.textContent = this.state.user;
+        if (headerUserName) {
+            headerUserName.textContent = this.state.user ? `· ${this.state.user}` : '';
         }
         // Actualizar el nombre en el botón "Cambiar de miembro"
         const switchName = document.getElementById('switch-member-name');
