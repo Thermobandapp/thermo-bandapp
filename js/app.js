@@ -51,6 +51,7 @@ const App = {
         this.bindEvents();
         this.loadLocalSession();
         this.initDecimalNormalizer();
+        this.initScrollFades();
     },
 
     initTheme() {
@@ -3195,7 +3196,7 @@ const App = {
 
         const html = `
             <div class="modal-summary-shell">
-                <div class="modal-summary-body">
+                <div class="modal-summary-body scroll-fade-bottom">
                     <div class="ticket-receipt">
                         <div class="ticket-header">
                             <h3>${barName}</h3>
@@ -4822,7 +4823,7 @@ const App = {
                         </div>
                     </div>
                 </div>
-                <div class="modal-summary-body">
+                <div class="modal-summary-body scroll-fade-bottom">
                     ${debtsHtml}
                     ${settledHtml}
                     ${breakdownHtml}
@@ -5824,6 +5825,7 @@ const App = {
                 closeBtn.style.fontWeight = '';
             }
         }
+        this.initScrollFades();
     },
 
     closeModal() {
@@ -5858,6 +5860,48 @@ const App = {
         if (orderProduct && selectedParticipants && selectedParticipants.length > 0) {
             this.addOrder(orderProduct, selectedParticipants);
         }
+    },
+
+    // --- MÉTODOS DE SCROLL FADE INFERIOR Y SCROLLBARS ---
+    updateScrollFade(el) {
+        if (!el) return;
+        const hasOverflow = el.scrollHeight > (el.clientHeight + 4);
+        if (!hasOverflow) {
+            el.removeAttribute('data-scroll-bottom');
+            return;
+        }
+        const isAtBottom = (el.scrollTop + el.clientHeight) >= (el.scrollHeight - 6);
+        el.setAttribute('data-scroll-bottom', isAtBottom ? 'false' : 'true');
+    },
+
+    attachScrollFade(el) {
+        if (!el) return;
+        el.classList.add('scroll-fade-bottom');
+        if (!el._scrollFadeInit) {
+            el._scrollFadeInit = true;
+            const handler = () => this.updateScrollFade(el);
+            el.addEventListener('scroll', handler, { passive: true });
+
+            if (window.ResizeObserver) {
+                const ro = new ResizeObserver(() => this.updateScrollFade(el));
+                ro.observe(el);
+            }
+        }
+
+        this.updateScrollFade(el);
+        setTimeout(() => this.updateScrollFade(el), 60);
+        setTimeout(() => this.updateScrollFade(el), 250);
+    },
+
+    initScrollFades() {
+        const selectors = [
+            '.modal-summary-body',
+            '#modal-content',
+            '.participant-grid',
+            '.ticket-body',
+            '#history-list-container'
+        ];
+        document.querySelectorAll(selectors.join(', ')).forEach(el => this.attachScrollFade(el));
     },
 
     // --- MÉTODOS DEL COMBOBOX DE BARES ---
@@ -7321,6 +7365,7 @@ Reglas obligatorias:
         });
 
         container.innerHTML = html;
+        this.initScrollFades();
     },
 
     showHistoryTableDetail(tableId) {
@@ -7485,7 +7530,7 @@ Reglas obligatorias:
                 </div>
 
                 <!-- Contenido con scroll independiente -->
-                <div class="modal-summary-body">
+                <div class="modal-summary-body scroll-fade-bottom">
                     ${bodyHtml}
                 </div>
 
@@ -7700,7 +7745,7 @@ Reglas obligatorias:
                 </div>
 
                 <!-- Contenido con scroll independiente -->
-                <div class="modal-summary-body">
+                <div class="modal-summary-body scroll-fade-bottom">
                     ${bodyHtml}
                 </div>
 

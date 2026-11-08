@@ -1166,6 +1166,121 @@ body.modal-open {
     align-items: center;
 }
 
+/* ========================================================
+   SCROLLBAR ESTILIZADO SEMI-PERMANENTE & FADE INFERIOR
+   ======================================================== */
+
+/* Scrollbar estilizado general */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+body.light-theme * {
+    scrollbar-color: rgba(44, 37, 35, 0.3) transparent;
+}
+
+/* WebKit (Chrome, Safari, iOS Safari, Android Webview, Edge) */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.48);
+}
+
+body.light-theme ::-webkit-scrollbar-thumb {
+    background: rgba(44, 37, 35, 0.28);
+}
+
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+    background: rgba(44, 37, 35, 0.45);
+}
+
+/* Contenedores con scroll semi-permanente destacado */
+.modal-summary-body,
+#modal-content,
+.participant-grid,
+.ticket-body,
+#history-list-container,
+.dropdown-list {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.05);
+}
+
+body.light-theme .modal-summary-body,
+body.light-theme #modal-content,
+body.light-theme .participant-grid,
+body.light-theme .ticket-body,
+body.light-theme #history-list-container,
+body.light-theme .dropdown-list {
+    scrollbar-color: rgba(44, 37, 35, 0.36) rgba(44, 37, 35, 0.06);
+}
+
+.modal-summary-body::-webkit-scrollbar-track,
+#modal-content::-webkit-scrollbar-track,
+.participant-grid::-webkit-scrollbar-track,
+.ticket-body::-webkit-scrollbar-track,
+#history-list-container::-webkit-scrollbar-track,
+.dropdown-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 9999px;
+}
+
+body.light-theme .modal-summary-body::-webkit-scrollbar-track,
+body.light-theme #modal-content::-webkit-scrollbar-track,
+body.light-theme .participant-grid::-webkit-scrollbar-track,
+body.light-theme .ticket-body::-webkit-scrollbar-track,
+body.light-theme #history-list-container::-webkit-scrollbar-track,
+body.light-theme .dropdown-list::-webkit-scrollbar-track {
+    background: rgba(44, 37, 35, 0.06);
+}
+
+.modal-summary-body::-webkit-scrollbar-thumb,
+#modal-content::-webkit-scrollbar-thumb,
+.participant-grid::-webkit-scrollbar-thumb,
+.ticket-body::-webkit-scrollbar-thumb,
+#history-list-container::-webkit-scrollbar-thumb,
+.dropdown-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.42);
+    border-radius: 9999px;
+}
+
+body.light-theme .modal-summary-body::-webkit-scrollbar-thumb,
+body.light-theme #modal-content::-webkit-scrollbar-thumb,
+body.light-theme .participant-grid::-webkit-scrollbar-thumb,
+body.light-theme .ticket-body::-webkit-scrollbar-thumb,
+body.light-theme #history-list-container::-webkit-scrollbar-thumb,
+body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
+    background: rgba(44, 37, 35, 0.38);
+}
+
+/* Degradado suave inferior (Opción 2) */
+.scroll-fade-bottom {
+    position: relative;
+    transition: -webkit-mask-image 0.22s ease-out, mask-image 0.22s ease-out;
+}
+
+.scroll-fade-bottom[data-scroll-bottom="true"] {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 36px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 36px), transparent 100%);
+}
+
+.scroll-fade-bottom[data-scroll-bottom="false"] {
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+
 @keyframes zoomIn {
     from { opacity: 0; transform: scale(0.9); }
     to { opacity: 1; transform: scale(1); }
