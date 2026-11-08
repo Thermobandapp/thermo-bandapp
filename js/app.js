@@ -7038,12 +7038,12 @@ Reglas obligatorias:
                     const expenses = history.filter(h => h.type === 'expense');
                     const incomes = history.filter(h => h.type === 'income');
 
-                    const totalCollected = pData.totalCollected !== undefined 
-                        ? Number(pData.totalCollected) 
-                        : incomes.reduce((s, h) => s + (Number(h.amount) || 0), 0);
-                    const totalSpent = pData.totalSpent !== undefined 
-                        ? Number(pData.totalSpent) 
-                        : expenses.reduce((s, h) => s + (Number(h.amount) || 0), 0);
+                    const partyBalances = this.calculatePartyBalances(pData);
+                    const totalSpent = partyBalances.totalSpent !== undefined 
+                        ? Number(partyBalances.totalSpent) 
+                        : (pData.totalSpent !== undefined ? Number(pData.totalSpent) : expenses.reduce((s, h) => s + (Number(h.amount) || 0), 0));
+                    const totalDebts = (partyBalances.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+                    const totalPaid = Math.max(0, totalSpent - totalDebts);
 
                     const participantNames = Object.values(pData.participants || {}).map(p => p.name || '').filter(Boolean);
 
@@ -7052,8 +7052,9 @@ Reglas obligatorias:
                         name: pData.name || id,
                         status: pData.status || 'finished',
                         date,
-                        totalCollected,
                         totalSpent,
+                        totalPaid,
+                        totalDebts,
                         participantCount: participantNames.length,
                         expenseCount: expenses.length,
                         participants: participantNames,
@@ -7201,9 +7202,14 @@ Reglas obligatorias:
 
                         <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.6rem; align-items: center;">
                             <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600;">
-                                💰 Bote: ${this.formatEuro(item.totalCollected)}
+                                ✅ Pagado: ${this.formatEuro(item.totalPaid !== undefined ? item.totalPaid : item.totalSpent)}
                             </span>
-                            <span style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                            ${item.totalDebts > 0.01 ? `
+                                <span style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                                    ⚖️ Deudas: ${this.formatEuro(item.totalDebts)}
+                                </span>
+                            ` : ''}
+                            <span style="font-size: 0.75rem; background: rgba(255, 255, 255, 0.08); color: var(--text-muted); padding: 0.18rem 0.45rem; border-radius: 4px;">
                                 👥 ${item.participantCount} amigos
                             </span>
                             <span style="font-size: 0.75rem; background: rgba(255, 255, 255, 0.08); color: var(--text-muted); padding: 0.18rem 0.45rem; border-radius: 4px;">
@@ -7416,79 +7422,70 @@ Reglas obligatorias:
         const raw = item.raw;
         const history = Object.values(raw.history || {}).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         const expenses = history.filter(h => h.type === 'expense');
+        const settlements = history.filter(h => h.type === 'settlement');
         const incomes = history.filter(h => h.type === 'income');
-        const participants = Object.values(raw.participants || {});
         const dateStr = this.formatDateTime(item.date);
         const currentTab = this.state.historyActivePartyDetailTab || 'balances';
 
-        const totalCollected = item.totalCollected;
-        const totalSpent = item.totalSpent;
-        const remaining = totalCollected - totalSpent;
-
-        const balances = {};
-        participants.forEach(p => {
-            if (p && p.name) {
-                balances[p.name] = { contributed: 0, consumed: 0, balance: 0 };
-            }
-        });
-
-        incomes.forEach(inc => {
-            const friend = inc.friend || inc.user;
-            if (friend) {
-                if (!balances[friend]) balances[friend] = { contributed: 0, consumed: 0, balance: 0 };
-                balances[friend].contributed += (Number(inc.amount) || 0);
-            }
-        });
-
-        expenses.forEach(exp => {
-            const amount = Number(exp.amount) || 0;
-            let bens = Array.isArray(exp.beneficiaries) && exp.beneficiaries.length > 0
-                ? exp.beneficiaries
-                : participants.map(p => p.name);
-            if (bens.length === 0) bens = ['Todos'];
-            const share = amount / bens.length;
-            bens.forEach(b => {
-                if (!balances[b]) balances[b] = { contributed: 0, consumed: 0, balance: 0 };
-                balances[b].consumed += share;
-            });
-        });
-
-        Object.values(balances).forEach(b => {
-            b.balance = b.contributed - b.consumed;
-        });
+        // Usar cálculo financiero unificado de la fiesta
+        const partyBalances = this.calculatePartyBalances(raw);
+        const totalSpent = partyBalances.totalSpent !== undefined 
+            ? Number(partyBalances.totalSpent) 
+            : (item.totalSpent !== undefined ? Number(item.totalSpent) : expenses.reduce((s, h) => s + (Number(h.amount) || 0), 0));
+        const totalDebts = (partyBalances.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+        const totalPaid = Math.max(0, totalSpent - totalDebts);
+        const debtsAmount = Math.max(0, totalSpent - totalPaid);
 
         let bodyHtml = '';
 
         if (currentTab === 'balances') {
-            const balanceEntries = Object.entries(balances).sort((a, b) => b[1].balance - a[1].balance);
             bodyHtml = `
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.85rem; text-align: center;">
-                    <div style="flex: 1; padding: 0.5rem; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px;">
-                        <span style="font-size: 0.72rem; color: #34d399; font-weight: 600; display: block;">Recaudado</span>
-                        <span style="font-weight: 800; font-size: 1rem; color: #10b981;">${this.formatEuro(totalCollected)}</span>
-                    </div>
-                    <div style="flex: 1; padding: 0.5rem; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px;">
+                <div class="party-summary-grid" style="display: flex; gap: 0.5rem; margin-bottom: 0.85rem; text-align: center;">
+                    <div class="party-summary-cell cell-spent" style="flex: 1; padding: 0.5rem; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px;">
                         <span style="font-size: 0.72rem; color: #fbbf24; font-weight: 600; display: block;">Gastado</span>
                         <span style="font-weight: 800; font-size: 1rem; color: #f59e0b;">${this.formatEuro(totalSpent)}</span>
                     </div>
-                    <div style="flex: 1; padding: 0.5rem; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px;">
-                        <span style="font-size: 0.72rem; color: #818cf8; font-weight: 600; display: block;">Sobrante</span>
-                        <span style="font-weight: 800; font-size: 1rem; color: #a5b4fc;">${this.formatEuro(remaining)}</span>
+                    <div class="party-summary-cell cell-paid" style="flex: 1; padding: 0.5rem; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px;">
+                        <span style="font-size: 0.72rem; color: #34d399; font-weight: 600; display: block;">Pagado</span>
+                        <span style="font-weight: 800; font-size: 1rem; color: #10b981;">${this.formatEuro(totalPaid)}</span>
+                    </div>
+                    <div class="party-summary-cell cell-debts" style="flex: 1; padding: 0.5rem; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px;">
+                        <span style="font-size: 0.72rem; color: #818cf8; font-weight: 600; display: block;">Deudas</span>
+                        <span style="font-weight: 800; font-size: 1rem; color: #a5b4fc;">${this.formatEuro(debtsAmount)}</span>
                     </div>
                 </div>
 
+                ${partyBalances.debts && partyBalances.debts.length > 0 ? `
+                    <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem;">
+                        <span style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #818cf8; display: block; margin-bottom: 0.35rem;">
+                            ⚖️ Deudas pendientes de liquidar:
+                        </span>
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            ${partyBalances.debts.map(d => `
+                                <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
+                                    <span style="color: var(--text-main);"><b>${d.from}</b> debe pagar a <b>${d.to}</b></span>
+                                    <b style="color: #ef4444;">${this.formatEuro(d.amount)}</b>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
                 <div style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 44vh; overflow-y: auto;">
-                    ${balanceEntries.map(([name, b]) => {
-                        const isPlus = b.balance >= 0.01;
-                        const isMinus = b.balance <= -0.01;
+                    ${partyBalances.units.map(u => {
+                        const isPlus = u.net >= 0.01;
+                        const isMinus = u.net <= -0.01;
                         const color = isPlus ? '#10b981' : (isMinus ? '#ef4444' : 'var(--text-muted)');
-                        const label = isPlus ? `Devolver ${this.formatEuro(b.balance)}` : (isMinus ? `Debe ${this.formatEuro(Math.abs(b.balance))}` : 'En paz (0 €)');
+                        const label = isPlus ? `Le deben ${this.formatEuro(u.net)}` : (isMinus ? `Debe ${this.formatEuro(Math.abs(u.net))}` : 'En paz (0 €)');
+                        let subDetails = `Pagó: ${this.formatEuro(u.paid)} · Consumió: ${this.formatEuro(u.spent)}`;
+                        if (u.settlementPaid > 0) subDetails += ` · Reembolsó: +${this.formatEuro(u.settlementPaid)}`;
+                        if (u.settlementReceived > 0) subDetails += ` · Cobró: -${this.formatEuro(u.settlementReceived)}`;
                         return `
                             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.55rem 0.75rem;">
                                 <div>
-                                    <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-main);">${name}</span>
+                                    <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-main);">${u.displayName} ${u.isCouple ? '<span class="badge-couple">💑 Pareja</span>' : ''}</span>
                                     <div style="font-size: 0.74rem; color: var(--text-muted);">
-                                        Puso ${this.formatEuro(b.contributed)} · Consumió ${this.formatEuro(b.consumed)}
+                                        ${subDetails}
                                     </div>
                                 </div>
                                 <div style="text-align: right; font-weight: 800; font-size: 0.92rem; color: ${color};">
@@ -7520,9 +7517,23 @@ Reglas obligatorias:
                     </div>
                 `;
             }
-        } else if (currentTab === 'incomes') {
-            if (incomes.length === 0) {
-                bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay aportaciones al bote registradas.</p>';
+        } else if (currentTab === 'settlements' || currentTab === 'incomes') {
+            if (settlements.length === 0 && incomes.length === 0) {
+                bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay pagos ni reembolsos registrados.</p>';
+            } else if (settlements.length > 0) {
+                bodyHtml = `
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 48vh; overflow-y: auto;">
+                        ${settlements.map(s => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
+                                <div>
+                                    <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-main);"><b>${s.from}</b> pagó a <b>${s.to}</b></span>
+                                    <div style="font-size: 0.74rem; color: var(--text-muted);">${s.description || 'Reembolso liquidado'}</div>
+                                </div>
+                                <span style="font-weight: 800; font-size: 0.95rem; color: #10b981;">+${this.formatEuro(s.amount || 0)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
             } else {
                 bodyHtml = `
                     <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 48vh; overflow-y: auto;">
@@ -7565,14 +7576,20 @@ Reglas obligatorias:
                 <!-- Sub-pestañas -->
                 <div style="display: flex; gap: 0.35rem; margin-bottom: 0.85rem;">
                     <button type="button" class="modal-subtab-btn ${currentTab === 'balances' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('balances', '${item.id}')">
-                        ⚖️ Saldos (${Object.keys(balances).length})
+                        ⚖️ Saldos (${partyBalances.units.length})
                     </button>
                     <button type="button" class="modal-subtab-btn ${currentTab === 'expenses' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('expenses', '${item.id}')">
                         🛒 Gastos (${expenses.length})
                     </button>
-                    <button type="button" class="modal-subtab-btn ${currentTab === 'incomes' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('incomes', '${item.id}')">
-                        💰 Bote (${incomes.length})
-                    </button>
+                    ${settlements.length > 0 ? `
+                        <button type="button" class="modal-subtab-btn ${currentTab === 'settlements' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('settlements', '${item.id}')">
+                            💳 Pagos (${settlements.length})
+                        </button>
+                    ` : (incomes.length > 0 ? `
+                        <button type="button" class="modal-subtab-btn ${currentTab === 'incomes' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('incomes', '${item.id}')">
+                            💰 Bote (${incomes.length})
+                        </button>
+                    ` : '')}
                 </div>
 
                 <!-- Contenido -->
@@ -7635,13 +7652,28 @@ Reglas obligatorias:
         const item = this.state.historyParties.find(p => p.id === partyId);
         if (!item || !item.raw) return;
 
+        const partyBalances = this.calculatePartyBalances(item.raw);
+        const totalSpent = partyBalances.totalSpent !== undefined 
+            ? Number(partyBalances.totalSpent) 
+            : (item.totalSpent !== undefined ? Number(item.totalSpent) : 0);
+        const totalDebts = (partyBalances.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+        const totalPaid = Math.max(0, totalSpent - totalDebts);
+
         const dateStr = this.formatDateTime(item.date);
         let text = `🍹 *RESUMEN DE FIESTA - ${item.name.toUpperCase()}*\n`;
         text += `📅 Fecha: ${dateStr}\n`;
-        text += `💰 Bote recaudado: ${this.formatEuro(item.totalCollected)}\n`;
-        text += `💸 Total gastado: ${this.formatEuro(item.totalSpent)}\n`;
-        const remaining = item.totalCollected - item.totalSpent;
-        text += `⚖️ Bote sobrante: ${this.formatEuro(remaining)}\n\n`;
+        text += `💸 Gastado: ${this.formatEuro(totalSpent)}\n`;
+        text += `✅ Pagado: ${this.formatEuro(totalPaid)}\n`;
+        text += `⚖️ Deudas: ${this.formatEuro(totalDebts)}\n\n`;
+
+        if (partyBalances.debts && partyBalances.debts.length > 0) {
+            text += `*DEUDAS PENDIENTES:*\n`;
+            partyBalances.debts.forEach(d => {
+                text += `• ${d.from} debe ${this.formatEuro(d.amount)} a ${d.to}\n`;
+            });
+            text += `\n`;
+        }
+
         text += `_Generado con Thermo Bandapp_ 📱`;
 
         try {

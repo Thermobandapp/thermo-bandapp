@@ -2132,3 +2132,31 @@ body.light-theme .btn-header-history {
     border-color: rgba(194, 65, 12, 0.35);
     color: #c2410c;
 }
+
+/* Celdas resumen de fiesta en historial */
+body.light-theme .party-summary-cell.cell-spent {
+    background: rgba(245, 158, 11, 0.14) !important;
+    border-color: rgba(217, 119, 6, 0.35) !important;
+}
+body.light-theme .party-summary-cell.cell-spent span:first-child,
+body.light-theme .party-summary-cell.cell-spent span:last-child {
+    color: #b45309 !important;
+}
+
+body.light-theme .party-summary-cell.cell-paid {
+    background: rgba(22, 163, 74, 0.12) !important;
+    border-color: rgba(22, 163, 74, 0.35) !important;
+}
+body.light-theme .party-summary-cell.cell-paid span:first-child,
+body.light-theme .party-summary-cell.cell-paid span:last-child {
+    color: #15803d !important;
+}
+
+body.light-theme .party-summary-cell.cell-debts {
+    background: rgba(99, 102, 241, 0.12) !important;
+    border-color: rgba(99, 102, 241, 0.35) !important;
+}
+body.light-theme .party-summary-cell.cell-debts span:first-child,
+body.light-theme .party-summary-cell.cell-debts span:last-child {
+    color: #4338ca !important;
+}
