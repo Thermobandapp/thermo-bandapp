@@ -8059,7 +8059,8 @@ Reglas obligatorias:
                     displayName: `${userName} y ${partnerInTable}`,
                     isCouple: true,
                     spent: spent1 + spent2,
-                    paid: paid1 + paid2
+                    paid: paid1 + paid2,
+                    names: [userName, partnerInTable]
                 });
             } else {
                 processedKeys.add(pKey);
@@ -8067,7 +8068,8 @@ Reglas obligatorias:
                     displayName: userName,
                     isCouple: false,
                     spent: summary.userTotals[userName] || 0,
-                    paid: userPaid[userName] || 0
+                    paid: userPaid[userName] || 0,
+                    names: [userName]
                 });
             }
         });
@@ -8082,15 +8084,25 @@ Reglas obligatorias:
         }
         text += `\n`;
 
+        // 1. Detalle general de gastos / ticket del bar
+        const ticketEntries = Object.entries(summary.ticketItems || {});
+        if (ticketEntries.length > 0) {
+            text += `🧾 *DETALLE DE GASTOS (TICKET):*\n`;
+            ticketEntries.forEach(([pName, data]) => {
+                text += `• ${data.qty}x ${pName}: ${this.formatEuro(data.total)}\n`;
+            });
+            text += `\n`;
+        }
+
+        // 2. Gastos y pagos por persona / pareja con detalle de consumiciones
         text += `👥 *GASTOS Y PAGOS POR PERSONA / PAREJA:*\n`;
         tableUnits.forEach(u => {
             const coupleTag = u.isCouple ? ' 💑' : '';
-            let line = `• *${u.displayName}${coupleTag}*\n`;
-            line += `   Gastó: ${this.formatEuro(u.spent)}`;
+            text += `• *${u.displayName}${coupleTag}*\n`;
             
+            let status = '';
             if (totalPot > 0) {
                 const net = u.paid - u.spent;
-                let status = '';
                 if (Math.abs(net) < 0.01) {
                     status = '(En paz)';
                 } else if (net > 0) {
@@ -8098,24 +8110,39 @@ Reglas obligatorias:
                 } else {
                     status = `(Faltan ${this.formatEuro(Math.abs(net))})`;
                 }
-                line += ` · Pagó: ${this.formatEuro(u.paid)} ${status}`;
+                text += `   Gastó: ${this.formatEuro(u.spent)} · Pagó: ${this.formatEuro(u.paid)} ${status}\n`;
             } else if (u.paid > 0) {
-                line += ` · Pagó: ${this.formatEuro(u.paid)}`;
+                text += `   Gastó: ${this.formatEuro(u.spent)} · Pagó: ${this.formatEuro(u.paid)}\n`;
             } else {
-                line += ` · Pagó: ${this.formatEuro(0)}`;
+                text += `   Gastó: ${this.formatEuro(u.spent)} · Pagó: ${this.formatEuro(0)}\n`;
             }
-            
-            text += line + '\n';
+
+            // Detalle de consumos individuales de la persona/pareja
+            const userOrdersList = u.names.flatMap(n => summary.userOrders[n] || []);
+            if (userOrdersList.length > 0) {
+                const counts = {};
+                userOrdersList.forEach(o => {
+                    const key = o.name;
+                    if (!counts[key]) counts[key] = { qty: 0, total: 0 };
+                    counts[key].qty++;
+                    counts[key].total += o.price;
+                });
+                const detailsText = Object.entries(counts)
+                    .map(([n, d]) => `${d.qty > 1 ? `${d.qty}x ` : ''}${n} (${this.formatEuro(d.total)})`)
+                    .join(', ');
+                text += `   🍽️ Consumos: ${detailsText}\n`;
+            }
         });
+        text += `\n`;
 
         if (summary.drinkers && summary.drinkers.length > 0) {
             const maxAlc = summary.drinkers[0][1];
             const winners = summary.drinkers.filter(([, cl]) => Math.abs(cl - maxAlc) < 0.05).map(([n]) => n);
             const equiv = (maxAlc / 1.0).toFixed(1).replace('.0', '');
-            text += `\n🏆 *Borrachuzo del día:* ${winners.join(', ')} (${maxAlc.toFixed(1)} cl · ≈${equiv} cañas)\n`;
+            text += `🏆 *Borrachuzo del día:* ${winners.join(', ')} (${maxAlc.toFixed(1)} cl · ≈${equiv} cañas)\n\n`;
         }
 
-        text += `\n_Generado con Thermo Bandapp_ 📱`;
+        text += `_Generado con Thermo Bandapp_ 📱`;
 
         try {
             await navigator.clipboard.writeText(text);
@@ -8140,6 +8167,10 @@ Reglas obligatorias:
         const totalDebts = (partyBalances.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
         const totalPaid = Math.max(0, totalSpent - totalDebts);
 
+        const allHistory = Object.values(raw.history || {}).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        const expenses = allHistory.filter(h => h && h.type === 'expense');
+        const allParticipants = raw.participants ? Object.values(raw.participants) : [];
+
         const dateStr = this.formatDateTime(date);
         let text = `🍹 *RESUMEN DE FIESTA - ${name.toUpperCase()}*\n`;
         text += `📅 Fecha: ${dateStr}\n`;
@@ -8147,6 +8178,27 @@ Reglas obligatorias:
         text += `✅ *Total Pagado:* ${this.formatEuro(totalPaid)}\n`;
         text += `⚖️ *Deudas pendientes:* ${this.formatEuro(totalDebts)}\n\n`;
 
+        // 1. Detalle completo de todos los gastos de la fiesta
+        if (expenses.length > 0) {
+            text += `🛒 *DETALLE DE GASTOS (${expenses.length}):*\n`;
+            expenses.forEach((exp, idx) => {
+                const desc = exp.description || `Gasto #${idx + 1}`;
+                const amount = this.formatEuro(exp.amount || 0);
+                const payer = exp.payer || exp.user || 'Desconocido';
+                let splitText = 'Todos';
+                if (Array.isArray(exp.beneficiaries) && exp.beneficiaries.length > 0) {
+                    if (allParticipants.length > 0 && exp.beneficiaries.length >= allParticipants.length) {
+                        splitText = 'Todos';
+                    } else {
+                        splitText = `${exp.beneficiaries.length} pers.`;
+                    }
+                }
+                text += `• ${desc}: ${amount} (Pagó ${payer} · ${splitText})\n`;
+            });
+            text += `\n`;
+        }
+
+        // 2. Gastos y pagos por persona / pareja con detalle de aportaciones
         text += `👥 *GASTOS Y PAGOS POR PERSONA / PAREJA:*\n`;
         if (partyBalances.units && partyBalances.units.length > 0) {
             partyBalances.units.forEach(u => {
@@ -8162,10 +8214,18 @@ Reglas obligatorias:
 
                 text += `• *${u.displayName}${coupleTag}*\n`;
                 text += `   Gastó: ${this.formatEuro(u.spent)} · Pagó: ${this.formatEuro(u.paid)} ${statusLabel}\n`;
+
+                // Detalle de gastos que pagó esta persona/pareja
+                const paidList = expenses.filter(e => u.names.includes(e.payer || e.user));
+                if (paidList.length > 0) {
+                    const paidDesc = paidList.map(e => `${e.description || 'Gasto'} (${this.formatEuro(e.amount)})`).join(', ');
+                    text += `   💳 Pagó: ${paidDesc}\n`;
+                }
             });
             text += `\n`;
         }
 
+        // 3. Deudas y reembolsos
         if (partyBalances.debts && partyBalances.debts.length > 0) {
             text += `⚖️ *DEUDAS PENDIENTES / REEMBOLSOS:*\n`;
             partyBalances.debts.forEach(d => {
