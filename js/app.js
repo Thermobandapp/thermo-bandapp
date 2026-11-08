@@ -32,7 +32,14 @@ const App = {
         tempLoginCode: null,
         couples: {},
         theme: 'dark',
-        fontSize: 'small'
+        fontSize: 'small',
+        historyTables: [],
+        historyParties: [],
+        historyCurrentTab: 'tables',
+        historySearchQuery: '',
+        previousView: 'setup',
+        historyActiveDetailTab: 'ticket',
+        historyActivePartyDetailTab: 'balances'
     },
 
     init() {
@@ -331,7 +338,8 @@ const App = {
             settle: document.getElementById('settle-view'),
             'party-pot': document.getElementById('party-pot-view'),
             'admin-view': document.getElementById('admin-view'),
-            'login-view': document.getElementById('login-view')
+            'login-view': document.getElementById('login-view'),
+            'history-view': document.getElementById('history-view')
         };
         this.inputs = {
             userName: document.getElementById('user-name'),
@@ -2972,7 +2980,7 @@ const App = {
         this.state.currentView = viewName;
 
         // Gestión de visibilidad de navegación y botones contextuales
-        if (viewName === 'setup' || viewName === 'login-view' || viewName === 'admin-view') {
+        if (viewName === 'setup' || viewName === 'login-view' || viewName === 'admin-view' || viewName === 'history-view') {
             this.nav.classList.add('hidden');
             this.buttons.leaveTable.classList.add('hidden');
         } else {
@@ -6839,6 +6847,793 @@ Reglas obligatorias:
         `;
 
         this.openModal(html);
+    },
+
+    // ==========================================
+    // HISTORIAL Y ARCHIVO DE QUEDADAS (MESAS Y FIESTAS)
+    // ==========================================
+
+    showHistoryView() {
+        if (this.state.currentView !== 'history-view') {
+            this.state.previousView = this.state.currentView || 'setup';
+        }
+        this.showView('history-view');
+        this.loadHistory();
+    },
+
+    closeHistoryView() {
+        const target = this.state.previousView || 'setup';
+        this.showView(target);
+    },
+
+    switchHistoryTab(tab) {
+        this.state.historyCurrentTab = tab;
+        const tabTables = document.getElementById('history-tab-tables');
+        const tabParties = document.getElementById('history-tab-parties');
+        if (tabTables) tabTables.classList.toggle('active', tab === 'tables');
+        if (tabParties) tabParties.classList.toggle('active', tab === 'parties');
+        this.renderHistoryList();
+    },
+
+    filterHistory() {
+        const input = document.getElementById('history-search-input');
+        this.state.historySearchQuery = (input ? input.value : '').toLowerCase().trim();
+        this.renderHistoryList();
+    },
+
+    extractDateFromTableId(id) {
+        if (!id || typeof id !== 'string') return null;
+        const m = id.match(/(\d{4})(\d{2})(\d{2})/);
+        if (m) {
+            const year = parseInt(m[1], 10);
+            const month = parseInt(m[2], 10) - 1;
+            const day = parseInt(m[3], 10);
+            const d = new Date(year, month, day, 21, 0, 0);
+            return isNaN(d.getTime()) ? null : d.getTime();
+        }
+        return null;
+    },
+
+    formatDateTime(timestamp) {
+        if (!timestamp) return 'Fecha no registrada';
+        const d = new Date(timestamp);
+        if (isNaN(d.getTime())) return 'Fecha no registrada';
+        return d.toLocaleDateString('es-ES', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    },
+
+    calculateHistoricalTableSummary(tableData) {
+        const orders = Object.values(tableData.orders || {});
+        const participants = Object.values(tableData.participants || {});
+        const totalBill = orders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+
+        const userTotals = {};
+        const userOrders = {};
+        const alcoholByUser = {};
+
+        participants.forEach(p => {
+            if (p && p.name) {
+                userTotals[p.name] = 0;
+                userOrders[p.name] = [];
+                alcoholByUser[p.name] = 0;
+            }
+        });
+
+        const ticketItems = {};
+
+        orders.forEach(o => {
+            if (!o) return;
+            const price = Number(o.price) || 0;
+            const pName = o.productName || 'Consumición';
+
+            if (!ticketItems[pName]) {
+                ticketItems[pName] = { qty: 0, price: price, total: 0 };
+            }
+            ticketItems[pName].qty += 1;
+            ticketItems[pName].total += price;
+
+            // Alcohol puro
+            const pureCl = (Number(o.cl) > 0 && Number(o.alcohol) > 0)
+                ? (Number(o.cl) * (Number(o.alcohol) / 100))
+                : 0;
+
+            if (o.user === 'SHARED') {
+                let bens = Array.isArray(o.beneficiaries) && o.beneficiaries.length > 0
+                    ? o.beneficiaries
+                    : participants.map(p => p.name);
+                if (bens.length === 0) bens = ['Todos'];
+                const share = price / bens.length;
+                const shareAlc = pureCl / bens.length;
+                bens.forEach(u => {
+                    userTotals[u] = (userTotals[u] || 0) + share;
+                    if (!userOrders[u]) userOrders[u] = [];
+                    userOrders[u].push({ name: `${pName} (Escote)`, price: share, isShared: true });
+                    alcoholByUser[u] = (alcoholByUser[u] || 0) + shareAlc;
+                });
+            } else if (o.user) {
+                userTotals[o.user] = (userTotals[o.user] || 0) + price;
+                if (!userOrders[o.user]) userOrders[o.user] = [];
+                userOrders[o.user].push({ name: pName, price: price, isShared: false });
+                alcoholByUser[o.user] = (alcoholByUser[o.user] || 0) + pureCl;
+            }
+        });
+
+        const drinkers = Object.entries(alcoholByUser)
+            .filter(([, cl]) => cl > 0.05)
+            .sort((a, b) => b[1] - a[1]);
+
+        return { totalBill, userTotals, userOrders, ticketItems, drinkers };
+    },
+
+    async loadHistory(forceRefresh = false) {
+        const container = document.getElementById('history-list-container');
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 2rem 1rem;">
+                    <div class="loader" style="margin: 0 auto 1rem;"></div>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Cargando quedadas de Firebase...</p>
+                </div>
+            `;
+        }
+
+        try {
+            // 1. Cargar mesas
+            const tablesSnap = await get(ref(this.db, 'tables'));
+            const tablesList = [];
+            if (tablesSnap.exists()) {
+                const allTables = tablesSnap.val();
+                for (const [id, tData] of Object.entries(allTables)) {
+                    if (!tData || id === 'null') continue;
+                    const date = tData.finishedAt || tData.createdAt || this.extractDateFromTableId(id) || Date.now();
+                    const orders = Object.values(tData.orders || {});
+                    const totalAmount = orders.reduce((s, o) => s + (Number(o.price) || 0), 0);
+                    const participantNames = Object.values(tData.participants || {}).map(p => p.name || '').filter(Boolean);
+
+                    let topDrinker = null;
+                    const alcMap = {};
+                    orders.forEach(o => {
+                        if (o && o.user && o.user !== 'SHARED' && Number(o.cl) > 0 && Number(o.alcohol) > 0) {
+                            const clPure = Number(o.cl) * (Number(o.alcohol) / 100);
+                            alcMap[o.user] = (alcMap[o.user] || 0) + clPure;
+                        }
+                    });
+                    const sortedDrinkers = Object.entries(alcMap).sort((a, b) => b[1] - a[1]);
+                    if (sortedDrinkers.length > 0) {
+                        topDrinker = `${sortedDrinkers[0][0]} (${sortedDrinkers[0][1].toFixed(1)} cl)`;
+                    }
+
+                    tablesList.push({
+                        id,
+                        name: tData.name || id,
+                        status: tData.status || 'closed',
+                        date,
+                        totalAmount,
+                        participantCount: participantNames.length,
+                        orderCount: orders.length,
+                        participants: participantNames,
+                        topDrinker,
+                        raw: tData
+                    });
+                }
+            }
+
+            tablesList.sort((a, b) => b.date - a.date);
+            this.state.historyTables = tablesList;
+
+            // 2. Cargar fiestas
+            const partiesSnap = await get(ref(this.db, 'party_pots'));
+            const partiesList = [];
+            if (partiesSnap.exists()) {
+                const allParties = partiesSnap.val();
+                for (const [id, pData] of Object.entries(allParties)) {
+                    if (!pData || id === 'null') continue;
+                    const date = pData.finishedAt || pData.createdAt || Date.now();
+                    const history = Object.values(pData.history || {});
+                    const expenses = history.filter(h => h.type === 'expense');
+                    const incomes = history.filter(h => h.type === 'income');
+
+                    const totalCollected = pData.totalCollected !== undefined 
+                        ? Number(pData.totalCollected) 
+                        : incomes.reduce((s, h) => s + (Number(h.amount) || 0), 0);
+                    const totalSpent = pData.totalSpent !== undefined 
+                        ? Number(pData.totalSpent) 
+                        : expenses.reduce((s, h) => s + (Number(h.amount) || 0), 0);
+
+                    const participantNames = Object.values(pData.participants || {}).map(p => p.name || '').filter(Boolean);
+
+                    partiesList.push({
+                        id,
+                        name: pData.name || id,
+                        status: pData.status || 'finished',
+                        date,
+                        totalCollected,
+                        totalSpent,
+                        participantCount: participantNames.length,
+                        expenseCount: expenses.length,
+                        participants: participantNames,
+                        raw: pData
+                    });
+                }
+            }
+
+            partiesList.sort((a, b) => b.date - a.date);
+            this.state.historyParties = partiesList;
+
+            const badgeTables = document.getElementById('history-badge-tables');
+            const badgeParties = document.getElementById('history-badge-parties');
+            if (badgeTables) badgeTables.textContent = `(${tablesList.length})`;
+            if (badgeParties) badgeParties.textContent = `(${partiesList.length})`;
+
+            this.renderHistoryList();
+        } catch (error) {
+            console.error('Error cargando historial de Firebase:', error);
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 2rem 1rem; color: #ef4444;">
+                        <p style="font-weight: 700; margin-bottom: 0.5rem;">⚠️ Error de conexión</p>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">No se pudo conectar con Firebase para leer el historial.</p>
+                        <button class="btn-primary" onclick="App.loadHistory(true)" style="padding: 0.5rem 1rem;">Reintentar</button>
+                    </div>
+                `;
+            }
+        }
+    },
+
+    renderHistoryList() {
+        const container = document.getElementById('history-list-container');
+        if (!container) return;
+
+        const isTables = this.state.historyCurrentTab === 'tables';
+        const rawList = isTables ? this.state.historyTables : this.state.historyParties;
+        const q = this.state.historySearchQuery;
+
+        const filtered = rawList.filter(item => {
+            if (!q) return true;
+            const nameMatch = (item.name || '').toLowerCase().includes(q);
+            const idMatch = (item.id || '').toLowerCase().includes(q);
+            const dateMatch = this.formatDateTime(item.date).toLowerCase().includes(q);
+            const partMatch = (item.participants || []).some(p => p.toLowerCase().includes(q));
+            return nameMatch || idMatch || dateMatch || partMatch;
+        });
+
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 2.5rem 1rem;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">${isTables ? '🍻' : '🍹'}</div>
+                    <p style="font-weight: 600; color: var(--text-main); margin-bottom: 0.25rem;">
+                        ${q ? 'No se encontraron quedadas' : (isTables ? 'Aún no hay mesas registradas' : 'Aún no hay fiestas registradas')}
+                    </p>
+                    <p style="font-size: 0.82rem; color: var(--text-muted);">
+                        ${q ? `No hay coincidencias con "${q}". Prueba con otro término.` : 'Cuando se cierren mesas o finalicen fiestas en la app, aparecerán aquí para consultarlas.'}
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(item => {
+            const dateStr = this.formatDateTime(item.date);
+            const isClosed = item.status === 'closed' || item.status === 'finished';
+
+            if (isTables) {
+                html += `
+                    <div class="history-card glass" onclick="App.showHistoryTableDetail('${item.id}')" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 0.85rem 1rem; cursor: pointer; text-align: left;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+                            <div style="flex: 1; overflow: hidden;">
+                                <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                                    <span style="font-size: 1.25rem;">🍻</span>
+                                    <span style="font-weight: 700; font-size: 1rem; color: var(--text-main, #ffffff);">${item.name}</span>
+                                    <span style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; ${isClosed ? 'background: rgba(107, 114, 128, 0.2); color: #9ca3af;' : 'background: rgba(16, 185, 129, 0.2); color: #34d399;'}">
+                                        ${isClosed ? '🔒 Cerrada' : '🟢 Activa'}
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                    📅 ${dateStr}
+                                </div>
+                            </div>
+                            <div style="text-align: right; white-space: nowrap;">
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #10b981;">
+                                    ${this.formatEuro(item.totalAmount)}
+                                </div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">
+                                    total
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.6rem; align-items: center;">
+                            <span style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                                👥 ${item.participantCount} personas
+                            </span>
+                            <span style="font-size: 0.75rem; background: rgba(255, 255, 255, 0.08); color: var(--text-muted); padding: 0.18rem 0.45rem; border-radius: 4px;">
+                                🛒 ${item.orderCount} consumiciones
+                            </span>
+                            ${item.topDrinker ? `
+                                <span style="font-size: 0.75rem; background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                                    🏆 ${item.topDrinker}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="history-card glass" onclick="App.showHistoryPartyDetail('${item.id}')" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 0.85rem 1rem; cursor: pointer; text-align: left;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+                            <div style="flex: 1; overflow: hidden;">
+                                <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                                    <span style="font-size: 1.25rem;">🍹</span>
+                                    <span style="font-weight: 700; font-size: 1rem; color: var(--text-main, #ffffff);">${item.name}</span>
+                                    <span style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; ${isClosed ? 'background: rgba(107, 114, 128, 0.2); color: #9ca3af;' : 'background: rgba(16, 185, 129, 0.2); color: #34d399;'}">
+                                        ${isClosed ? '🔒 Finalizada' : '🟢 En curso'}
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                    📅 ${dateStr}
+                                </div>
+                            </div>
+                            <div style="text-align: right; white-space: nowrap;">
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #f59e0b;">
+                                    ${this.formatEuro(item.totalSpent)}
+                                </div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">
+                                    gastado
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.6rem; align-items: center;">
+                            <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                                💰 Bote: ${this.formatEuro(item.totalCollected)}
+                            </span>
+                            <span style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                                👥 ${item.participantCount} amigos
+                            </span>
+                            <span style="font-size: 0.75rem; background: rgba(255, 255, 255, 0.08); color: var(--text-muted); padding: 0.18rem 0.45rem; border-radius: 4px;">
+                                🛒 ${item.expenseCount} gastos
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        container.innerHTML = html;
+    },
+
+    showHistoryTableDetail(tableId) {
+        const item = this.state.historyTables.find(t => t.id === tableId);
+        if (!item || !item.raw) return alert('No se encontraron datos para esta mesa.');
+
+        this.state.historyActiveDetailTab = this.state.historyActiveDetailTab || 'ticket';
+        this.renderHistoryTableDetailModal(item);
+    },
+
+    switchHistoryModalTab(tab, tableId) {
+        this.state.historyActiveDetailTab = tab;
+        const item = this.state.historyTables.find(t => t.id === tableId);
+        if (item) this.renderHistoryTableDetailModal(item);
+    },
+
+    renderHistoryTableDetailModal(item) {
+        const raw = item.raw;
+        const summary = this.calculateHistoricalTableSummary(raw);
+        const dateStr = this.formatDateTime(item.date);
+        const currentTab = this.state.historyActiveDetailTab || 'ticket';
+
+        let bodyHtml = '';
+
+        if (currentTab === 'ticket') {
+            const ticketEntries = Object.entries(summary.ticketItems);
+            if (ticketEntries.length === 0) {
+                bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No se registraron consumiciones en el ticket.</p>';
+            } else {
+                bodyHtml = `
+                    <div style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 0.75rem; max-height: 48vh; overflow-y: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.78rem;">
+                                    <th style="padding: 0.4rem 0.2rem;">Cant.</th>
+                                    <th style="padding: 0.4rem 0.2rem;">Artículo</th>
+                                    <th style="padding: 0.4rem 0.2rem; text-align: right;">Precio</th>
+                                    <th style="padding: 0.4rem 0.2rem; text-align: right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${ticketEntries.map(([name, data]) => `
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                        <td style="padding: 0.5rem 0.2rem; font-weight: 700; color: var(--primary);">${data.qty}x</td>
+                                        <td style="padding: 0.5rem 0.2rem; font-weight: 600;">${name}</td>
+                                        <td style="padding: 0.5rem 0.2rem; text-align: right; color: var(--text-muted);">${this.formatEuro(data.price)}</td>
+                                        <td style="padding: 0.5rem 0.2rem; text-align: right; font-weight: 700;">${this.formatEuro(data.total)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+        } else if (currentTab === 'cuentas') {
+            const userEntries = Object.entries(summary.userTotals).sort((a, b) => b[1] - a[1]);
+            if (userEntries.length === 0) {
+                bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay participantes registrados.</p>';
+            } else {
+                bodyHtml = `
+                    <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 48vh; overflow-y: auto;">
+                        ${userEntries.map(([name, total]) => {
+                            const orders = summary.userOrders[name] || [];
+                            return `
+                                <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.65rem 0.8rem; text-align: left;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                        <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">${name}</span>
+                                        <span style="font-weight: 800; font-size: 1rem; color: #10b981;">${this.formatEuro(total)}</span>
+                                    </div>
+                                    <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
+                                        ${orders.length > 0 ? orders.map(o => `${o.name} (${this.formatEuro(o.price)})`).join(' · ') : 'Sin pedidos directos'}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+        } else if (currentTab === 'borrachuzo') {
+            if (summary.drinkers.length === 0) {
+                bodyHtml = `
+                    <div style="text-align: center; padding: 2rem 1rem;">
+                        <span style="font-size: 2.5rem;">😇</span>
+                        <p style="font-weight: 600; margin-top: 0.5rem;">¡Todos sobrios en esta mesa!</p>
+                        <p style="font-size: 0.8rem; color: var(--text-muted);">No se registraron bebidas con graduación alcohólica.</p>
+                    </div>
+                `;
+            } else {
+                const maxAlc = summary.drinkers[0][1];
+                const winners = summary.drinkers.filter(([, cl]) => Math.abs(cl - maxAlc) < 0.05).map(([n]) => n);
+                const equivCanas = (maxAlc / 1.0).toFixed(1).replace('.0', '');
+
+                bodyHtml = `
+                    <div style="background: #fdf2f8; border: 2px solid #ec4899; border-radius: 12px; padding: 1rem; margin-bottom: 0.85rem; text-align: center;">
+                        <p style="margin: 0 0 0.35rem; font-weight: 700; color: #be185d; font-size: 0.95rem;">
+                            🏆 ${winners.length > 1 ? 'Borrachuzos' : 'Borrachuzo'}:
+                        </p>
+                        <p style="font-size: 1.25rem; margin: 0 0 0.25rem; color: #111827; font-weight: 800;">
+                            🍺 ${winners.join(', ')}
+                        </p>
+                        <p style="color: #d97706; font-size: 1rem; margin: 0; font-weight: 700;">
+                            ${maxAlc.toFixed(1)} cl <span style="font-size: 0.85rem; color: #4b5563; font-weight: 600;">(≈ ${equivCanas} cañas)</span>
+                        </p>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 32vh; overflow-y: auto;">
+                        ${summary.drinkers.map(([name, pureCl], idx) => {
+                            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`;
+                            const canas = (pureCl / 1.0).toFixed(1).replace('.0', '');
+                            return `
+                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; background: #ffffff; padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                                    <span style="color: #111827 !important; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                                        <span>${medal}</span>
+                                        <span style="color: #111827 !important;">${name}</span>
+                                    </span>
+                                    <span style="font-weight: 700; color: #d97706;">
+                                        ${pureCl.toFixed(1)} cl <span style="font-size: 0.78rem; color: #6b7280; font-weight: 500;">(≈${canas}🍺)</span>
+                                    </span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        const modalHtml = `
+            <div style="text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span style="font-size: 1.3rem;">🍻</span>
+                            <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">${item.name}</h3>
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
+                            📅 ${dateStr}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 1.25rem; font-weight: 800; color: #10b981;">${this.formatEuro(summary.totalBill)}</span>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">total cuenta</div>
+                    </div>
+                </div>
+
+                <div style="display: inline-block; font-size: 0.72rem; padding: 0.2rem 0.55rem; background: rgba(99, 102, 241, 0.12); color: #818cf8; border-radius: 4px; font-weight: 600; margin-bottom: 0.75rem;">
+                    🔒 Mesa Archivada en Firebase
+                </div>
+
+                <!-- Sub-pestañas -->
+                <div style="display: flex; gap: 0.35rem; margin-bottom: 0.85rem;">
+                    <button type="button" class="modal-subtab-btn ${currentTab === 'ticket' ? 'active' : ''}" onclick="App.switchHistoryModalTab('ticket', '${item.id}')">
+                        🧾 Ticket (${Object.keys(summary.ticketItems).length})
+                    </button>
+                    <button type="button" class="modal-subtab-btn ${currentTab === 'cuentas' ? 'active' : ''}" onclick="App.switchHistoryModalTab('cuentas', '${item.id}')">
+                        👥 Cuentas (${Object.keys(summary.userTotals).length})
+                    </button>
+                    <button type="button" class="modal-subtab-btn ${currentTab === 'borrachuzo' ? 'active' : ''}" onclick="App.switchHistoryModalTab('borrachuzo', '${item.id}')">
+                        🏆 Borrachuzo
+                    </button>
+                </div>
+
+                <!-- Contenido -->
+                ${bodyHtml}
+
+                <!-- Botones inferiores -->
+                <div style="display: flex; gap: 0.6rem; margin-top: 1rem;">
+                    <button type="button" class="btn-primary" onclick="App.copyTableSummaryWhatsApp('${item.id}')" style="flex: 1; padding: 0.75rem; font-size: 0.9rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
+                        📋 Copiar para WhatsApp
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1.2rem;">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        this.openModal(modalHtml, true);
+    },
+
+    showHistoryPartyDetail(partyId) {
+        const item = this.state.historyParties.find(p => p.id === partyId);
+        if (!item || !item.raw) return alert('No se encontraron datos para esta fiesta.');
+
+        this.state.historyActivePartyDetailTab = this.state.historyActivePartyDetailTab || 'balances';
+        this.renderHistoryPartyDetailModal(item);
+    },
+
+    switchHistoryPartyModalTab(tab, partyId) {
+        this.state.historyActivePartyDetailTab = tab;
+        const item = this.state.historyParties.find(p => p.id === partyId);
+        if (item) this.renderHistoryPartyDetailModal(item);
+    },
+
+    renderHistoryPartyDetailModal(item) {
+        const raw = item.raw;
+        const history = Object.values(raw.history || {}).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const expenses = history.filter(h => h.type === 'expense');
+        const incomes = history.filter(h => h.type === 'income');
+        const participants = Object.values(raw.participants || {});
+        const dateStr = this.formatDateTime(item.date);
+        const currentTab = this.state.historyActivePartyDetailTab || 'balances';
+
+        const totalCollected = item.totalCollected;
+        const totalSpent = item.totalSpent;
+        const remaining = totalCollected - totalSpent;
+
+        const balances = {};
+        participants.forEach(p => {
+            if (p && p.name) {
+                balances[p.name] = { contributed: 0, consumed: 0, balance: 0 };
+            }
+        });
+
+        incomes.forEach(inc => {
+            const friend = inc.friend || inc.user;
+            if (friend) {
+                if (!balances[friend]) balances[friend] = { contributed: 0, consumed: 0, balance: 0 };
+                balances[friend].contributed += (Number(inc.amount) || 0);
+            }
+        });
+
+        expenses.forEach(exp => {
+            const amount = Number(exp.amount) || 0;
+            let bens = Array.isArray(exp.beneficiaries) && exp.beneficiaries.length > 0
+                ? exp.beneficiaries
+                : participants.map(p => p.name);
+            if (bens.length === 0) bens = ['Todos'];
+            const share = amount / bens.length;
+            bens.forEach(b => {
+                if (!balances[b]) balances[b] = { contributed: 0, consumed: 0, balance: 0 };
+                balances[b].consumed += share;
+            });
+        });
+
+        Object.values(balances).forEach(b => {
+            b.balance = b.contributed - b.consumed;
+        });
+
+        let bodyHtml = '';
+
+        if (currentTab === 'balances') {
+            const balanceEntries = Object.entries(balances).sort((a, b) => b[1].balance - a[1].balance);
+            bodyHtml = `
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.85rem; text-align: center;">
+                    <div style="flex: 1; padding: 0.5rem; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px;">
+                        <span style="font-size: 0.72rem; color: #34d399; font-weight: 600; display: block;">Recaudado</span>
+                        <span style="font-weight: 800; font-size: 1rem; color: #10b981;">${this.formatEuro(totalCollected)}</span>
+                    </div>
+                    <div style="flex: 1; padding: 0.5rem; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px;">
+                        <span style="font-size: 0.72rem; color: #fbbf24; font-weight: 600; display: block;">Gastado</span>
+                        <span style="font-weight: 800; font-size: 1rem; color: #f59e0b;">${this.formatEuro(totalSpent)}</span>
+                    </div>
+                    <div style="flex: 1; padding: 0.5rem; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px;">
+                        <span style="font-size: 0.72rem; color: #818cf8; font-weight: 600; display: block;">Sobrante</span>
+                        <span style="font-weight: 800; font-size: 1rem; color: #a5b4fc;">${this.formatEuro(remaining)}</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 44vh; overflow-y: auto;">
+                    ${balanceEntries.map(([name, b]) => {
+                        const isPlus = b.balance >= 0.01;
+                        const isMinus = b.balance <= -0.01;
+                        const color = isPlus ? '#10b981' : (isMinus ? '#ef4444' : 'var(--text-muted)');
+                        const label = isPlus ? `Devolver ${this.formatEuro(b.balance)}` : (isMinus ? `Debe ${this.formatEuro(Math.abs(b.balance))}` : 'En paz (0 €)');
+                        return `
+                            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.55rem 0.75rem;">
+                                <div>
+                                    <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-main);">${name}</span>
+                                    <div style="font-size: 0.74rem; color: var(--text-muted);">
+                                        Puso ${this.formatEuro(b.contributed)} · Consumió ${this.formatEuro(b.consumed)}
+                                    </div>
+                                </div>
+                                <div style="text-align: right; font-weight: 800; font-size: 0.92rem; color: ${color};">
+                                    ${label}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        } else if (currentTab === 'expenses') {
+            if (expenses.length === 0) {
+                bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay gastos registrados en esta fiesta.</p>';
+            } else {
+                bodyHtml = `
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 48vh; overflow-y: auto;">
+                        ${expenses.map(exp => `
+                            <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; text-align: left;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                                    <span style="font-weight: 600; font-size: 0.92rem;">${exp.description || 'Gasto'}</span>
+                                    <span style="font-weight: 800; font-size: 0.95rem; color: #ef4444;">-${this.formatEuro(exp.amount || 0)}</span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                                    ${exp.payer ? `Pagado por <b>${exp.payer}</b>` : ''} 
+                                    ${exp.beneficiaries ? `(${exp.beneficiaries.length} beneficiarios)` : '(Todos)'}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        } else if (currentTab === 'incomes') {
+            if (incomes.length === 0) {
+                bodyHtml = '<p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">No hay aportaciones al bote registradas.</p>';
+            } else {
+                bodyHtml = `
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 48vh; overflow-y: auto;">
+                        ${incomes.map(inc => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
+                                <div>
+                                    <span style="font-weight: 700; font-size: 0.92rem;">${inc.friend || inc.user || 'Amigo'}</span>
+                                    <div style="font-size: 0.74rem; color: var(--text-muted);">${inc.description || 'Aporte al bote'}</div>
+                                </div>
+                                <span style="font-weight: 800; font-size: 0.95rem; color: #10b981;">+${this.formatEuro(inc.amount || 0)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        const modalHtml = `
+            <div style="text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span style="font-size: 1.3rem;">🍹</span>
+                            <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">${item.name}</h3>
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
+                            📅 ${dateStr}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 1.25rem; font-weight: 800; color: #f59e0b;">${this.formatEuro(totalSpent)}</span>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">gastado total</div>
+                    </div>
+                </div>
+
+                <div style="display: inline-block; font-size: 0.72rem; padding: 0.2rem 0.55rem; background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-radius: 4px; font-weight: 600; margin-bottom: 0.75rem;">
+                    🔒 Fiesta Archivada en Firebase
+                </div>
+
+                <!-- Sub-pestañas -->
+                <div style="display: flex; gap: 0.35rem; margin-bottom: 0.85rem;">
+                    <button type="button" class="modal-subtab-btn ${currentTab === 'balances' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('balances', '${item.id}')">
+                        ⚖️ Saldos (${Object.keys(balances).length})
+                    </button>
+                    <button type="button" class="modal-subtab-btn ${currentTab === 'expenses' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('expenses', '${item.id}')">
+                        🛒 Gastos (${expenses.length})
+                    </button>
+                    <button type="button" class="modal-subtab-btn ${currentTab === 'incomes' ? 'active' : ''}" onclick="App.switchHistoryPartyModalTab('incomes', '${item.id}')">
+                        💰 Bote (${incomes.length})
+                    </button>
+                </div>
+
+                <!-- Contenido -->
+                ${bodyHtml}
+
+                <!-- Botones inferiores -->
+                <div style="display: flex; gap: 0.6rem; margin-top: 1rem;">
+                    <button type="button" class="btn-primary" onclick="App.copyPartySummaryWhatsApp('${item.id}')" style="flex: 1; padding: 0.75rem; font-size: 0.9rem; font-weight: 700; background: #25D366; border: none; color: #ffffff;">
+                        📋 Copiar para WhatsApp
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="App.closeModal()" style="padding: 0.75rem 1.2rem;">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        this.openModal(modalHtml, true);
+    },
+
+    async copyTableSummaryWhatsApp(tableId) {
+        const item = this.state.historyTables.find(t => t.id === tableId);
+        if (!item || !item.raw) return;
+
+        const summary = this.calculateHistoricalTableSummary(item.raw);
+        const dateStr = this.formatDateTime(item.date);
+
+        let text = `🍻 *RESUMEN DE CUENTA - ${item.name.toUpperCase()}*\n`;
+        text += `📅 Fecha: ${dateStr}\n`;
+        text += `💶 *Total cuenta:* ${this.formatEuro(summary.totalBill)}\n\n`;
+
+        text += `👥 *CUENTAS POR PERSONA:*\n`;
+        Object.entries(summary.userTotals)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([user, tot]) => {
+                text += `• ${user}: ${this.formatEuro(tot)}\n`;
+            });
+
+        if (summary.drinkers.length > 0) {
+            const maxAlc = summary.drinkers[0][1];
+            const winners = summary.drinkers.filter(([, cl]) => Math.abs(cl - maxAlc) < 0.05).map(([n]) => n);
+            const equiv = (maxAlc / 1.0).toFixed(1).replace('.0', '');
+            text += `\n🏆 *Borrachuzo del día:* ${winners.join(', ')} (${maxAlc.toFixed(1)} cl · ≈${equiv} cañas)\n`;
+        }
+
+        text += `\n_Generado con Thermo Bandapp_ 📱`;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            alert('¡Resumen de la mesa copiado al portapapeles! Listo para pegar en WhatsApp 📋');
+        } catch (e) {
+            prompt('Copia el resumen para WhatsApp:', text);
+        }
+    },
+
+    async copyPartySummaryWhatsApp(partyId) {
+        const item = this.state.historyParties.find(p => p.id === partyId);
+        if (!item || !item.raw) return;
+
+        const dateStr = this.formatDateTime(item.date);
+        let text = `🍹 *RESUMEN DE FIESTA - ${item.name.toUpperCase()}*\n`;
+        text += `📅 Fecha: ${dateStr}\n`;
+        text += `💰 Bote recaudado: ${this.formatEuro(item.totalCollected)}\n`;
+        text += `💸 Total gastado: ${this.formatEuro(item.totalSpent)}\n`;
+        const remaining = item.totalCollected - item.totalSpent;
+        text += `⚖️ Bote sobrante: ${this.formatEuro(remaining)}\n\n`;
+        text += `_Generado con Thermo Bandapp_ 📱`;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            alert('¡Resumen de la fiesta copiado al portapapeles! Listo para pegar en WhatsApp 📋');
+        } catch (e) {
+            prompt('Copia el resumen para WhatsApp:', text);
+        }
     }
 };
 

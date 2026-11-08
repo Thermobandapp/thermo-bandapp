@@ -38,6 +38,9 @@
                 <button id="btn-toggle-theme" class="btn-theme-toggle" onclick="App.toggleTheme()" title="Cambiar a Modo Claro / Oscuro">
                     <span id="theme-toggle-icon">☀️</span>
                 </button>
+                <button id="btn-header-history" class="btn-theme-toggle" onclick="App.showHistoryView()" title="Historial de Quedadas">
+                    <span>📜</span>
+                </button>
                 <button id="btn-leave-table" class="btn-leave hidden">
                     <span>Dejar la mesa</span>
                     <span class="icon">🚪</span>
@@ -81,6 +84,13 @@
                     <div id="switch-member-btn" style="display: flex; justify-content: flex-end; margin-bottom: 0.75rem;">
                         <button class="btn-logout" onclick="localStorage.clear(); location.reload();" title="Cambiar de miembro" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.85rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
                             <span>👤</span> <span id="switch-member-name"></span> <span style="color: var(--text-muted); font-size: 0.75rem;">· Cambiar</span>
+                        </button>
+                    </div>
+
+                    <!-- Botón Historial de Quedadas (Mesas y Fiestas) -->
+                    <div style="display: flex; justify-content: center; margin-bottom: 0.85rem;">
+                        <button type="button" class="btn-secondary" onclick="App.showHistoryView()" style="background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; font-weight: 600; padding: 0.5rem 1.1rem; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.45rem; font-size: 0.88rem; box-shadow: 0 2px 6px rgba(0,0,0,0.15); width: 100%; justify-content: center;">
+                            <span>📜</span> <span>Historial de Mesas y Fiestas</span>
                         </button>
                     </div>
 
@@ -143,6 +153,43 @@
                             <div class="divider"><span>o</span></div>
                             <button id="btn-join-party-main" class="btn-secondary">Unirse a Fiesta Abierta</button>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VISTA: Historial de Quedadas (MESAS Y FIESTAS) -->
+            <section id="history-view" class="view">
+                <div class="card glass" style="padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                        <button type="button" class="btn-secondary" onclick="App.closeHistoryView()" style="padding: 0.4rem 0.85rem; font-size: 0.85rem;">
+                            ← Volver
+                        </button>
+                        <h2 style="margin: 0; font-size: 1.25rem;">📜 Historial</h2>
+                        <button type="button" class="btn-icon-small" onclick="App.loadHistory(true)" title="Recargar desde Firebase" style="padding: 0.4rem 0.6rem; font-size: 0.95rem;">
+                            🔄
+                        </button>
+                    </div>
+
+                    <p class="subtitle" style="margin-bottom: 0.85rem; font-size: 0.85rem;">Mesas y fiestas guardadas en Firebase</p>
+
+                    <!-- Pestañas: Mesas vs Fiestas -->
+                    <div class="setup-mode-selector" style="margin-bottom: 0.85rem;">
+                        <button type="button" id="history-tab-tables" class="mode-tab active" onclick="App.switchHistoryTab('tables')">
+                            🍻 Mesas <span id="history-badge-tables" style="font-size: 0.85em; opacity: 0.85;"></span>
+                        </button>
+                        <button type="button" id="history-tab-parties" class="mode-tab" onclick="App.switchHistoryTab('parties')">
+                            🍹 Fiestas <span id="history-badge-parties" style="font-size: 0.85em; opacity: 0.85;"></span>
+                        </button>
+                    </div>
+
+                    <!-- Buscador -->
+                    <div style="margin-bottom: 0.85rem;">
+                        <input type="text" id="history-search-input" placeholder="🔍 Buscar por bar, fiesta, fecha o amigo..." oninput="App.filterHistory()" style="width: 100%; padding: 0.65rem 0.85rem; font-size: 0.9rem; box-sizing: border-box; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); background: rgba(255,255,255,0.06); color: var(--text-main);">
+                    </div>
+
+                    <!-- Lista de resultados -->
+                    <div id="history-list-container" class="list-container" style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 62vh; overflow-y: auto; padding-right: 0.2rem;">
+                        <p class="empty-msg">Cargando quedadas de Firebase...</p>
                     </div>
                 </div>
             </section>
@@ -422,6 +469,6 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-    <script type="module" src="js/app.js?v=37"></script>
+    <script type="module" src="js/app.js?v=38"></script>
 </body>
 </html>
