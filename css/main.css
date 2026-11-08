@@ -1324,6 +1324,49 @@ body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
     height: 0 !important;
 }
 
+#history-view {
+    overflow-y: hidden;
+}
+
+/* Indicador de scroll de página que aparece al entrar y se oculta automáticamente */
+.page-scroll-track {
+    position: fixed;
+    right: max(3px, calc((100vw - 500px) / 2 + 3px));
+    top: calc(75px + env(safe-area-inset-top));
+    bottom: calc(75px + env(safe-area-inset-bottom));
+    width: 5px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    z-index: 95;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+body.light-theme .page-scroll-track {
+    background: rgba(44, 37, 35, 0.12);
+}
+
+.page-scroll-track.visible {
+    opacity: 1;
+}
+
+.page-scroll-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 28px;
+    background: #818cf8;
+    border-radius: 9999px;
+    box-shadow: 0 0 6px rgba(129, 140, 248, 0.6);
+}
+
+body.light-theme .page-scroll-thumb {
+    background: #c2410c;
+    box-shadow: 0 0 5px rgba(194, 65, 12, 0.4);
+}
+
 /* Indicador de scroll dentro de modales */
 .modal-scroll-track {
     position: absolute;
@@ -1336,7 +1379,7 @@ body.light-theme .dropdown-list::-webkit-scrollbar-thumb {
     z-index: 40;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 0.25s ease;
+    transition: opacity 0.3s ease;
 }
 
 body.light-theme .modal-scroll-track {
@@ -1375,7 +1418,7 @@ body.light-theme .modal-scroll-thumb {
     z-index: 10;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 0.25s ease;
+    transition: opacity 0.3s ease;
 }
 
 body.light-theme .history-scroll-track {

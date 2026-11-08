@@ -52,6 +52,8 @@ const App = {
         this.loadLocalSession();
         this.initDecimalNormalizer();
         this.initScrollFades();
+        this.updatePageScrollIndicator();
+        setTimeout(() => this.updatePageScrollIndicator(), 300);
     },
 
     initTheme() {
@@ -560,8 +562,10 @@ const App = {
             editTableBtn.addEventListener('click', () => this.handleRenameTable());
         }
 
-        // Monitoreo de resize para indicadores visuales de scroll
+        // Monitoreo de scroll y resize para indicadores visuales de scroll
+        window.addEventListener('scroll', () => this.updatePageScrollIndicator(), { passive: true });
         window.addEventListener('resize', () => {
+            this.updatePageScrollIndicator();
             this.updateModalScrollIndicator();
             this.updateHistoryScrollIndicator();
         }, { passive: true });
@@ -3099,6 +3103,18 @@ const App = {
                 }
             }
         }
+
+        // Mostrar indicadores de scroll relevantes al entrar a la nueva pantalla
+        this.updatePageScrollIndicator();
+        this.updateHistoryScrollIndicator();
+        setTimeout(() => {
+            this.updatePageScrollIndicator();
+            this.updateHistoryScrollIndicator();
+        }, 80);
+        setTimeout(() => {
+            this.updatePageScrollIndicator();
+            this.updateHistoryScrollIndicator();
+        }, 300);
     },
 
     async handleLeaveTable() {
@@ -5888,9 +5904,14 @@ const App = {
 
         const modalTrack = document.getElementById('modal-scroll-track');
         if (modalTrack) modalTrack.classList.remove('visible');
+        clearTimeout(this._modalScrollTimer);
 
         this.display.modalOverlay.classList.add('hidden');
         document.body.classList.remove('modal-open');
+
+        // Restaurar indicador de página al salir del modal
+        this.updatePageScrollIndicator();
+        setTimeout(() => this.updatePageScrollIndicator(), 80);
 
         if (orderProduct && selectedParticipants && selectedParticipants.length > 0) {
             this.addOrder(orderProduct, selectedParticipants);
@@ -5898,7 +5919,60 @@ const App = {
     },
 
     // --- MÉTODOS DE SCROLL FADE INFERIOR Y SCROLLBARS ---
-    updateModalScrollIndicator() {
+    updatePageScrollIndicator(autoHide = true) {
+        const trackEl = document.getElementById('page-scroll-track');
+        const thumbEl = document.getElementById('page-scroll-thumb');
+        if (!trackEl || !thumbEl) return;
+
+        const activeView = document.querySelector('.view.active');
+        // Si hay un modal abierto o estamos en Historial (que tiene su propia barra interna), no mostramos la barra de página
+        if (document.body.classList.contains('modal-open') || (activeView && activeView.id === 'history-view')) {
+            trackEl.classList.remove('visible');
+            clearTimeout(this._pageScrollTimer);
+            return;
+        }
+
+        const docEl = document.documentElement;
+        const body = document.body;
+        const scrollHeight = Math.max(docEl.scrollHeight, body.scrollHeight);
+        const clientHeight = window.innerHeight;
+        const hasScroll = scrollHeight > (clientHeight + 15);
+
+        if (!hasScroll) {
+            trackEl.classList.remove('visible');
+            clearTimeout(this._pageScrollTimer);
+            return;
+        }
+
+        // Ajustar posición inferior según si la barra de navegación está visible o no
+        const nav = document.querySelector('.main-nav');
+        const hasNav = nav && !nav.classList.contains('hidden');
+        trackEl.style.bottom = hasNav ? 'calc(75px + env(safe-area-inset-bottom))' : 'calc(20px + env(safe-area-inset-bottom))';
+
+        const trackHeight = trackEl.clientHeight;
+        if (trackHeight > 0) {
+            const thumbHeight = Math.max(28, (clientHeight / scrollHeight) * trackHeight);
+            const scrollTop = window.scrollY || window.pageYOffset || docEl.scrollTop || 0;
+            const maxScroll = scrollHeight - clientHeight;
+            const scrollRatio = maxScroll > 0 ? (scrollTop / maxScroll) : 0;
+            const maxThumbTop = trackHeight - thumbHeight;
+            const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
+
+            thumbEl.style.height = `${thumbHeight}px`;
+            thumbEl.style.top = `${thumbTop}px`;
+        }
+
+        trackEl.classList.add('visible');
+
+        clearTimeout(this._pageScrollTimer);
+        if (autoHide) {
+            this._pageScrollTimer = setTimeout(() => {
+                trackEl.classList.remove('visible');
+            }, 1500);
+        }
+    },
+
+    updateModalScrollIndicator(autoHide = true) {
         const trackEl = document.getElementById('modal-scroll-track');
         const thumbEl = document.getElementById('modal-scroll-thumb');
         const modalCard = document.querySelector('.modal-card');
@@ -5907,6 +5981,7 @@ const App = {
         const overlay = document.getElementById('modal-overlay');
         if (!overlay || overlay.classList.contains('hidden')) {
             trackEl.classList.remove('visible');
+            clearTimeout(this._modalScrollTimer);
             return;
         }
 
@@ -5917,6 +5992,7 @@ const App = {
 
         if (!scrollable) {
             trackEl.classList.remove('visible');
+            clearTimeout(this._modalScrollTimer);
             return;
         }
 
@@ -5926,6 +6002,7 @@ const App = {
 
         if (!hasScroll) {
             trackEl.classList.remove('visible');
+            clearTimeout(this._modalScrollTimer);
             return;
         }
 
@@ -5937,27 +6014,35 @@ const App = {
 
         trackEl.style.top = `${topOffset}px`;
         trackEl.style.bottom = `${bottomOffset}px`;
-        trackEl.classList.add('visible');
 
         if (!scrollable._modalIndicatorListening) {
             scrollable._modalIndicatorListening = true;
-            scrollable.addEventListener('scroll', () => this.updateModalScrollIndicator(), { passive: true });
+            scrollable.addEventListener('scroll', () => this.updateModalScrollIndicator(true), { passive: true });
         }
 
         const trackHeight = trackEl.clientHeight;
-        if (trackHeight <= 0) return;
+        if (trackHeight > 0) {
+            const thumbHeight = Math.max(24, (clientHeight / scrollHeight) * trackHeight);
+            const maxScroll = scrollHeight - clientHeight;
+            const scrollRatio = maxScroll > 0 ? (scrollable.scrollTop / maxScroll) : 0;
+            const maxThumbTop = trackHeight - thumbHeight;
+            const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
 
-        const thumbHeight = Math.max(24, (clientHeight / scrollHeight) * trackHeight);
-        const maxScroll = scrollHeight - clientHeight;
-        const scrollRatio = maxScroll > 0 ? (scrollable.scrollTop / maxScroll) : 0;
-        const maxThumbTop = trackHeight - thumbHeight;
-        const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
+            thumbEl.style.height = `${thumbHeight}px`;
+            thumbEl.style.top = `${thumbTop}px`;
+        }
 
-        thumbEl.style.height = `${thumbHeight}px`;
-        thumbEl.style.top = `${thumbTop}px`;
+        trackEl.classList.add('visible');
+
+        clearTimeout(this._modalScrollTimer);
+        if (autoHide) {
+            this._modalScrollTimer = setTimeout(() => {
+                trackEl.classList.remove('visible');
+            }, 1500);
+        }
     },
 
-    updateHistoryScrollIndicator() {
+    updateHistoryScrollIndicator(autoHide = true) {
         const trackEl = document.getElementById('history-scroll-track');
         const thumbEl = document.getElementById('history-scroll-thumb');
         const listEl = document.getElementById('history-list-container');
@@ -5969,27 +6054,35 @@ const App = {
 
         if (!hasScroll) {
             trackEl.classList.remove('visible');
+            clearTimeout(this._historyScrollTimer);
             return;
+        }
+
+        if (!listEl._historyIndicatorListening) {
+            listEl._historyIndicatorListening = true;
+            listEl.addEventListener('scroll', () => this.updateHistoryScrollIndicator(true), { passive: true });
+        }
+
+        const trackHeight = trackEl.clientHeight;
+        if (trackHeight > 0) {
+            const thumbHeight = Math.max(24, (clientHeight / scrollHeight) * trackHeight);
+            const maxScroll = scrollHeight - clientHeight;
+            const scrollRatio = maxScroll > 0 ? (listEl.scrollTop / maxScroll) : 0;
+            const maxThumbTop = trackHeight - thumbHeight;
+            const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
+
+            thumbEl.style.height = `${thumbHeight}px`;
+            thumbEl.style.top = `${thumbTop}px`;
         }
 
         trackEl.classList.add('visible');
 
-        if (!listEl._historyIndicatorListening) {
-            listEl._historyIndicatorListening = true;
-            listEl.addEventListener('scroll', () => this.updateHistoryScrollIndicator(), { passive: true });
+        clearTimeout(this._historyScrollTimer);
+        if (autoHide) {
+            this._historyScrollTimer = setTimeout(() => {
+                trackEl.classList.remove('visible');
+            }, 1500);
         }
-
-        const trackHeight = trackEl.clientHeight;
-        if (trackHeight <= 0) return;
-
-        const thumbHeight = Math.max(24, (clientHeight / scrollHeight) * trackHeight);
-        const maxScroll = scrollHeight - clientHeight;
-        const scrollRatio = maxScroll > 0 ? (listEl.scrollTop / maxScroll) : 0;
-        const maxThumbTop = trackHeight - thumbHeight;
-        const thumbTop = Math.min(maxThumbTop, Math.max(0, scrollRatio * maxThumbTop));
-
-        thumbEl.style.height = `${thumbHeight}px`;
-        thumbEl.style.top = `${thumbTop}px`;
     },
 
     // --- MÉTODOS DE SCROLL FADE INFERIOR Y SCROLLBARS ---
