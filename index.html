@@ -162,17 +162,19 @@
             <!-- VISTA: Historial de Quedadas (MESAS Y FIESTAS) -->
             <section id="history-view" class="view">
                 <div class="card glass" style="padding: 1.25rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-                        <button type="button" class="btn-secondary" onclick="App.closeHistoryView()" style="padding: 0.4rem 0.85rem; font-size: 0.85rem;">
-                            ← Volver
-                        </button>
-                        <h2 style="margin: 0; font-size: 1.25rem;">📜 Historial</h2>
-                        <button type="button" class="btn-icon-small" onclick="App.loadHistory(true)" title="Recargar desde Firebase" style="padding: 0.4rem 0.6rem; font-size: 0.95rem;">
-                            🔄
-                        </button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                        <h2 style="margin: 0; font-size: 1.35rem; font-weight: 700; text-align: left;">Historial</h2>
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <button type="button" class="btn-icon-small" onclick="App.loadHistory(true)" title="Recargar desde Firebase" style="padding: 0.35rem 0.55rem; font-size: 0.95rem;">
+                                🔄
+                            </button>
+                            <button type="button" class="btn-secondary" onclick="App.closeHistoryView()" style="padding: 0.35rem 0.65rem; font-size: 0.82rem; font-weight: 600;">
+                                Volver
+                            </button>
+                        </div>
                     </div>
 
-                    <p class="subtitle" style="margin-bottom: 0.85rem; font-size: 0.85rem;">Mesas y fiestas guardadas en Firebase</p>
+                    <p class="subtitle" style="text-align: left; margin-bottom: 0.85rem; font-size: 0.85rem;">Mesas y fiestas guardadas en Firebase</p>
 
                     <!-- Pestañas: Mesas vs Fiestas -->
                     <div class="setup-mode-selector" style="margin-bottom: 0.85rem;">
@@ -471,6 +473,6 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-    <script type="module" src="js/app.js?v=39"></script>
+    <script type="module" src="js/app.js?v=40"></script>
 </body>
 </html>
