@@ -8004,24 +8004,111 @@ Reglas obligatorias:
     },
 
     async copyTableSummaryWhatsApp(tableId) {
-        const item = this.state.historyTables.find(t => t.id === tableId);
-        if (!item || !item.raw) return;
+        let item = this.state.historyTables.find(t => t.id === tableId);
+        let raw = item ? item.raw : (this.state.tableId === tableId ? this.state.tableData : null);
+        let name = item ? item.name : (raw ? (raw.name || tableId) : tableId);
+        let date = item ? item.date : (raw ? (raw.finishedAt || raw.createdAt || Date.now()) : Date.now());
 
-        const summary = this.calculateHistoricalTableSummary(item.raw);
-        const dateStr = this.formatDateTime(item.date);
+        if (!raw) return;
 
-        let text = `🍻 *RESUMEN DE CUENTA - ${item.name.toUpperCase()}*\n`;
-        text += `📅 Fecha: ${dateStr}\n`;
-        text += `💶 *Total cuenta:* ${this.formatEuro(summary.totalBill)}\n\n`;
+        const summary = this.calculateHistoricalTableSummary(raw);
+        const dateStr = this.formatDateTime(date);
 
-        text += `👥 *CUENTAS POR PERSONA:*\n`;
-        Object.entries(summary.userTotals)
-            .sort((a, b) => b[1] - a[1])
-            .forEach(([user, tot]) => {
-                text += `• ${user}: ${this.formatEuro(tot)}\n`;
+        // Calcular aportaciones / pagos registrados
+        const userPaid = {};
+        let totalPot = 0;
+        if (raw.contributions) {
+            Object.values(raw.contributions).forEach(c => {
+                if (c && c.user) {
+                    const amt = Number(c.amount) || 0;
+                    userPaid[c.user] = (userPaid[c.user] || 0) + amt;
+                    totalPot += amt;
+                }
             });
+        }
 
-        if (summary.drinkers.length > 0) {
+        // Agrupar por persona o pareja
+        const participants = Object.values(raw.participants || {});
+        const allNames = Array.from(new Set([
+            ...participants.map(p => p && p.name).filter(Boolean),
+            ...Object.keys(summary.userTotals)
+        ]));
+
+        const processedKeys = new Set();
+        const tableUnits = [];
+
+        allNames.forEach(userName => {
+            const pKey = this.normalizeKey(userName);
+            if (processedKeys.has(pKey)) return;
+
+            const partnerName = this.getPartner(userName);
+            const partnerInTable = partnerName 
+                ? allNames.find(n => this.normalizeKey(n) === this.normalizeKey(partnerName))
+                : null;
+
+            if (partnerInTable) {
+                processedKeys.add(pKey);
+                processedKeys.add(this.normalizeKey(partnerName));
+
+                const spent1 = summary.userTotals[userName] || 0;
+                const spent2 = summary.userTotals[partnerInTable] || 0;
+                const paid1 = userPaid[userName] || 0;
+                const paid2 = userPaid[partnerInTable] || 0;
+
+                tableUnits.push({
+                    displayName: `${userName} y ${partnerInTable}`,
+                    isCouple: true,
+                    spent: spent1 + spent2,
+                    paid: paid1 + paid2
+                });
+            } else {
+                processedKeys.add(pKey);
+                tableUnits.push({
+                    displayName: userName,
+                    isCouple: false,
+                    spent: summary.userTotals[userName] || 0,
+                    paid: userPaid[userName] || 0
+                });
+            }
+        });
+
+        tableUnits.sort((a, b) => b.spent - a.spent);
+
+        let text = `🍻 *RESUMEN DE CUENTA - ${name.toUpperCase()}*\n`;
+        text += `📅 Fecha: ${dateStr}\n`;
+        text += `💶 *Total cuenta:* ${this.formatEuro(summary.totalBill)}\n`;
+        if (totalPot > 0) {
+            text += `💰 *Total aportado al bote:* ${this.formatEuro(totalPot)}\n`;
+        }
+        text += `\n`;
+
+        text += `👥 *GASTOS Y PAGOS POR PERSONA / PAREJA:*\n`;
+        tableUnits.forEach(u => {
+            const coupleTag = u.isCouple ? ' 💑' : '';
+            let line = `• *${u.displayName}${coupleTag}*\n`;
+            line += `   Gastó: ${this.formatEuro(u.spent)}`;
+            
+            if (totalPot > 0) {
+                const net = u.paid - u.spent;
+                let status = '';
+                if (Math.abs(net) < 0.01) {
+                    status = '(En paz)';
+                } else if (net > 0) {
+                    status = `(Le sobran ${this.formatEuro(net)})`;
+                } else {
+                    status = `(Faltan ${this.formatEuro(Math.abs(net))})`;
+                }
+                line += ` · Pagó: ${this.formatEuro(u.paid)} ${status}`;
+            } else if (u.paid > 0) {
+                line += ` · Pagó: ${this.formatEuro(u.paid)}`;
+            } else {
+                line += ` · Pagó: ${this.formatEuro(0)}`;
+            }
+            
+            text += line + '\n';
+        });
+
+        if (summary.drinkers && summary.drinkers.length > 0) {
             const maxAlc = summary.drinkers[0][1];
             const winners = summary.drinkers.filter(([, cl]) => Math.abs(cl - maxAlc) < 0.05).map(([n]) => n);
             const equiv = (maxAlc / 1.0).toFixed(1).replace('.0', '');
@@ -8039,29 +8126,54 @@ Reglas obligatorias:
     },
 
     async copyPartySummaryWhatsApp(partyId) {
-        const item = this.state.historyParties.find(p => p.id === partyId);
-        if (!item || !item.raw) return;
+        let item = this.state.historyParties.find(p => p.id === partyId);
+        let raw = item ? item.raw : (this.state.partyId === partyId ? this.state.partyData : null);
+        let name = item ? item.name : (raw ? (raw.name || partyId) : partyId);
+        let date = item ? item.date : (raw ? (raw.finishedAt || raw.createdAt || Date.now()) : Date.now());
 
-        const partyBalances = this.calculatePartyBalances(item.raw);
+        if (!raw) return;
+
+        const partyBalances = this.calculatePartyBalances(raw);
         const totalSpent = partyBalances.totalSpent !== undefined 
             ? Number(partyBalances.totalSpent) 
-            : (item.totalSpent !== undefined ? Number(item.totalSpent) : 0);
+            : (item && item.totalSpent !== undefined ? Number(item.totalSpent) : 0);
         const totalDebts = (partyBalances.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
         const totalPaid = Math.max(0, totalSpent - totalDebts);
 
-        const dateStr = this.formatDateTime(item.date);
-        let text = `🍹 *RESUMEN DE FIESTA - ${item.name.toUpperCase()}*\n`;
+        const dateStr = this.formatDateTime(date);
+        let text = `🍹 *RESUMEN DE FIESTA - ${name.toUpperCase()}*\n`;
         text += `📅 Fecha: ${dateStr}\n`;
-        text += `💸 Gastado: ${this.formatEuro(totalSpent)}\n`;
-        text += `✅ Pagado: ${this.formatEuro(totalPaid)}\n`;
-        text += `⚖️ Deudas: ${this.formatEuro(totalDebts)}\n\n`;
+        text += `💸 *Total Gastado:* ${this.formatEuro(totalSpent)}\n`;
+        text += `✅ *Total Pagado:* ${this.formatEuro(totalPaid)}\n`;
+        text += `⚖️ *Deudas pendientes:* ${this.formatEuro(totalDebts)}\n\n`;
 
-        if (partyBalances.debts && partyBalances.debts.length > 0) {
-            text += `*DEUDAS PENDIENTES:*\n`;
-            partyBalances.debts.forEach(d => {
-                text += `• ${d.from} debe ${this.formatEuro(d.amount)} a ${d.to}\n`;
+        text += `👥 *GASTOS Y PAGOS POR PERSONA / PAREJA:*\n`;
+        if (partyBalances.units && partyBalances.units.length > 0) {
+            partyBalances.units.forEach(u => {
+                const coupleTag = u.isCouple ? ' 💑' : '';
+                let statusLabel = '';
+                if (u.net > 0.01) {
+                    statusLabel = `(Le deben ${this.formatEuro(u.net)})`;
+                } else if (u.net < -0.01) {
+                    statusLabel = `(Debe ${this.formatEuro(Math.abs(u.net))})`;
+                } else {
+                    statusLabel = `(En paz)`;
+                }
+
+                text += `• *${u.displayName}${coupleTag}*\n`;
+                text += `   Gastó: ${this.formatEuro(u.spent)} · Pagó: ${this.formatEuro(u.paid)} ${statusLabel}\n`;
             });
             text += `\n`;
+        }
+
+        if (partyBalances.debts && partyBalances.debts.length > 0) {
+            text += `⚖️ *DEUDAS PENDIENTES / REEMBOLSOS:*\n`;
+            partyBalances.debts.forEach(d => {
+                text += `• ${d.from} debe pagar ${this.formatEuro(d.amount)} a ${d.to}\n`;
+            });
+            text += `\n`;
+        } else if (totalSpent > 0) {
+            text += `✨ *¡Todas las cuentas están saldadas!*\n\n`;
         }
 
         text += `_Generado con Thermo Bandapp_ 📱`;
