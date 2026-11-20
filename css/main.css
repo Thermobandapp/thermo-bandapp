@@ -1093,11 +1093,11 @@ body.modal-open {
 .modal-card {
     width: 96vw;
     max-width: 480px;
-    max-height: min(88dvh, calc(100dvh - 1.5rem));
+    max-height: min(92dvh, calc(100dvh - 1rem));
     height: auto;
     display: flex;
     flex-direction: column;
-    padding: 1.15rem 1rem 0.9rem 1rem;
+    padding: 1.05rem 0.95rem 0.8rem 0.95rem;
     border-radius: var(--radius-lg);
     animation: zoomIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     box-sizing: border-box;

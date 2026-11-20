@@ -3445,12 +3445,12 @@ const App = {
             this.state.tempSelectionFriends = [];
             this.state.tempAvailableTableMembers = availableMembers.map(m => m.name);
             
-            let html = `<h3>Añadir Amigos a la Mesa</h3>`;
-            html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
+            let html = `<h3 style="margin: 0 0 0.25rem 0; font-size: 1.25rem;">Añadir Amigos a la Mesa</h3>`;
+            html += `<p class="subtitle" style="margin-bottom: 0.55rem; font-size: 0.82rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
             // Botones de selección rápida: Chicos, Chicas, Switch Todos/Ninguno
             html += `
-                <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.65rem;">
                     <button type="button" class="filter-pill filter-pill-boys" onclick="App.setTableFriendsQuickFilter('chicos')">
                         👦 Chicos
                     </button>
@@ -3464,7 +3464,7 @@ const App = {
                 </div>
             `;
 
-            html += `<div class="participant-grid" style="max-height: 40vh; overflow-y: auto;">`;
+            html += `<div class="participant-grid scroll-fade-bottom" style="max-height: 58vh; max-height: calc(100dvh - 215px); overflow-y: auto; padding-right: 0.35rem; gap: 0.55rem;">`;
             
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
@@ -3480,18 +3480,21 @@ const App = {
             html += `</div>`;
 
             html += `
-                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
-                    <p class="subtitle" style="margin-bottom: 0.5rem; color: var(--text-main);">¿No es miembro? Añádelo manualmente:</p>
-                    <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 0.75rem;">
-                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-bottom: 0.75rem;">
-                        <input type="checkbox" id="chk-permanent-member" style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;">
-                        <span style="font-size: 0.88rem; line-height: 1.35;">
-                            <strong>Miembro permanente</strong><br>
-                            <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en esta mesa.</span>
-                        </span>
-                    </label>
-                    <button class="btn-secondary" onclick="App.confirmTableCustomFriend()" style="width: 100%;">Añadir nombre escrito</button>
-                </div>
+                <details style="margin-top: 0.75rem; border-top: 1px solid var(--glass-border); padding-top: 0.5rem;">
+                    <summary style="cursor: pointer; color: var(--primary); font-size: 0.85rem; font-weight: 600; padding: 0.25rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.4rem;">
+                        <span>➕</span> <span>¿No es miembro? Añadir manualmente</span>
+                    </summary>
+                    <div style="margin-top: 0.55rem; display: flex; flex-direction: column; gap: 0.45rem;">
+                        <div style="display: flex; gap: 0.45rem;">
+                            <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="flex: 1; padding: 0.65rem 0.85rem; font-size: 0.95rem; margin-bottom: 0;">
+                            <button class="btn-primary" onclick="App.confirmTableCustomFriend()" style="padding: 0.65rem 0.9rem; font-size: 0.88rem; font-weight: 700; white-space: nowrap;">Añadir</button>
+                        </div>
+                        <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer; user-select: none; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0;">
+                            <input type="checkbox" id="chk-permanent-member" checked style="accent-color: var(--primary); width: 1rem; height: 1rem; cursor: pointer;">
+                            <span>Guardar como miembro permanente en la banda</span>
+                        </label>
+                    </div>
+                </details>
             `;
 
             this.openModal(html);
@@ -3689,7 +3692,7 @@ const App = {
                     <p class="subtitle" style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
                         O selecciona a su pareja en la banda:
                     </p>
-                    <div class="participant-grid" style="max-height: 35vh; overflow-y: auto;">
+                    <div class="participant-grid scroll-fade-bottom" style="max-height: 52vh; max-height: calc(100dvh - 240px); overflow-y: auto; gap: 0.55rem; padding-right: 0.35rem;">
                 `;
 
                 availableCandidates.forEach(m => {
@@ -5143,12 +5146,12 @@ const App = {
             this.state.tempSelectionFriends = [];
             this.state.tempAvailablePartyMembers = availableMembers.map(m => m.name);
             
-            let html = `<h3>Añadir Amigos a la Fiesta</h3>`;
-            html += `<p class="subtitle" style="margin-bottom: 0.75rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
+            let html = `<h3 style="margin: 0 0 0.25rem 0; font-size: 1.25rem;">Añadir Amigos a la Fiesta</h3>`;
+            html += `<p class="subtitle" style="margin-bottom: 0.55rem; font-size: 0.82rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
             // Botones de selección rápida: Chicos, Chicas, Switch Todos/Ninguno
             html += `
-                <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.65rem;">
                     <button type="button" class="filter-pill filter-pill-boys" onclick="App.setPartyFriendsQuickFilter('chicos')">
                         👦 Chicos
                     </button>
@@ -5162,7 +5165,7 @@ const App = {
                 </div>
             `;
 
-            html += `<div class="participant-grid" style="max-height: 40vh; overflow-y: auto;">`;
+            html += `<div class="participant-grid scroll-fade-bottom" style="max-height: 58vh; max-height: calc(100dvh - 215px); overflow-y: auto; padding-right: 0.35rem; gap: 0.55rem;">`;
             
             availableMembers.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
@@ -5178,18 +5181,21 @@ const App = {
             html += `</div>`;
 
             html += `
-                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
-                    <p class="subtitle" style="margin-bottom: 0.5rem; color: var(--text-main);">¿No es miembro? Añádelo manualmente:</p>
-                    <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="margin-bottom: 0.75rem;">
-                    <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-bottom: 0.75rem;">
-                        <input type="checkbox" id="chk-permanent-member" style="width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;">
-                        <span style="font-size: 0.88rem; line-height: 1.35;">
-                            <strong>Miembro permanente</strong><br>
-                            <span style="color: var(--text-muted); font-size: 0.78rem;">Se da de alta en la banda para futuras quedadas. Si no, solo participa en esta fiesta.</span>
-                        </span>
-                    </label>
-                    <button class="btn-secondary" onclick="App.confirmPartyCustomFriend()" style="width: 100%;">Añadir nombre escrito</button>
-                </div>
+                <details style="margin-top: 0.75rem; border-top: 1px solid var(--glass-border); padding-top: 0.5rem;">
+                    <summary style="cursor: pointer; color: var(--primary); font-size: 0.85rem; font-weight: 600; padding: 0.25rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.4rem;">
+                        <span>➕</span> <span>¿No es miembro? Añadir manualmente</span>
+                    </summary>
+                    <div style="margin-top: 0.55rem; display: flex; flex-direction: column; gap: 0.45rem;">
+                        <div style="display: flex; gap: 0.45rem;">
+                            <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="flex: 1; padding: 0.65rem 0.85rem; font-size: 0.95rem; margin-bottom: 0;">
+                            <button class="btn-primary" onclick="App.confirmPartyCustomFriend()" style="padding: 0.65rem 0.9rem; font-size: 0.88rem; font-weight: 700; white-space: nowrap;">Añadir</button>
+                        </div>
+                        <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer; user-select: none; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0;">
+                            <input type="checkbox" id="chk-permanent-member" checked style="accent-color: var(--primary); width: 1rem; height: 1rem; cursor: pointer;">
+                            <span>Guardar como miembro permanente en la banda</span>
+                        </label>
+                    </div>
+                </details>
             `;
 
             this.openModal(html);
