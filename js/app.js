@@ -3825,26 +3825,82 @@ const App = {
         try {
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
-            const sortedMembers = members.sort((a, b) => a.name.localeCompare(b.name));
             const safeNewFriend = newFriendName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const safeOtherSelected = JSON.stringify(otherSelected).replace(/"/g, '&quot;');
 
-            // Filtrar solo las personas que NO tienen pareja actualmente (estén en la mesa o no)
-            const availableCandidates = sortedMembers.filter(m => {
-                if (this.normalizeKey(m.name) === this.normalizeKey(newFriendName)) return false;
+            // Mapa para recolectar candidatos sin pareja (members + participantes de mesa/fiesta)
+            const candidateMap = new Map();
+
+            // 1. Añadir miembros de la banda que no tengan pareja
+            members.forEach(m => {
+                if (!m || !m.name) return;
+                const key = this.normalizeKey(m.name);
+                if (key === this.normalizeKey(newFriendName)) return;
                 const partner = this.getPartner(m.name);
-                return !partner; // Excluir a cualquiera que ya tenga pareja
+                if (!partner) {
+                    candidateMap.set(key, { name: m.name, label: '' });
+                }
             });
+
+            // 2. Añadir participantes de la mesa activa que no tengan pareja (incluso si son no habituales / invitados)
+            if (this.state.tableData?.participants) {
+                Object.values(this.state.tableData.participants).forEach(p => {
+                    if (!p || !p.name || p.status === 'left') return;
+                    const key = this.normalizeKey(p.name);
+                    if (key === this.normalizeKey(newFriendName)) return;
+                    const partner = this.getPartner(p.name);
+                    if (!partner) {
+                        if (!candidateMap.has(key)) {
+                            candidateMap.set(key, { name: p.name, label: 'En la mesa' });
+                        } else {
+                            const item = candidateMap.get(key);
+                            item.label = 'En la mesa';
+                        }
+                    }
+                });
+            }
+
+            // 3. Añadir participantes de la fiesta activa que no tengan pareja (incluso si son no habituales / invitados)
+            if (this.state.partyData?.participants) {
+                Object.values(this.state.partyData.participants).forEach(p => {
+                    if (!p || !p.name || p.status === 'left') return;
+                    const key = this.normalizeKey(p.name);
+                    if (key === this.normalizeKey(newFriendName)) return;
+                    const partner = this.getPartner(p.name);
+                    if (!partner) {
+                        if (!candidateMap.has(key)) {
+                            candidateMap.set(key, { name: p.name, label: 'En la fiesta' });
+                        } else {
+                            const item = candidateMap.get(key);
+                            item.label = 'En la fiesta';
+                        }
+                    }
+                });
+            }
+
+            // 4. Añadir cualquier otra persona seleccionada en lote
+            otherSelected.forEach(name => {
+                if (!name) return;
+                const key = this.normalizeKey(name);
+                if (key === this.normalizeKey(newFriendName)) return;
+                const partner = this.getPartner(name);
+                if (!partner && !candidateMap.has(key)) {
+                    candidateMap.set(key, { name, label: 'Seleccionado/a' });
+                }
+            });
+
+            const availableCandidates = Array.from(candidateMap.values())
+                .sort((a, b) => a.name.localeCompare(b.name));
 
             let html = `
                 <div style="text-align: center;">
                     <div style="font-size: 2.2rem; margin-bottom: 0.25rem;">💑</div>
                     <h3 style="margin-bottom: 0.5rem;">¿${newFriendName} es pareja de alguien?</h3>
-                    <p class="subtitle" style="margin-bottom: 1.25rem; font-size: 0.88rem;">
+                    <p class="subtitle" style="margin-bottom: 1.15rem; font-size: 0.88rem;">
                         Muchos somos matrimonios y uno paga lo del otro. Si es pareja de alguien, se acumularán sus consumos de ahora en adelante.
                     </p>
 
-                    <div style="margin-bottom: 1.25rem;">
+                    <div style="margin-bottom: 1.15rem;">
                         <button class="btn-primary" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '', ${safeOtherSelected}, ${isParty})" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
                             👤 No, viene solo/a (Sin pareja)
                         </button>
@@ -3853,19 +3909,21 @@ const App = {
 
             if (availableCandidates.length > 0) {
                 html += `
-                    <p class="subtitle" style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-                        O selecciona a su pareja en la banda:
+                    <p class="subtitle" style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.65rem;">
+                        Selecciona a su pareja en la lista:
                     </p>
-                    <div class="participant-grid scroll-fade-bottom" style="max-height: 52vh; max-height: calc(100dvh - 240px); overflow-y: auto; gap: 0.55rem; padding-right: 0.35rem;">
+                    <div class="participant-grid scroll-fade-bottom" style="max-height: 44vh; max-height: calc(100dvh - 310px); overflow-y: auto; gap: 0.55rem; padding-right: 0.35rem;">
                 `;
 
-                availableCandidates.forEach(m => {
-                    const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    const sizeClass = this.getNameLengthClass(m.name);
+                availableCandidates.forEach(cand => {
+                    const safeName = cand.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const sizeClass = this.getNameLengthClass(cand.name);
+                    const subLabel = cand.label ? `(${cand.label})` : `(Sin pareja)`;
+                    const color = cand.label ? '#818cf8' : '#22c55e';
                     html += `
                         <button class="participant-btn ${sizeClass}" onclick="App.finalizeAddFriendWithCouple('${safeNewFriend}', '${safeName}', ${safeOtherSelected}, ${isParty})" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.6rem 0.35rem; height: auto;">
-                            <span style="font-weight: 700;">${m.name}</span>
-                            <small style="font-size: 0.72rem; color: #22c55e;">(Sin pareja)</small>
+                            <span style="font-weight: 700;">${cand.name}</span>
+                            <small style="font-size: 0.72rem; color: ${color};">${subLabel}</small>
                         </button>
                     `;
                 });
@@ -3874,10 +3932,28 @@ const App = {
             } else {
                 html += `
                     <p class="empty-msg" style="font-size: 0.85rem; margin-top: 0.5rem; color: var(--text-muted);">
-                        No hay miembros disponibles sin pareja en la banda.
+                        No hay personas sin pareja disponibles en la lista.
                     </p>
                 `;
             }
+
+            // Opción para escribir el nombre de la pareja si tampoco es habitual y no está en la lista
+            html += `
+                <div style="margin-top: 1rem; padding: 0.85rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); text-align: left;">
+                    <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.25rem;">
+                        ➕ ¿Su pareja tampoco está en la lista?
+                    </div>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem; line-height: 1.35;">
+                        Escribe su nombre aquí y se añadirán juntos como pareja a la ${isParty ? 'fiesta' : 'mesa'}:
+                    </p>
+                    <div style="display: flex; gap: 0.45rem;">
+                        <input type="text" id="custom-partner-name-input" placeholder="Nombre de su pareja..." onkeydown="if(event.key==='Enter'){event.preventDefault(); App.finalizeAddFriendWithCustomPartner('${safeNewFriend}', ${safeOtherSelected}, ${isParty});}" style="flex: 1; padding: 0.65rem 0.85rem; font-size: 0.92rem; margin-bottom: 0;">
+                        <button type="button" class="btn-primary" onclick="App.finalizeAddFriendWithCustomPartner('${safeNewFriend}', ${safeOtherSelected}, ${isParty})" style="padding: 0.65rem 0.95rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+                            Añadir Pareja
+                        </button>
+                    </div>
+                </div>
+            `;
 
             html += `
                 </div>
@@ -3896,26 +3972,50 @@ const App = {
         }
     },
 
+    async finalizeAddFriendWithCustomPartner(newFriendName, otherSelected = [], isParty = false) {
+        const inputEl = document.getElementById('custom-partner-name-input');
+        const partnerName = inputEl?.value.trim();
+        if (!partnerName) {
+            alert('Por favor, escribe el nombre de la pareja o pulsa "No, viene solo/a".');
+            return;
+        }
+        if (this.normalizeKey(newFriendName) === this.normalizeKey(partnerName)) {
+            alert('Una persona no puede ser pareja de sí misma.');
+            return;
+        }
+        await this.finalizeAddFriendWithCouple(newFriendName, partnerName, otherSelected, isParty);
+    },
+
     async finalizeAddFriendWithCouple(newFriendName, partnerName, otherSelected = [], isParty = false) {
         // Leer si se quiere dar de alta permanente (guardado en state por confirmAddFriends/confirmPartyAddFriends)
         const permanent = this.state.tempNewFriendPermanent !== false;
         this.state.tempNewFriendPermanent = undefined; // limpiar
 
         try {
-            // 1. Guardar pareja en Firebase si se seleccionó (solo si es permanente)
-            if (partnerName && permanent) {
+            // 1. Guardar pareja en Firebase siempre que se haya especificado (para que unifique sus cuentas)
+            if (partnerName) {
                 await this.setCouple(newFriendName, partnerName);
             }
             
-            // 2. Registrar el nuevo amigo en members solo si es miembro permanente
+            // 2. Registrar en members si se marcó como permanente
             if (permanent) {
-                const key = this.normalizeKey(newFriendName);
-                const memberSnap = await get(ref(this.db, `members/${key}`));
-                if (!memberSnap.exists()) {
-                    await set(ref(this.db, `members/${key}`), {
+                const key1 = this.normalizeKey(newFriendName);
+                const snap1 = await get(ref(this.db, `members/${key1}`));
+                if (!snap1.exists()) {
+                    await set(ref(this.db, `members/${key1}`), {
                         name: newFriendName,
                         code: `${newFriendName}_Thermobanda`
                     });
+                }
+                if (partnerName) {
+                    const key2 = this.normalizeKey(partnerName);
+                    const snap2 = await get(ref(this.db, `members/${key2}`));
+                    if (!snap2.exists()) {
+                        await set(ref(this.db, `members/${key2}`), {
+                            name: partnerName,
+                            code: `${partnerName}_Thermobanda`
+                        });
+                    }
                 }
             }
 
@@ -3925,11 +4025,9 @@ const App = {
             if (isParty) {
                 if (partnerName) {
                     const isPartnerInParty = Object.values(this.state.partyData?.participants || {})
-                        .some(p => this.normalizeKey(p.name) === this.normalizeKey(partnerName));
+                        .some(p => p.status !== 'left' && this.normalizeKey(p.name) === this.normalizeKey(partnerName));
                     if (!isPartnerInParty && !toAdd.some(n => this.normalizeKey(n) === this.normalizeKey(partnerName))) {
-                        if (confirm(`¿Quieres añadir también a su pareja ${partnerName} al bote ahora?`)) {
-                            toAdd.push(partnerName);
-                        }
+                        toAdd.push(partnerName);
                     }
                 }
                 this.closeModal();
@@ -3941,9 +4039,7 @@ const App = {
                     const isPartnerInTable = Object.values(this.state.tableData?.participants || {})
                         .some(p => p.status === 'active' && this.normalizeKey(p.name) === this.normalizeKey(partnerName));
                     if (!isPartnerInTable && !toAdd.some(n => this.normalizeKey(n) === this.normalizeKey(partnerName))) {
-                        if (confirm(`¿Quieres añadir también a su pareja ${partnerName} a la mesa ahora?`)) {
-                            toAdd.push(partnerName);
-                        }
+                        toAdd.push(partnerName);
                     }
                 }
                 this.closeModal();
