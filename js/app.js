@@ -3621,18 +3621,18 @@ const App = {
             html += `</div>`;
 
             html += `
-                <details style="margin-top: 0.75rem; border-top: 1px solid var(--glass-border); padding-top: 0.5rem;">
-                    <summary style="cursor: pointer; color: var(--primary); font-size: 0.85rem; font-weight: 600; padding: 0.25rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.4rem;">
-                        <span>➕</span> <span>¿No es miembro? Añadir manualmente</span>
+                <details style="margin-top: 0.85rem; border-top: 1px solid var(--glass-border); padding-top: 0.65rem;" ontoggle="if(this.open){ setTimeout(()=>{ const inp = document.getElementById('custom-friend-name'); if(inp) inp.focus(); }, 120); }">
+                    <summary style="cursor: pointer; color: var(--primary); font-size: 0.92rem; font-weight: 700; padding: 0.35rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.45rem;">
+                        <span>➕</span> <span>¿No es miembro? Añadir asistente puntual</span>
                     </summary>
-                    <div style="margin-top: 0.55rem; display: flex; flex-direction: column; gap: 0.45rem;">
-                        <div style="display: flex; gap: 0.45rem;">
-                            <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="flex: 1; padding: 0.65rem 0.85rem; font-size: 0.95rem; margin-bottom: 0;">
-                            <button class="btn-primary" onclick="App.confirmTableCustomFriend()" style="padding: 0.65rem 0.9rem; font-size: 0.88rem; font-weight: 700; white-space: nowrap;">Añadir</button>
+                    <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.65rem;">
+                        <div style="display: flex; gap: 0.55rem; align-items: stretch; width: 100%;">
+                            <input type="text" id="custom-friend-name" placeholder="Nombre del asistente puntual..." onkeydown="if(event.key==='Enter'){event.preventDefault(); App.confirmTableCustomFriend();}">
+                            <button type="button" class="btn-primary custom-friend-btn" onclick="App.confirmTableCustomFriend()">Añadir</button>
                         </div>
-                        <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer; user-select: none; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0;">
-                            <input type="checkbox" id="chk-permanent-member" checked style="accent-color: var(--primary); width: 1rem; height: 1rem; cursor: pointer;">
-                            <span>Guardar como miembro permanente en la banda</span>
+                        <label style="display: flex; align-items: center; gap: 0.55rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0;">
+                            <input type="checkbox" id="chk-permanent-member" checked style="accent-color: var(--primary); width: 1.15rem; height: 1.15rem; cursor: pointer;">
+                            <span>Guardar también como miembro permanente en la banda</span>
                         </label>
                     </div>
                 </details>
@@ -3939,16 +3939,16 @@ const App = {
 
             // Opción para escribir el nombre de la pareja si tampoco es habitual y no está en la lista
             html += `
-                <div style="margin-top: 1rem; padding: 0.85rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); text-align: left;">
-                    <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.25rem;">
+                <div style="margin-top: 1.1rem; padding: 0.95rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); text-align: left;">
+                    <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-main); margin-bottom: 0.3rem;">
                         ➕ ¿Su pareja tampoco está en la lista?
                     </div>
-                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem; line-height: 1.35;">
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.65rem; line-height: 1.35;">
                         Escribe su nombre aquí y se añadirán juntos como pareja a la ${isParty ? 'fiesta' : 'mesa'}:
                     </p>
-                    <div style="display: flex; gap: 0.45rem;">
-                        <input type="text" id="custom-partner-name-input" placeholder="Nombre de su pareja..." onkeydown="if(event.key==='Enter'){event.preventDefault(); App.finalizeAddFriendWithCustomPartner('${safeNewFriend}', ${safeOtherSelected}, ${isParty});}" style="flex: 1; padding: 0.65rem 0.85rem; font-size: 0.92rem; margin-bottom: 0;">
-                        <button type="button" class="btn-primary" onclick="App.finalizeAddFriendWithCustomPartner('${safeNewFriend}', ${safeOtherSelected}, ${isParty})" style="padding: 0.65rem 0.95rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+                    <div style="display: flex; gap: 0.55rem; align-items: stretch; width: 100%;">
+                        <input type="text" id="custom-partner-name-input" placeholder="Nombre de su pareja..." onkeydown="if(event.key==='Enter'){event.preventDefault(); App.finalizeAddFriendWithCustomPartner('${safeNewFriend}', ${safeOtherSelected}, ${isParty});}">
+                        <button type="button" class="btn-primary custom-friend-btn" onclick="App.finalizeAddFriendWithCustomPartner('${safeNewFriend}', ${safeOtherSelected}, ${isParty})">
                             Añadir Pareja
                         </button>
                     </div>
@@ -5495,18 +5495,18 @@ const App = {
             html += `</div>`;
 
             html += `
-                <details style="margin-top: 0.75rem; border-top: 1px solid var(--glass-border); padding-top: 0.5rem;">
-                    <summary style="cursor: pointer; color: var(--primary); font-size: 0.85rem; font-weight: 600; padding: 0.25rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.4rem;">
-                        <span>➕</span> <span>¿No es miembro? Añadir manualmente</span>
+                <details style="margin-top: 0.85rem; border-top: 1px solid var(--glass-border); padding-top: 0.65rem;" ontoggle="if(this.open){ setTimeout(()=>{ const inp = document.getElementById('custom-friend-name'); if(inp) inp.focus(); }, 120); }">
+                    <summary style="cursor: pointer; color: var(--primary); font-size: 0.92rem; font-weight: 700; padding: 0.35rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.45rem;">
+                        <span>➕</span> <span>¿No es miembro? Añadir asistente puntual</span>
                     </summary>
-                    <div style="margin-top: 0.55rem; display: flex; flex-direction: column; gap: 0.45rem;">
-                        <div style="display: flex; gap: 0.45rem;">
-                            <input type="text" id="custom-friend-name" placeholder="Escribe un nombre..." style="flex: 1; padding: 0.65rem 0.85rem; font-size: 0.95rem; margin-bottom: 0;">
-                            <button class="btn-primary" onclick="App.confirmPartyCustomFriend()" style="padding: 0.65rem 0.9rem; font-size: 0.88rem; font-weight: 700; white-space: nowrap;">Añadir</button>
+                    <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.65rem;">
+                        <div style="display: flex; gap: 0.55rem; align-items: stretch; width: 100%;">
+                            <input type="text" id="custom-friend-name" placeholder="Nombre del asistente puntual..." onkeydown="if(event.key==='Enter'){event.preventDefault(); App.confirmPartyCustomFriend();}">
+                            <button type="button" class="btn-primary custom-friend-btn" onclick="App.confirmPartyCustomFriend()">Añadir</button>
                         </div>
-                        <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer; user-select: none; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0;">
-                            <input type="checkbox" id="chk-permanent-member" checked style="accent-color: var(--primary); width: 1rem; height: 1rem; cursor: pointer;">
-                            <span>Guardar como miembro permanente en la banda</span>
+                        <label style="display: flex; align-items: center; gap: 0.55rem; cursor: pointer; user-select: none; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0;">
+                            <input type="checkbox" id="chk-permanent-member" checked style="accent-color: var(--primary); width: 1.15rem; height: 1.15rem; cursor: pointer;">
+                            <span>Guardar también como miembro permanente en la banda</span>
                         </label>
                     </div>
                 </details>
