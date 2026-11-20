@@ -133,6 +133,18 @@
                             </div>
                         </div>
 
+                        <div class="private-mode-option" style="margin-bottom: 1.1rem; padding: 0.65rem 0.85rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer;">
+                            <input type="checkbox" id="chk-private-table" style="margin-top: 0.2rem; width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--primary);">
+                            <label for="chk-private-table" style="cursor: pointer; display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0;">
+                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
+                                    🔒 Mesa privada
+                                </span>
+                                <span style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">
+                                    Si se marca, solo el creador de la mesa podrá añadir amigos.
+                                </span>
+                            </label>
+                        </div>
+
                         <div class="actions">
                             <button id="btn-create-table" class="btn-primary">Crear Mesa</button>
                             <div class="divider"><span>o</span></div>
@@ -153,6 +165,18 @@
                         <div class="form-group">
                             <label for="party-name-input">Nombre de la Fiesta</label>
                             <input type="text" id="party-name-input" placeholder="Ej: Cumpleaños Juan">
+                        </div>
+
+                        <div class="private-mode-option" style="margin-bottom: 1.1rem; padding: 0.65rem 0.85rem; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer;">
+                            <input type="checkbox" id="chk-private-party" style="margin-top: 0.2rem; width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--primary);">
+                            <label for="chk-private-party" style="cursor: pointer; display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0;">
+                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
+                                    🔒 Fiesta privada
+                                </span>
+                                <span style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">
+                                    Si se marca, solo el creador de la fiesta podrá añadir amigos.
+                                </span>
+                            </label>
                         </div>
 
                         <div class="actions">
@@ -254,7 +278,12 @@
                         <span id="display-table-name">Cargando...</span>
                         <button id="btn-edit-table-name" class="btn-icon-small" style="padding: 0.2rem 0.4rem; font-size: 0.85rem;" title="Editar nombre de la mesa">✏️</button>
                     </h2>
-                    <p id="display-table-code" class="code-badge">Código: ----</p>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <p id="display-table-code" class="code-badge" style="margin: 0;">Código: ----</p>
+                        <button id="display-table-private-badge" class="badge-private hidden" onclick="App.toggleTablePrivacy()" title="Modo Privado">
+                            🔒 Privada
+                        </button>
+                    </div>
                 </div>
 
                 <div class="grid-stats">
@@ -272,6 +301,9 @@
                     <div class="menu-controls">
                         <h3>Amigos en la mesa</h3>
                         <button id="btn-add-friend-manual" class="btn-icon-small">➕ Añadir Amigo</button>
+                        <div id="table-private-note" class="hidden" style="font-size: 0.78rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; background: rgba(255,255,255,0.04); border-radius: var(--radius-sm); border: 1px solid var(--glass-border);">
+                            <span>🔒 Privada · Solo <b id="table-creator-name" style="color: var(--text-main);">creador</b> puede añadir</span>
+                        </div>
                     </div>
                     <div id="participants-container" class="list-container">
                         <!-- Se llena dinámicamente -->
@@ -386,7 +418,12 @@
                 <div class="card glass">
                     <div class="summary-header">
                         <h2>Modo Fiesta 🥳</h2>
-                        <div id="party-code-badge" class="code-badge">CÓDIGO: ---</div>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <div id="party-code-badge" class="code-badge" style="margin: 0;">CÓDIGO: ---</div>
+                            <button id="party-private-badge" class="badge-private hidden" onclick="App.togglePartyPrivacy()" title="Modo Privado">
+                                🔒 Privada
+                            </button>
+                        </div>
                     </div>
 
                     <div id="party-pot-active">
@@ -415,6 +452,9 @@
                             <div class="menu-controls">
                                 <h3 style="color: var(--primary); font-size: 1.1rem;">Participantes y Balances</h3>
                                 <button id="btn-party-add-friend" class="btn-icon-small">➕ Añadir Amigo</button>
+                                <div id="party-private-note" class="hidden" style="font-size: 0.78rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; background: rgba(255,255,255,0.04); border-radius: var(--radius-sm); border: 1px solid var(--glass-border);">
+                                    <span>🔒 Privada · Solo <b id="party-creator-name" style="color: var(--text-main);">creador</b> puede añadir</span>
+                                </div>
                             </div>
                             <div id="party-participants-list" class="list-container" style="margin-top: 1rem;">
                                 <div class="empty-msg">Pulsa en "Añadir Amigo" para empezar la lista</div>
@@ -491,6 +531,6 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-    <script type="module" src="js/app.js?v=58"></script>
+    <script type="module" src="js/app.js?v=59"></script>
 </body>
 </html>

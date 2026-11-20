@@ -228,6 +228,91 @@ const App = {
         return partnerPart ? partnerPart.name : null;
     },
 
+    // Comprueba si el usuario actual es el creador de la mesa activa
+    isTableCreator() {
+        const data = this.state.tableData;
+        if (!data || !this.state.user) return false;
+        const creator = data.creator || data.createdBy;
+        if (creator) {
+            return this.state.user.trim().toLowerCase() === creator.trim().toLowerCase();
+        }
+        const myPart = data.participants?.[this.state.user.replace(/\./g, '_')];
+        return myPart?.role === 'admin';
+    },
+
+    // Comprueba si el usuario actual es el creador de la fiesta activa
+    isPartyCreator() {
+        const data = this.state.partyData;
+        if (!data || !this.state.user) return false;
+        const creator = data.createdBy || data.creator || data.custodian;
+        if (creator) {
+            return this.state.user.trim().toLowerCase() === creator.trim().toLowerCase();
+        }
+        return false;
+    },
+
+    // Comprueba si el usuario actual tiene permisos para añadir amigos a la mesa
+    canAddFriendsToTable() {
+        const data = this.state.tableData;
+        if (!data) return true;
+        if (!data.isPrivate) return true;
+        return this.isTableCreator();
+    },
+
+    // Comprueba si el usuario actual tiene permisos para añadir amigos a la fiesta
+    canAddFriendsToParty() {
+        const data = this.state.partyData;
+        if (!data) return true;
+        if (!data.isPrivate) return true;
+        return this.isPartyCreator();
+    },
+
+    // Permite al creador alternar el modo privado de la mesa
+    async toggleTablePrivacy() {
+        if (!this.state.tableId || !this.state.tableData) return;
+        if (!this.isTableCreator()) {
+            const creator = this.state.tableData.creator || 'el creador';
+            alert(`🔒 Esta mesa es privada.\nSolo ${creator} (creador de la mesa) puede modificar su privacidad.`);
+            return;
+        }
+        const isCurrentlyPrivate = Boolean(this.state.tableData.isPrivate);
+        const nextState = !isCurrentlyPrivate;
+        const confirmMsg = nextState
+            ? '¿Quieres activar el MODO PRIVADO en esta mesa?\nSolo tú (el creador) podrás añadir amigos a la mesa.'
+            : '¿Quieres cambiar esta mesa a MODO PÚBLICO?\nCualquier miembro de la mesa podrá añadir amigos.';
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            await set(ref(this.db, `tables/${this.state.tableId}/isPrivate`), nextState);
+        } catch (error) {
+            console.error('Error al cambiar privacidad de la mesa:', error);
+            alert('Error al actualizar la privacidad de la mesa.');
+        }
+    },
+
+    // Permite al creador alternar el modo privado de la fiesta
+    async togglePartyPrivacy() {
+        if (!this.state.partyId || !this.state.partyData) return;
+        if (!this.isPartyCreator()) {
+            const creator = this.state.partyData.createdBy || this.state.partyData.creator || 'el creador';
+            alert(`🔒 Esta fiesta es privada.\nSolo ${creator} (creador de la fiesta) puede modificar su privacidad.`);
+            return;
+        }
+        const isCurrentlyPrivate = Boolean(this.state.partyData.isPrivate);
+        const nextState = !isCurrentlyPrivate;
+        const confirmMsg = nextState
+            ? '¿Quieres activar el MODO PRIVADO en esta fiesta?\nSolo tú (el creador) podrás añadir amigos a la fiesta.'
+            : '¿Quieres cambiar esta fiesta a MODO PÚBLICO?\nCualquier miembro de la fiesta podrá añadir amigos.';
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            await set(ref(this.db, `party_pots/${this.state.partyId}/isPrivate`), nextState);
+        } catch (error) {
+            console.error('Error al cambiar privacidad de la fiesta:', error);
+            alert('Error al actualizar la privacidad de la fiesta.');
+        }
+    },
+
     // Comprueba si la pareja de alguien está registrada en la fiesta (y opcionalmente si sigue activa)
     isPartnerInParty(name, participants = null, onlyActive = false) {
         const partner = this.getPartner(name);
@@ -840,10 +925,17 @@ const App = {
         try {
             const snapshot = await get(tableRef);
             if (snapshot.exists()) {
+                const tData = snapshot.val();
+                const isUserCreator = (tData.creator || tData.createdBy) === userName;
+                const isAlreadyParticipant = Boolean(tData.participants && tData.participants[userName.replace(/\./g, '_')]);
+                if (tData.isPrivate && !isUserCreator && !isAlreadyParticipant) {
+                    alert(`🔒 Esta mesa es privada.\nSolo el creador (${tData.creator || 'el creador'}) puede añadir amigos.`);
+                    return;
+                }
                 const participantRef = ref(this.db, `tables/${code}/participants/${userName.replace(/\./g, '_')}`);
                 await set(participantRef, { 
                     name: userName, 
-                    role: 'member', 
+                    role: isUserCreator ? 'admin' : 'member', 
                     status: 'active',
                     joinedAt: Date.now() 
                 });
@@ -865,6 +957,7 @@ const App = {
         const userName = this.inputs.userName.value.trim();
         const barName = this.inputs.barName.value.trim();
         const tableNum = this.inputs.tableNum.value.trim() || '01';
+        const isPrivate = Boolean(document.getElementById('chk-private-table')?.checked);
 
         if (!userName || !barName) {
             alert('Por favor, rellena tu nombre y el del bar.');
@@ -879,11 +972,18 @@ const App = {
             const snapshot = await get(tableRef);
             
             if (snapshot.exists() && snapshot.val().status !== 'closed') {
+                const existingData = snapshot.val();
+                const isUserCreator = (existingData.creator || existingData.createdBy) === userName;
+                const isAlreadyIn = Boolean(existingData.participants && existingData.participants[userName.replace(/\./g, '_')]);
+                if (existingData.isPrivate && !isUserCreator && !isAlreadyIn) {
+                    alert(`🔒 Esta mesa ya existe y es privada.\nSolo el creador (${existingData.creator || 'el creador'}) puede añadirte.`);
+                    return;
+                }
                 if (!confirm('Esta mesa ya existe y está activa. ¿Quieres unirte a ella en lugar de crear una nueva?')) return;
                 const participantRef = ref(this.db, `tables/${tableId}/participants/${userName.replace(/\./g, '_')}`);
                 await set(participantRef, { 
                     name: userName, 
-                    role: 'member', 
+                    role: isUserCreator ? 'admin' : 'member', 
                     status: 'active',
                     joinedAt: Date.now() 
                 });
@@ -894,6 +994,7 @@ const App = {
                 const tableData = {
                     name: `${barName} (${dateFormatted})`,
                     creator: userName,
+                    isPrivate: isPrivate,
                     createdAt: Date.now(),
                     status: 'active',
                     participants: {
@@ -1698,6 +1799,41 @@ const App = {
         if (!data) return;
         this.display.tableName.textContent = data.name;
         this.display.tableCode.textContent = `Código: ${this.state.tableId}`;
+        
+        // Modo privado en la mesa
+        const privateBadge = document.getElementById('display-table-private-badge');
+        const privateNote = document.getElementById('table-private-note');
+        const creatorNameSpan = document.getElementById('table-creator-name');
+        const isPrivate = Boolean(data.isPrivate);
+        const isCreator = this.isTableCreator();
+
+        if (privateBadge) {
+            if (isPrivate) {
+                privateBadge.classList.remove('hidden');
+                if (isCreator) {
+                    privateBadge.classList.add('is-creator');
+                    privateBadge.title = 'Mesa Privada (eres el creador). Pulsa para hacerla pública.';
+                } else {
+                    privateBadge.classList.remove('is-creator');
+                    privateBadge.title = `Mesa Privada creada por ${data.creator || 'otro miembro'}.`;
+                }
+            } else {
+                privateBadge.classList.add('hidden');
+            }
+        }
+
+        if (this.display.addFriendManual) {
+            if (isPrivate && !isCreator) {
+                this.display.addFriendManual.classList.add('hidden');
+                if (privateNote) {
+                    privateNote.classList.remove('hidden');
+                    if (creatorNameSpan) creatorNameSpan.textContent = data.creator || 'creador';
+                }
+            } else {
+                this.display.addFriendManual.classList.remove('hidden');
+                if (privateNote) privateNote.classList.add('hidden');
+            }
+        }
         
         const totals = this.calculateAllIndividualTotals();
         this.display.participants.innerHTML = '';
@@ -3432,6 +3568,11 @@ const App = {
     },
 
     async handleAddFriendManual() {
+        if (!this.canAddFriendsToTable()) {
+            const creator = this.state.tableData?.creator || 'el creador';
+            alert(`🔒 Esta mesa es privada.\nSolo ${creator} puede añadir amigos a la mesa.`);
+            return;
+        }
         try {
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
@@ -3505,6 +3646,10 @@ const App = {
     },
 
     async toggleTableFriendDirect(name) {
+        if (!this.canAddFriendsToTable()) {
+            alert('Esta mesa es privada. Solo el creador puede añadir o modificar amigos.');
+            return;
+        }
         const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
         const btn = document.getElementById(`tf-btn-${idName}`);
         const isSelected = this.state.tempSelectionFriends.includes(name);
@@ -3533,6 +3678,10 @@ const App = {
     },
 
     async setTableFriendsQuickFilter(filterType) {
+        if (!this.canAddFriendsToTable()) {
+            alert('Esta mesa es privada. Solo el creador puede añadir o modificar amigos.');
+            return;
+        }
         const boysList = ['Antonio', 'Caba', 'David', 'Jose', 'Edu', 'Pedro', 'Karlos', 'Fernando'].map(n => n.toLowerCase());
         const available = this.state.tempAvailableTableMembers || [];
 
@@ -3600,6 +3749,10 @@ const App = {
     },
 
     async confirmTableCustomFriend() {
+        if (!this.canAddFriendsToTable()) {
+            alert('Esta mesa es privada. Solo el creador puede añadir amigos.');
+            return;
+        }
         const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
         const permanent = document.getElementById('chk-permanent-member')?.checked ?? true;
         if (!customNameInput) return alert('Escribe un nombre para añadir.');
@@ -3658,6 +3811,17 @@ const App = {
     },
 
     async promptNewFriendCouple(newFriendName, otherSelected = [], isParty = false) {
+        if (isParty) {
+            if (!this.canAddFriendsToParty()) {
+                alert('Esta fiesta es privada. Solo el creador puede añadir amigos.');
+                return;
+            }
+        } else {
+            if (!this.canAddFriendsToTable()) {
+                alert('Esta mesa es privada. Solo el creador puede añadir amigos.');
+                return;
+            }
+        }
         try {
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
@@ -3797,6 +3961,10 @@ const App = {
     },
 
     async addFriendsToTable(names) {
+        if (!this.canAddFriendsToTable()) {
+            alert('Esta mesa es privada. Solo el creador puede añadir amigos.');
+            return;
+        }
         try {
             for (const name of names) {
                 const participantRef = ref(this.db, `tables/${this.state.tableId}/participants/${name.replace(/\./g, '_')}`);
@@ -3810,6 +3978,7 @@ const App = {
     async handleCreatePartyFromSetup() {
         const userName = document.getElementById('user-name-party').value.trim();
         const partyName = document.getElementById('party-name-input').value.trim();
+        const isPrivate = Boolean(document.getElementById('chk-private-party')?.checked);
         if (!userName || !partyName) return alert('Rellena todos los campos');
 
         this.state.user = userName;
@@ -3823,6 +3992,8 @@ const App = {
             name: partyName,
             createdAt: Date.now(),
             createdBy: userName,
+            creator: userName,
+            isPrivate: isPrivate,
             totalCollected: 0,
             totalSpent: 0,
             custodian: userName,
@@ -3887,6 +4058,13 @@ const App = {
         const snapshot = await get(partyRef);
         
         if (snapshot.exists()) {
+            const pData = snapshot.val();
+            const isUserCreator = (pData.createdBy || pData.creator) === userName;
+            const isAlreadyParticipant = Boolean(pData.participants && pData.participants[userName.replace(/\./g, '_')]);
+            if (pData.isPrivate && !isUserCreator && !isAlreadyParticipant) {
+                alert(`🔒 Esta fiesta es privada.\nSolo el creador (${pData.createdBy || pData.creator || 'el creador'}) puede añadir amigos.`);
+                return;
+            }
             this.state.partyId = code;
             localStorage.setItem('thermo_partyId', code);
             this.listenToParty(code);
@@ -3919,6 +4097,41 @@ const App = {
         
         const codeBadge = document.getElementById('party-code-badge');
         if (codeBadge) codeBadge.textContent = `CÓDIGO: ${this.state.partyId}`;
+        
+        // Modo privado en la fiesta
+        const partyPrivateBadge = document.getElementById('party-private-badge');
+        const partyPrivateNote = document.getElementById('party-private-note');
+        const partyCreatorNameSpan = document.getElementById('party-creator-name');
+        const isPartyPrivate = Boolean(data.isPrivate);
+        const isPartyCreator = this.isPartyCreator();
+
+        if (partyPrivateBadge) {
+            if (isPartyPrivate) {
+                partyPrivateBadge.classList.remove('hidden');
+                if (isPartyCreator) {
+                    partyPrivateBadge.classList.add('is-creator');
+                    partyPrivateBadge.title = 'Fiesta Privada (eres el creador). Pulsa para hacerla pública.';
+                } else {
+                    partyPrivateBadge.classList.remove('is-creator');
+                    partyPrivateBadge.title = `Fiesta Privada creada por ${data.createdBy || data.creator || 'otro miembro'}.`;
+                }
+            } else {
+                partyPrivateBadge.classList.add('hidden');
+            }
+        }
+
+        if (this.buttons.addPartyFriend) {
+            if (isPartyPrivate && !isPartyCreator) {
+                this.buttons.addPartyFriend.classList.add('hidden');
+                if (partyPrivateNote) {
+                    partyPrivateNote.classList.remove('hidden');
+                    if (partyCreatorNameSpan) partyCreatorNameSpan.textContent = data.createdBy || data.creator || 'creador';
+                }
+            } else {
+                this.buttons.addPartyFriend.classList.remove('hidden');
+                if (partyPrivateNote) partyPrivateNote.classList.add('hidden');
+            }
+        }
         
         const totalSpentEl = document.getElementById('party-total-spent');
         if (totalSpentEl) totalSpentEl.textContent = this.formatEuro(balances.totalSpent || 0);
@@ -5134,6 +5347,11 @@ const App = {
 
 
     async handlePartyAddFriend() {
+        if (!this.canAddFriendsToParty()) {
+            const creator = this.state.partyData?.createdBy || this.state.partyData?.creator || 'el creador';
+            alert(`🔒 Esta fiesta es privada.\nSolo ${creator} puede añadir amigos a la fiesta.`);
+            return;
+        }
         try {
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
@@ -5206,6 +5424,10 @@ const App = {
     },
 
     async togglePartyFriendDirect(name) {
+        if (!this.canAddFriendsToParty()) {
+            alert('Esta fiesta es privada. Solo el creador puede añadir o modificar amigos.');
+            return;
+        }
         const idName = name.replace(/\s/g, '_').replace(/\./g, '_');
         const btn = document.getElementById(`f-btn-${idName}`);
         const isSelected = this.state.tempSelectionFriends.includes(name);
@@ -5234,6 +5456,10 @@ const App = {
     },
 
     async setPartyFriendsQuickFilter(filterType) {
+        if (!this.canAddFriendsToParty()) {
+            alert('Esta fiesta es privada. Solo el creador puede añadir o modificar amigos.');
+            return;
+        }
         const boysList = ['Antonio', 'Caba', 'David', 'Jose', 'Edu', 'Pedro', 'Karlos', 'Fernando'].map(n => n.toLowerCase());
         const available = this.state.tempAvailablePartyMembers || [];
 
@@ -5302,6 +5528,10 @@ const App = {
     },
 
     async confirmPartyCustomFriend() {
+        if (!this.canAddFriendsToParty()) {
+            alert('Esta fiesta es privada. Solo el creador puede añadir amigos.');
+            return;
+        }
         const customNameInput = document.getElementById('custom-friend-name')?.value.trim();
         const permanent = document.getElementById('chk-permanent-member')?.checked ?? true;
         if (!customNameInput) return alert('Escribe un nombre para añadir.');
@@ -5321,6 +5551,10 @@ const App = {
     },
 
     async addPartyFriendSilent(name) {
+        if (!this.canAddFriendsToParty()) {
+            alert('Esta fiesta es privada. Solo el creador puede añadir amigos.');
+            return;
+        }
         const key = name.replace(/\./g, '_');
         const friendRef = ref(this.db, `party_pots/${this.state.partyId}/participants/${key}`);
         const currentData = this.state.partyData?.participants?.[key] || {};
@@ -7384,6 +7618,7 @@ Reglas obligatorias:
                         id,
                         name: tData.name || id,
                         status: tData.status || 'closed',
+                        isPrivate: Boolean(tData.isPrivate),
                         date,
                         totalAmount,
                         participantCount: participantNames.length,
@@ -7431,6 +7666,7 @@ Reglas obligatorias:
                         id,
                         name: pData.name || id,
                         status: pData.status || 'finished',
+                        isPrivate: Boolean(pData.isPrivate),
                         date,
                         totalSpent,
                         totalPaid,
@@ -7514,6 +7750,11 @@ Reglas obligatorias:
                                     <span style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; ${isClosed ? 'background: rgba(107, 114, 128, 0.2); color: #9ca3af;' : 'background: rgba(16, 185, 129, 0.2); color: #34d399;'}">
                                         ${isClosed ? '🔒 Cerrada' : '🟢 Activa'}
                                     </span>
+                                    ${item.isPrivate ? `
+                                        <span style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; background: rgba(239, 68, 68, 0.15); color: #f87171;">
+                                            🔒 Privada
+                                        </span>
+                                    ` : ''}
                                 </div>
                                 <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem;">
                                     📅 ${dateStr}
@@ -7560,6 +7801,11 @@ Reglas obligatorias:
                                     <span style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; ${isClosed ? 'background: rgba(107, 114, 128, 0.2); color: #9ca3af;' : 'background: rgba(16, 185, 129, 0.2); color: #34d399;'}">
                                         ${isClosed ? '🔒 Finalizada' : '🟢 En curso'}
                                     </span>
+                                    ${item.isPrivate ? `
+                                        <span style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; background: rgba(239, 68, 68, 0.15); color: #f87171;">
+                                            🔒 Privada
+                                        </span>
+                                    ` : ''}
                                 </div>
                                 <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem;">
                                     📅 ${dateStr}

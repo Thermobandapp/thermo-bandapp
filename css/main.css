@@ -1445,6 +1445,59 @@ body.light-theme .history-scroll-thumb {
     box-shadow: 0 0 5px rgba(194, 65, 12, 0.4);
 }
 
+/* Modo Privado (Mesa / Fiesta) */
+.badge-private {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.22rem 0.65rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    cursor: default;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.badge-private.is-creator {
+    cursor: pointer;
+}
+
+.badge-private.is-creator:hover {
+    background: rgba(239, 68, 68, 0.26);
+    border-color: rgba(239, 68, 68, 0.65);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+}
+
+body.light-theme .badge-private {
+    background: rgba(220, 38, 38, 0.12);
+    border-color: rgba(220, 38, 38, 0.35);
+    color: #b91c1c;
+}
+
+.private-mode-option {
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.private-mode-option:hover {
+    border-color: var(--primary) !important;
+    background: rgba(255, 255, 255, 0.07) !important;
+}
+
+body.light-theme .private-mode-option {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme .private-mode-option:hover {
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-color: var(--primary) !important;
+}
+
 @keyframes zoomIn {
     from { opacity: 0; transform: scale(0.9); }
     to { opacity: 1; transform: scale(1); }
