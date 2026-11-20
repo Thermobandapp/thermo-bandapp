@@ -234,6 +234,18 @@ body.light-theme .filter-pill-girls {
     box-shadow: 0 1px 4px rgba(225, 29, 72, 0.15);
 }
 
+.filter-pill-admin-del {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #f87171;
+}
+
+body.light-theme .filter-pill-admin-del {
+    background: #fef2f2 !important;
+    border-color: #ef4444 !important;
+    color: #b91c1c !important;
+}
+
 /* Switch / Selector Todos - Ninguno */
 .selector-switch-group {
     display: inline-flex;
@@ -1651,6 +1663,31 @@ body.light-theme #custom-partner-name-input {
 
 .participant-btn.is-me {
     border: 1.5px solid var(--primary);
+}
+
+.participant-btn.admin-delete-highlight {
+    background: rgba(239, 68, 68, 0.22) !important;
+    border: 1.5px dashed #ef4444 !important;
+    color: #fca5a5 !important;
+    font-weight: 700;
+}
+
+.participant-btn.admin-delete-highlight:hover {
+    background: rgba(239, 68, 68, 0.45) !important;
+    border-color: #f87171 !important;
+    color: #ffffff !important;
+    transform: scale(1.03);
+}
+
+body.light-theme .participant-btn.admin-delete-highlight {
+    background: #fee2e2 !important;
+    border: 1.5px dashed #dc2626 !important;
+    color: #991b1b !important;
+}
+
+body.light-theme .participant-btn.admin-delete-highlight:hover {
+    background: #fecaca !important;
+    color: #7f1d1d !important;
 }
 
 .btn-shared {

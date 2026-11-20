@@ -266,7 +266,7 @@
                     </div>
 
                     <div class="actions" style="margin-top: 2rem;">
-                        <button class="btn-secondary" onclick="App.showView('setup')">Volver</button>
+                        <button class="btn-secondary" onclick="App.handleAdminBack()">Volver</button>
                     </div>
                 </div>
             </section>
@@ -301,6 +301,7 @@
                     <div class="menu-controls">
                         <h3>Amigos en la mesa</h3>
                         <button id="btn-add-friend-manual" class="btn-icon-small">➕ Añadir Amigo</button>
+                        <button id="btn-admin-manage-members-table" class="btn-icon-small hidden" onclick="App.showAdminView()" style="background: rgba(129, 140, 248, 0.18); border-color: var(--primary); color: #c7d2fe;" title="Gestión de Miembros de la Banda">⚙️ Miembros</button>
                         <div id="table-private-note" class="hidden" style="font-size: 0.78rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; background: rgba(255,255,255,0.04); border-radius: var(--radius-sm); border: 1px solid var(--glass-border);">
                             <span>🔒 Privada · Solo <b id="table-creator-name" style="color: var(--text-main);">creador</b> puede añadir</span>
                         </div>
@@ -452,6 +453,7 @@
                             <div class="menu-controls">
                                 <h3 style="color: var(--primary); font-size: 1.1rem;">Participantes y Balances</h3>
                                 <button id="btn-party-add-friend" class="btn-icon-small">➕ Añadir Amigo</button>
+                                <button id="btn-admin-manage-members-party" class="btn-icon-small hidden" onclick="App.showAdminView()" style="background: rgba(129, 140, 248, 0.18); border-color: var(--primary); color: #c7d2fe;" title="Gestión de Miembros de la Banda">⚙️ Miembros</button>
                                 <div id="party-private-note" class="hidden" style="font-size: 0.78rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; background: rgba(255,255,255,0.04); border-radius: var(--radius-sm); border: 1px solid var(--glass-border);">
                                     <span>🔒 Privada · Solo <b id="party-creator-name" style="color: var(--text-main);">creador</b> puede añadir</span>
                                 </div>
@@ -531,6 +533,6 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-    <script type="module" src="js/app.js?v=61"></script>
+    <script type="module" src="js/app.js?v=62"></script>
 </body>
 </html>

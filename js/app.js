@@ -761,6 +761,18 @@ const App = {
         if (switchName && this.state.user) {
             switchName.textContent = this.state.user;
         }
+        const isAdminUser = this.isAdmin();
+        if (this.display && this.display.adminPanelBtn) {
+            this.display.adminPanelBtn.classList.toggle('hidden', !isAdminUser);
+        }
+        const adminTableBtn = document.getElementById('btn-admin-manage-members-table');
+        if (adminTableBtn) adminTableBtn.classList.toggle('hidden', !isAdminUser);
+        const adminPartyBtn = document.getElementById('btn-admin-manage-members-party');
+        if (adminPartyBtn) adminPartyBtn.classList.toggle('hidden', !isAdminUser);
+    },
+
+    isAdmin() {
+        return Boolean(this.state.user && this.state.user.trim().toLowerCase() === 'fernando');
     },
 
     async addLog(action, details = {}) {
@@ -776,9 +788,77 @@ const App = {
 
     // --- FUNCIONES DE ADMINISTRACIÓN ---
     async showAdminView() {
-        if (this.state.user !== 'Fernando') return; // Seguridad extra
+        if (!this.isAdmin()) return; // Seguridad extra
+        this.state.previousView = this.state.currentView;
         this.showView('admin-view');
         this.loadAdminMembers();
+    },
+
+    handleAdminBack() {
+        if (this.state.previousView && this.state.previousView !== 'admin-view') {
+            this.showView(this.state.previousView);
+        } else if (this.state.tableId) {
+            this.showView('summary');
+        } else if (this.state.partyId) {
+            this.showView('party-pot');
+        } else {
+            this.showView('setup');
+        }
+    },
+
+    async toggleAdminDeletePermanentMode(isParty) {
+        if (!this.isAdmin()) return;
+        this.state.adminDeletePermMode = !this.state.adminDeletePermMode;
+        if (isParty) {
+            await this.handlePartyAddFriend();
+        } else {
+            await this.handleAddFriendManual();
+        }
+    },
+
+    async deletePermanentMemberFromModal(name, isParty) {
+        if (!this.isAdmin()) return;
+        if (this.normalizeKey(name) === 'fernando') {
+            alert('No puedes eliminar al administrador principal.');
+            return;
+        }
+
+        if (!confirm(`¿Seguro que quieres eliminar a "${name}" del grupo de miembros permanentes de la banda?\n\nYa no aparecerá en la lista habitual de miembros.`)) {
+            return;
+        }
+
+        try {
+            const snapshot = await get(ref(this.db, 'members'));
+            let foundKey = null;
+            if (snapshot.exists()) {
+                const all = snapshot.val();
+                for (const [k, v] of Object.entries(all)) {
+                    if (v && (v.name === name || this.normalizeKey(v.name) === this.normalizeKey(name) || k === this.normalizeKey(name))) {
+                        foundKey = k;
+                        break;
+                    }
+                }
+            }
+            if (!foundKey) {
+                foundKey = this.normalizeKey(name);
+            }
+
+            await this.setCouple(name, null);
+            await set(ref(this.db, `members/${foundKey}`), null);
+            await this.addLog('admin_delete_member', { targetUser: name, key: foundKey, fromModal: true });
+            alert(`"${name}" ha sido eliminado del grupo de miembros permanentes.`);
+
+            // Mantener el modo de borrado activo y refrescar la lista
+            this.state.adminDeletePermMode = true;
+            if (isParty) {
+                await this.handlePartyAddFriend();
+            } else {
+                await this.handleAddFriendManual();
+            }
+        } catch (error) {
+            console.error('Error al eliminar miembro permanente:', error);
+            alert('Error al conectar con la base de datos para eliminar el miembro.');
+        }
     },
 
     async loadAdminMembers() {
@@ -861,17 +941,22 @@ const App = {
     },
 
     async handleDeleteMember(key) {
-        if (key === 'fernando') return alert('No puedes eliminar al administrador principal.');
-        if (!confirm(`¿Seguro que quieres eliminar al miembro ${key}?`)) return;
+        if (key.toLowerCase() === 'fernando') return alert('No puedes eliminar al administrador principal.');
         
         try {
             const snapshot = await get(ref(this.db, `members/${key}`));
-            const memberName = snapshot.exists() ? snapshot.val().name : key;
+            const memberName = snapshot.exists() ? (snapshot.val().name || key) : key;
+            if (!confirm(`¿Seguro que quieres eliminar a "${memberName}" del grupo de miembros permanentes de la banda?\n\nYa no aparecerá en la lista habitual.`)) return;
+
             await this.setCouple(memberName, null);
             await set(ref(this.db, `members/${key}`), null);
             this.loadAdminMembers();
-            await this.addLog('admin_delete_member', { targetUser: key });
-        } catch (error) { console.error(error); }
+            await this.addLog('admin_delete_member', { targetUser: memberName, key });
+            alert(`"${memberName}" ha sido eliminado del grupo de miembros permanentes.`);
+        } catch (error) {
+            console.error('Error al eliminar miembro:', error);
+            alert('Error al conectar con la base de datos para eliminar el miembro.');
+        }
     },
 
     // --- FIN ADMINISTRACIÓN ---
@@ -3574,6 +3659,7 @@ const App = {
             return;
         }
         try {
+            const isDeleteMode = Boolean(this.state.adminDeletePermMode && this.isAdmin());
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
             const activeParticipants = Object.values(this.state.tableData?.participants || {})
@@ -3585,11 +3671,12 @@ const App = {
 
             this.state.tempSelectionFriends = [];
             this.state.tempAvailableTableMembers = availableMembers.map(m => m.name);
+            this.state.allMembersList = members;
             
             let html = `<h3 style="margin: 0 0 0.25rem 0; font-size: 1.25rem;">Añadir Amigos a la Mesa</h3>`;
             html += `<p class="subtitle" style="margin-bottom: 0.55rem; font-size: 0.82rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
-            // Botones de selección rápida: Chicos, Chicas, Switch Todos/Ninguno
+            // Botones de selección rápida y modo admin si es Fernando
             html += `
                 <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.65rem;">
                     <button type="button" class="filter-pill filter-pill-boys" onclick="App.setTableFriendsQuickFilter('chicos')">
@@ -3602,20 +3689,49 @@ const App = {
                         <button type="button" id="switch-table-friend-all" class="selector-switch-btn" onclick="App.setTableFriendsQuickFilter('todos')">Todos</button>
                         <button type="button" id="switch-table-friend-none" class="selector-switch-btn active" onclick="App.setTableFriendsQuickFilter('ninguno')">Ninguno</button>
                     </div>
+                    ${this.isAdmin() ? `
+                        <button type="button" id="btn-admin-toggle-delete-perm" class="filter-pill filter-pill-admin-del" onclick="App.toggleAdminDeletePermanentMode(false)" title="Activar/desactivar modo para eliminar amigos permanentes de la banda" style="margin-left: auto; ${isDeleteMode ? 'background: rgba(239, 68, 68, 0.4); border-color: #ef4444; color: #ffffff;' : 'background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171;'} font-weight: 600;">
+                            ${isDeleteMode ? '❌ Salir de borrar' : '⚙️ Quitar permanentes'}
+                        </button>
+                    ` : ''}
                 </div>
             `;
 
-            html += `<div class="participant-grid scroll-fade-bottom" style="max-height: 58vh; max-height: calc(100dvh - 215px); overflow-y: auto; padding-right: 0.35rem; gap: 0.55rem;">`;
+            if (this.isAdmin()) {
+                html += `
+                    <div id="admin-delete-perm-banner" class="${isDeleteMode ? '' : 'hidden'}" style="margin-bottom: 0.65rem; padding: 0.6rem 0.8rem; background: rgba(239, 68, 68, 0.18); border: 1.5px solid rgba(239, 68, 68, 0.45); border-radius: var(--radius-sm); font-size: 0.82rem; color: #fca5a5;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="font-size: 1.1rem;">⚠️</span>
+                                <b style="color: #ffffff;">MODO BORRAR MIEMBRO PERMANENTE</b>
+                            </div>
+                            <div style="display: flex; gap: 0.4rem;">
+                                <button type="button" class="btn-secondary" onclick="App.toggleAdminDeletePermanentMode(false)" style="padding: 0.2rem 0.5rem; font-size: 0.78rem; background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25);">Salir de este modo</button>
+                                <button type="button" class="btn-secondary" onclick="App.closeModal(); App.showAdminView();" style="padding: 0.2rem 0.5rem; font-size: 0.78rem; background: rgba(129, 140, 248, 0.25); border-color: var(--primary); color: #e0e7ff;">⚙️ Gestión completa</button>
+                            </div>
+                        </div>
+                        <p style="margin: 0.35rem 0 0 0; font-size: 0.79rem; color: #fecaca; line-height: 1.35;">
+                            Toca cualquier nombre en la cuadrícula de abajo para <b>eliminarlo definitivamente</b> del grupo permanente de la banda.
+                        </p>
+                    </div>
+                `;
+            }
+
+            const membersToDisplay = isDeleteMode ? members : availableMembers;
+
+            html += `<div id="table-friends-grid" class="participant-grid scroll-fade-bottom" style="max-height: 58vh; max-height: calc(100dvh - 215px); overflow-y: auto; padding-right: 0.35rem; gap: 0.55rem;">`;
             
-            availableMembers.forEach(m => {
+            membersToDisplay.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = m.name.replace(/\s/g, '_').replace(/\./g, '_');
                 const sizeClass = this.getNameLengthClass(m.name);
-                html += `<button id="tf-btn-${idName}" class="participant-btn ${sizeClass}" onclick="App.toggleTableFriendDirect('${safeName}')">${m.name}</button>`;
+                const isDelClass = isDeleteMode ? 'admin-delete-highlight' : '';
+                const label = isDeleteMode ? `🗑️ ${m.name}` : m.name;
+                html += `<button id="tf-btn-${idName}" data-original-name="${m.name}" class="participant-btn ${sizeClass} ${isDelClass}" onclick="App.toggleTableFriendDirect('${safeName}')">${label}</button>`;
             });
             
-            if (availableMembers.length === 0) {
-                html += `<p class="empty-msg" style="grid-column: span 2;">Todos los miembros ya están en la mesa.</p>`;
+            if (membersToDisplay.length === 0) {
+                html += `<p class="empty-msg" style="grid-column: span 2;">${isDeleteMode ? 'No hay miembros permanentes registrados.' : 'Todos los miembros ya están en la mesa.'}</p>`;
             }
             
             html += `</div>`;
@@ -3623,7 +3739,7 @@ const App = {
             html += `
                 <details style="margin-top: 0.85rem; border-top: 1px solid var(--glass-border); padding-top: 0.65rem;" ontoggle="if(this.open){ setTimeout(()=>{ const inp = document.getElementById('custom-friend-name'); if(inp) inp.focus(); }, 120); }">
                     <summary style="cursor: pointer; color: var(--primary); font-size: 0.92rem; font-weight: 700; padding: 0.35rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.45rem;">
-                        <span>➕</span> <span>¿No es miembro? Añadir asistente puntual</span>
+                        <span>➕</span> <span>¿No es miembro? Añadir manualmente</span>
                     </summary>
                     <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.65rem;">
                         <div style="display: flex; gap: 0.55rem; align-items: stretch; width: 100%;">
@@ -3646,6 +3762,10 @@ const App = {
     },
 
     async toggleTableFriendDirect(name) {
+        if (this.state.adminDeletePermMode && this.isAdmin()) {
+            await this.deletePermanentMemberFromModal(name, false);
+            return;
+        }
         if (!this.canAddFriendsToTable()) {
             alert('Esta mesa es privada. Solo el creador puede añadir o modificar amigos.');
             return;
@@ -3678,6 +3798,10 @@ const App = {
     },
 
     async setTableFriendsQuickFilter(filterType) {
+        if (this.state.adminDeletePermMode) {
+            alert('Estás en el modo de quitar permanentes. Pulsa "Salir de borrar" para usar los filtros de selección.');
+            return;
+        }
         if (!this.canAddFriendsToTable()) {
             alert('Esta mesa es privada. Solo el creador puede añadir o modificar amigos.');
             return;
@@ -5449,6 +5573,7 @@ const App = {
             return;
         }
         try {
+            const isDeleteMode = Boolean(this.state.adminDeletePermMode && this.isAdmin());
             const snapshot = await get(ref(this.db, 'members'));
             const members = snapshot.exists() ? Object.values(snapshot.val()) : [];
             const activeParticipants = Object.values(this.state.partyData?.participants || {})
@@ -5459,11 +5584,12 @@ const App = {
 
             this.state.tempSelectionFriends = [];
             this.state.tempAvailablePartyMembers = availableMembers.map(m => m.name);
+            this.state.allMembersList = members;
             
             let html = `<h3 style="margin: 0 0 0.25rem 0; font-size: 1.25rem;">Añadir Amigos a la Fiesta</h3>`;
             html += `<p class="subtitle" style="margin-bottom: 0.55rem; font-size: 0.82rem;">Toca un amigo para añadirlo o quitarlo directamente:</p>`;
 
-            // Botones de selección rápida: Chicos, Chicas, Switch Todos/Ninguno
+            // Botones de selección rápida y modo admin si es Fernando
             html += `
                 <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.65rem;">
                     <button type="button" class="filter-pill filter-pill-boys" onclick="App.setPartyFriendsQuickFilter('chicos')">
@@ -5476,20 +5602,49 @@ const App = {
                         <button type="button" id="switch-party-friend-all" class="selector-switch-btn" onclick="App.setPartyFriendsQuickFilter('todos')">Todos</button>
                         <button type="button" id="switch-party-friend-none" class="selector-switch-btn active" onclick="App.setPartyFriendsQuickFilter('ninguno')">Ninguno</button>
                     </div>
+                    ${this.isAdmin() ? `
+                        <button type="button" id="btn-admin-toggle-delete-perm" class="filter-pill filter-pill-admin-del" onclick="App.toggleAdminDeletePermanentMode(true)" title="Activar/desactivar modo para eliminar amigos permanentes de la banda" style="margin-left: auto; ${isDeleteMode ? 'background: rgba(239, 68, 68, 0.4); border-color: #ef4444; color: #ffffff;' : 'background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171;'} font-weight: 600;">
+                            ${isDeleteMode ? '❌ Salir de borrar' : '⚙️ Quitar permanentes'}
+                        </button>
+                    ` : ''}
                 </div>
             `;
 
-            html += `<div class="participant-grid scroll-fade-bottom" style="max-height: 58vh; max-height: calc(100dvh - 215px); overflow-y: auto; padding-right: 0.35rem; gap: 0.55rem;">`;
+            if (this.isAdmin()) {
+                html += `
+                    <div id="admin-delete-perm-banner" class="${isDeleteMode ? '' : 'hidden'}" style="margin-bottom: 0.65rem; padding: 0.6rem 0.8rem; background: rgba(239, 68, 68, 0.18); border: 1.5px solid rgba(239, 68, 68, 0.45); border-radius: var(--radius-sm); font-size: 0.82rem; color: #fca5a5;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="font-size: 1.1rem;">⚠️</span>
+                                <b style="color: #ffffff;">MODO BORRAR MIEMBRO PERMANENTE</b>
+                            </div>
+                            <div style="display: flex; gap: 0.4rem;">
+                                <button type="button" class="btn-secondary" onclick="App.toggleAdminDeletePermanentMode(true)" style="padding: 0.2rem 0.5rem; font-size: 0.78rem; background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25);">Salir de este modo</button>
+                                <button type="button" class="btn-secondary" onclick="App.closeModal(); App.showAdminView();" style="padding: 0.2rem 0.5rem; font-size: 0.78rem; background: rgba(129, 140, 248, 0.25); border-color: var(--primary); color: #e0e7ff;">⚙️ Gestión completa</button>
+                            </div>
+                        </div>
+                        <p style="margin: 0.35rem 0 0 0; font-size: 0.79rem; color: #fecaca; line-height: 1.35;">
+                            Toca cualquier nombre en la cuadrícula de abajo para <b>eliminarlo definitivamente</b> del grupo permanente de la banda.
+                        </p>
+                    </div>
+                `;
+            }
+
+            const membersToDisplay = isDeleteMode ? members : availableMembers;
+
+            html += `<div id="party-friends-grid" class="participant-grid scroll-fade-bottom" style="max-height: 58vh; max-height: calc(100dvh - 215px); overflow-y: auto; padding-right: 0.35rem; gap: 0.55rem;">`;
             
-            availableMembers.forEach(m => {
+            membersToDisplay.forEach(m => {
                 const safeName = m.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 const idName = m.name.replace(/\s/g, '_').replace(/\./g, '_');
                 const sizeClass = this.getNameLengthClass(m.name);
-                html += `<button id="f-btn-${idName}" class="participant-btn ${sizeClass}" onclick="App.togglePartyFriendDirect('${safeName}')">${m.name}</button>`;
+                const isDelClass = isDeleteMode ? 'admin-delete-highlight' : '';
+                const label = isDeleteMode ? `🗑️ ${m.name}` : m.name;
+                html += `<button id="f-btn-${idName}" data-original-name="${m.name}" class="participant-btn ${sizeClass} ${isDelClass}" onclick="App.togglePartyFriendDirect('${safeName}')">${label}</button>`;
             });
             
-            if (availableMembers.length === 0) {
-                html += `<p class="empty-msg" style="grid-column: span 2;">Todos los miembros ya están en la fiesta.</p>`;
+            if (membersToDisplay.length === 0) {
+                html += `<p class="empty-msg" style="grid-column: span 2;">${isDeleteMode ? 'No hay miembros permanentes registrados.' : 'Todos los miembros ya están en la fiesta.'}</p>`;
             }
             
             html += `</div>`;
@@ -5497,7 +5652,7 @@ const App = {
             html += `
                 <details style="margin-top: 0.85rem; border-top: 1px solid var(--glass-border); padding-top: 0.65rem;" ontoggle="if(this.open){ setTimeout(()=>{ const inp = document.getElementById('custom-friend-name'); if(inp) inp.focus(); }, 120); }">
                     <summary style="cursor: pointer; color: var(--primary); font-size: 0.92rem; font-weight: 700; padding: 0.35rem 0; user-select: none; outline: none; display: flex; align-items: center; gap: 0.45rem;">
-                        <span>➕</span> <span>¿No es miembro? Añadir asistente puntual</span>
+                        <span>➕</span> <span>¿No es miembro? Añadir manualmente</span>
                     </summary>
                     <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.65rem;">
                         <div style="display: flex; gap: 0.55rem; align-items: stretch; width: 100%;">
@@ -5520,6 +5675,10 @@ const App = {
     },
 
     async togglePartyFriendDirect(name) {
+        if (this.state.adminDeletePermMode && this.isAdmin()) {
+            await this.deletePermanentMemberFromModal(name, true);
+            return;
+        }
         if (!this.canAddFriendsToParty()) {
             alert('Esta fiesta es privada. Solo el creador puede añadir o modificar amigos.');
             return;
@@ -5552,6 +5711,10 @@ const App = {
     },
 
     async setPartyFriendsQuickFilter(filterType) {
+        if (this.state.adminDeletePermMode) {
+            alert('Estás en el modo de quitar permanentes. Pulsa "Salir de borrar" para usar los filtros de selección.');
+            return;
+        }
         if (!this.canAddFriendsToParty()) {
             alert('Esta fiesta es privada. Solo el creador puede añadir o modificar amigos.');
             return;
@@ -6220,6 +6383,7 @@ const App = {
 
         this.state.isAuditModalOpen = false;
         this.state.isPartyAddExpenseModal = false;
+        this.state.adminDeletePermMode = false;
         const orderProduct = this.state.currentOrderProduct;
         const selectedParticipants = (this.state.tempSelection && this.state.tempSelection.length > 0)
             ? [...this.state.tempSelection]
